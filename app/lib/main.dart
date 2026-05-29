@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:todo_app/app.dart';
-import 'package:todo_app/core/sync/sync_bootstrap.dart';
+import 'package:todo_app/core/sync/sync_engine.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();

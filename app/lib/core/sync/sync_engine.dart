@@ -16,7 +16,7 @@ final syncStatusProvider = StateProvider<SyncStatus>((ref) => SyncStatus.idle);
 
 enum SyncStatus { idle, syncing, error, offline }
 
-Future<void> triggerSyncIfSignedIn(Ref ref) async {
+Future<void> triggerSyncIfSignedIn(WidgetRef ref) async {
   if (AuthService.instance.isSignedIn) {
     await ref.read(syncEngineProvider).sync();
   }

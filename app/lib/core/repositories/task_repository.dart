@@ -10,7 +10,7 @@ const _storageKey = 'todo_tasks_v1';
 
 final taskStoreInitProvider = FutureProvider<TaskStore>((ref) async {
   final prefs = await SharedPreferences.getInstance();
-  final store = JsonTaskStore.withLoader(
+  final store = JsonTaskStore(
     persist: (json) async => prefs.setString(_storageKey, json),
     load: () async => prefs.getString(_storageKey),
   );

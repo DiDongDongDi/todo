@@ -1,9 +1,11 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:todo_app/core/models/task.dart';
 
+final _t = DateTime.utc(2025, 1, 1);
+
 void main() {
   test('Task hasContent detects text and attachments', () {
-    const empty = Task(
+    final empty = Task(
       id: '1',
       title: '',
       status: TaskStatus.inbox,
@@ -12,7 +14,7 @@ void main() {
     );
     expect(empty.hasContent, false);
 
-    const withTitle = Task(
+    final withTitle = Task(
       id: '2',
       title: 'hello',
       status: TaskStatus.inbox,
@@ -38,5 +40,3 @@ void main() {
     expect(restored.attachments.length, 1);
   });
 }
-
-final _t = DateTime.utc(2025, 1, 1);

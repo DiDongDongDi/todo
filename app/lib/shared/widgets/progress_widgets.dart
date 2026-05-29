@@ -88,7 +88,7 @@ void showCelebrateOverlay(BuildContext context) {
         tween: Tween(begin: 0, end: 1),
         duration: const Duration(milliseconds: 800),
         onEnd: () => entry.remove(),
-        builder: (context, value) {
+        builder: (context, value, child) {
           return IgnorePointer(
             child: Center(
               child: Opacity(
