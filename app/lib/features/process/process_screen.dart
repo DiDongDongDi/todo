@@ -10,6 +10,8 @@ import 'package:todo_app/shared/utils/haptics.dart';
 import 'package:todo_app/shared/utils/platform_capabilities.dart';
 import 'package:todo_app/shared/widgets/app_snackbar.dart';
 import 'package:todo_app/shared/widgets/big_task_card.dart';
+import 'package:todo_app/shared/widgets/card_stage.dart';
+import 'package:todo_app/shared/widgets/hint_chip.dart';
 import 'package:todo_app/shared/widgets/progress_widgets.dart';
 import 'package:todo_app/shared/widgets/swipeable_card.dart';
 import 'package:todo_app/shared/widgets/task_action_bar.dart';
@@ -64,22 +66,16 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     );
   }
 
-  Widget _buildHint(BuildContext context, String text) {
-    return Align(
-      alignment: Alignment.center,
-      child: Padding(
-        padding: const EdgeInsets.only(bottom: 8),
-        child: Text(
-          text,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context)
-                    .colorScheme
-                    .onSurface
-                    .withValues(alpha: 0.4),
-              ),
-        ),
-      ),
-    );
+  Future<void> _animateFlyout(
+    Offset flyout,
+    Future<void> Function() action,
+  ) async {
+    final state = _swipeKey.currentState;
+    if (state != null) {
+      await state.animateFlyout(flyout, action);
+    } else {
+      await action();
+    }
   }
 
   @override
@@ -127,13 +123,13 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
               }
             : {
                 const SingleActivator(LogicalKeyboardKey.arrowLeft): () =>
-                    _trash(task),
+                    _trash(task, animated: true),
                 const SingleActivator(LogicalKeyboardKey.arrowRight): () =>
-                    _archive(task),
+                    _archive(task, animated: true),
                 const SingleActivator(LogicalKeyboardKey.arrowUp): () =>
-                    _move(-1, tasks.length),
+                    _setIndex(clampedIndex - 1, tasks.length, animated: true),
                 const SingleActivator(LogicalKeyboardKey.arrowDown): () =>
-                    _move(1, tasks.length),
+                    _setIndex(clampedIndex + 1, tasks.length, animated: true),
               };
 
         return CallbackShortcuts(
@@ -176,44 +172,44 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
                       ],
                     ),
                   ),
-                  Expanded(
-                    child: SwipeableCard(
-                      key: _swipeKey,
-                      enabled: touchFirst && !_editing,
-                      onSwipeLeft: () => _trash(task),
-                      onSwipeRight: () => _archive(task),
-                      onSwipeUp: () async =>
-                          _move(1, tasks.length, animated: false),
-                      onSwipeDown: () async =>
-                          _move(-1, tasks.length, animated: false),
-                      child: GestureDetector(
-                        onTap: _editing ? null : () => _startEdit(task),
-                        child: BigTaskCard(
-                          mode: _editing
-                              ? BigTaskCardMode.process
-                              : BigTaskCardMode.readOnly,
-                          task: task,
-                          controller: _editing ? _editController : null,
-                          focusNode: _editing ? _editFocusNode : null,
-                          onChanged: _editing ? (_) => setState(() {}) : null,
-                        ),
+                  if (!_editing)
+                    HintChip(
+                      text: touchFirst
+                          ? '← 放弃   → 完成   ↑↓ 切换'
+                          : '方向键或下方按钮操作',
+                    ),
+                  CardStage(
+                    swipeKey: _swipeKey,
+                    enabled: touchFirst && !_editing,
+                    onSwipeLeft: () => _trash(task),
+                    onSwipeRight: () => _archive(task),
+                    onSwipeUp: () => _setIndex(clampedIndex + 1, tasks.length),
+                    onSwipeDown: () =>
+                        _setIndex(clampedIndex - 1, tasks.length),
+                    child: GestureDetector(
+                      onTap: _editing ? null : () => _startEdit(task),
+                      child: BigTaskCard(
+                        mode: _editing
+                            ? BigTaskCardMode.process
+                            : BigTaskCardMode.readOnly,
+                        task: task,
+                        controller: _editing ? _editController : null,
+                        focusNode: _editing ? _editFocusNode : null,
+                        onChanged: _editing ? (_) => setState(() {}) : null,
                       ),
                     ),
                   ),
-                  if (!_editing)
-                    touchFirst
-                        ? _buildHint(context, '← 放弃   → 完成   ↑↓ 切换')
-                        : _buildHint(context, '方向键或下方按钮操作'),
                   if (_editing)
                     Padding(
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
                       child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           TextButton(
                             onPressed: () => setState(() => _editing = false),
                             child: const Text('取消'),
                           ),
-                          const Spacer(),
+                          const SizedBox(width: 16),
                           FilledButton(
                             onPressed: () => _saveEdit(task),
                             child: const Text('保存'),
@@ -223,10 +219,12 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
                     )
                   else if (!touchFirst)
                     TaskActionBar(
-                      onTrash: () => _trash(task),
-                      onComplete: () => _archive(task),
-                      onPrevious: () => _move(-1, tasks.length),
-                      onNext: () => _move(1, tasks.length),
+                      onTrash: () => _trash(task, animated: true),
+                      onComplete: () => _archive(task, animated: true),
+                      onPrevious: () =>
+                          _setIndex(clampedIndex - 1, tasks.length, animated: true),
+                      onNext: () =>
+                          _setIndex(clampedIndex + 1, tasks.length, animated: true),
                       canGoPrevious: clampedIndex > 0,
                       canGoNext: clampedIndex < tasks.length - 1,
                     ),
@@ -241,25 +239,30 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     );
   }
 
-  Future<void> _move(int delta, int length, {bool animated = true}) async {
-    final newIndex = (_index + delta).clamp(0, length - 1);
-    if (newIndex == _index) return;
+  Future<void> _setIndex(
+    int newIndex,
+    int length, {
+    bool animated = false,
+  }) async {
+    final clamped = newIndex.clamp(0, length - 1);
+    if (clamped == _index) return;
 
-    Future<void> applyMove() async {
+    Future<void> apply() async {
       setState(() {
-        _index = newIndex;
+        _index = clamped;
         _editing = false;
       });
+      AppHaptics.selection();
     }
 
-    if (animated && (delta == 1 || delta == -1)) {
+    if (animated) {
+      final delta = clamped - _index;
       final flyout =
           delta > 0 ? const Offset(0, -1.5) : const Offset(0, 1.5);
-      await _swipeKey.currentState?.animateFlyout(flyout, applyMove);
+      await _animateFlyout(flyout, apply);
     } else {
-      await applyMove();
+      await apply();
     }
-    AppHaptics.selection();
   }
 
   void _startEdit(Task task) {
@@ -276,7 +279,18 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     setState(() => _editing = false);
   }
 
-  Future<void> _archive(Task task) async {
+  Future<void> _archive(Task task, {bool animated = false}) async {
+    if (animated) {
+      await _animateFlyout(
+        const Offset(1.5, 0),
+        () => _performArchive(task),
+      );
+    } else {
+      await _performArchive(task);
+    }
+  }
+
+  Future<void> _performArchive(Task task) async {
     final repo = await ref.read(taskRepositoryProvider.future);
     await repo.archive(task.id);
     await triggerSyncIfSignedIn(ref);
@@ -294,7 +308,18 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     }
   }
 
-  Future<void> _trash(Task task) async {
+  Future<void> _trash(Task task, {bool animated = false}) async {
+    if (animated) {
+      await _animateFlyout(
+        const Offset(-1.5, 0),
+        () => _performTrash(task),
+      );
+    } else {
+      await _performTrash(task);
+    }
+  }
+
+  Future<void> _performTrash(Task task) async {
     final repo = await ref.read(taskRepositoryProvider.future);
     await repo.trash(task.id);
     await triggerSyncIfSignedIn(ref);

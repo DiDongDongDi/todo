@@ -29,20 +29,20 @@ class AppTheme {
       scaffoldBackgroundColor: colorScheme.surface,
       navigationBarTheme: NavigationBarThemeData(
         elevation: 0,
-        height: 64,
-        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+        height: 56,
+        labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
         indicatorColor: colorScheme.primaryContainer,
       ),
       cardTheme: CardTheme(
         elevation: 0,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         color: colorScheme.surfaceContainerHighest,
       ),
       inputDecorationTheme: InputDecorationTheme(
         border: InputBorder.none,
         hintStyle: TextStyle(
           color: colorScheme.onSurface.withValues(alpha: 0.35),
-          fontSize: 28,
+          fontSize: 24,
           fontWeight: FontWeight.w300,
         ),
       ),
@@ -53,8 +53,8 @@ class AppTheme {
         insetPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       ),
       textTheme: const TextTheme(
-        headlineMedium: TextStyle(fontSize: 28, fontWeight: FontWeight.w500),
-        bodyLarge: TextStyle(fontSize: 18, height: 1.5),
+        headlineMedium: TextStyle(fontSize: 24, fontWeight: FontWeight.w500),
+        bodyLarge: TextStyle(fontSize: 17, height: 1.5),
       ),
     );
   }

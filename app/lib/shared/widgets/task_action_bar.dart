@@ -25,44 +25,52 @@ class TaskActionBar extends StatelessWidget {
     final successColor = context.semanticColors.success;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+      padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Expanded(
-            child: OutlinedButton.icon(
-              onPressed: onTrash,
-              icon: Icon(Icons.close, color: colorScheme.error),
-              label: Text(
-                '放弃',
-                style: TextStyle(color: colorScheme.error),
-              ),
-              style: OutlinedButton.styleFrom(
-                side: BorderSide(color: colorScheme.error.withValues(alpha: 0.5)),
-              ),
+          OutlinedButton.icon(
+            onPressed: onTrash,
+            icon: Icon(Icons.close, size: 18, color: colorScheme.error),
+            label: Text(
+              '放弃',
+              style: TextStyle(color: colorScheme.error),
+            ),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              side: BorderSide(color: colorScheme.error.withValues(alpha: 0.5)),
             ),
           ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: FilledButton.icon(
-              onPressed: onComplete,
-              icon: Icon(Icons.check, color: colorScheme.onPrimary),
-              label: const Text('完成'),
-              style: FilledButton.styleFrom(
-                backgroundColor: successColor,
-                foregroundColor: Colors.white,
-              ),
+          const SizedBox(width: 10),
+          FilledButton.icon(
+            onPressed: onComplete,
+            icon: Icon(Icons.check, size: 18, color: colorScheme.onPrimary),
+            label: const Text('完成'),
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              backgroundColor: successColor,
+              foregroundColor: Colors.white,
             ),
           ),
-          const SizedBox(width: 24),
+          const SizedBox(width: 20),
           IconButton.filledTonal(
             onPressed: canGoPrevious ? onPrevious : null,
             icon: const Icon(Icons.keyboard_arrow_up),
             tooltip: '上一条',
+            style: IconButton.styleFrom(
+              minimumSize: const Size(40, 40),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
           ),
+          const SizedBox(width: 8),
           IconButton.filledTonal(
             onPressed: canGoNext ? onNext : null,
             icon: const Icon(Icons.keyboard_arrow_down),
             tooltip: '下一条',
+            style: IconButton.styleFrom(
+              minimumSize: const Size(40, 40),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
           ),
         ],
       ),

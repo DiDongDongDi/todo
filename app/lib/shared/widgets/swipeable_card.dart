@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:todo_app/shared/theme/app_semantic_colors.dart';
 import 'package:todo_app/shared/utils/haptics.dart';
 
-enum SwipeDirection { left, right, up, down }
-
 typedef SwipeCallback = Future<void> Function();
 
 class SwipeableCard extends StatefulWidget {
@@ -41,25 +39,37 @@ class SwipeableCardState extends State<SwipeableCard> {
   bool _animating = false;
 
   static const _threshold = 80.0;
+  static const _flyoutDuration = Duration(milliseconds: 220);
 
   double _bandOpacity(double drag, double threshold) {
     return ((drag.abs() - 20) / threshold).clamp(0.0, 0.55);
+  }
+
+  Size _resolveSize() {
+    final box = context.findRenderObject() as RenderBox?;
+    if (box != null && box.hasSize && box.size.longestSide > 0) {
+      return box.size;
+    }
+    return MediaQuery.sizeOf(context);
   }
 
   Future<void> animateFlyout(Offset flyout, SwipeCallback action) async {
     if (_animating || !mounted) return;
 
     setState(() => _animating = true);
-    final size = context.size ?? Size.zero;
     await AppHaptics.medium();
 
     if (!mounted) return;
 
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) return;
+
+    final size = _resolveSize();
     setState(() {
       _drag = Offset(flyout.dx * size.width, flyout.dy * size.height);
     });
 
-    await Future<void>.delayed(const Duration(milliseconds: 220));
+    await Future<void>.delayed(_flyoutDuration);
     await action();
     if (mounted) {
       setState(() {
@@ -113,70 +123,73 @@ class SwipeableCardState extends State<SwipeableCard> {
           ? (d) => setState(() => _drag += d.delta)
           : null,
       onPanEnd: widget.enabled ? _onDragEnd : null,
-      child: Stack(
-        children: [
-          if (_drag.dx < -20)
-            Positioned.fill(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: colorScheme.error.withValues(
-                    alpha: _bandOpacity(_drag.dx, _threshold),
-                  ),
-                ),
-              ),
-            ),
-          if (_drag.dx > 20)
-            Positioned.fill(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: successColor.withValues(
-                    alpha: _bandOpacity(_drag.dx, _threshold),
-                  ),
-                ),
-              ),
-            ),
-          if (_drag.dx < -20)
-            Positioned.fill(
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Padding(
-                  padding: const EdgeInsets.only(left: 32),
-                  child: Text(
-                    widget.leftLabel,
-                    style: TextStyle(
-                      color: colorScheme.error,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
+      child: ClipRect(
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            if (_drag.dx < -20)
+              Positioned.fill(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: colorScheme.error.withValues(
+                      alpha: _bandOpacity(_drag.dx, _threshold),
                     ),
                   ),
                 ),
               ),
-            ),
-          if (_drag.dx > 20)
-            Positioned.fill(
-              child: Align(
-                alignment: Alignment.centerRight,
-                child: Padding(
-                  padding: const EdgeInsets.only(right: 32),
-                  child: Text(
-                    widget.rightLabel,
-                    style: TextStyle(
-                      color: successColor,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
+            if (_drag.dx > 20)
+              Positioned.fill(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: successColor.withValues(
+                      alpha: _bandOpacity(_drag.dx, _threshold),
                     ),
                   ),
                 ),
               ),
+            if (_drag.dx < -20)
+              Positioned.fill(
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 32),
+                    child: Text(
+                      widget.leftLabel,
+                      style: TextStyle(
+                        color: colorScheme.error,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            if (_drag.dx > 20)
+              Positioned.fill(
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 32),
+                    child: Text(
+                      widget.rightLabel,
+                      style: TextStyle(
+                        color: successColor,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            Transform.translate(
+              offset: _drag,
+              child: Transform.rotate(
+                angle: _drag.dx * 0.0008,
+                child: widget.child,
+              ),
             ),
-          Transform.translate(
-            offset: _drag,
-            child: Transform.rotate(
-              angle: _drag.dx * 0.0008,
-              child: widget.child,
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

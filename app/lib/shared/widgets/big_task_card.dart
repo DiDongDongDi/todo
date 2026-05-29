@@ -35,9 +35,9 @@ class BigTaskCard extends StatelessWidget {
     final touchFirst = isTouchFirstPlatform;
 
     return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      margin: EdgeInsets.zero,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(28, 32, 28, 24),
+        padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -65,14 +65,7 @@ class BigTaskCard extends StatelessWidget {
                     ),
                   ),
                   const Spacer(),
-                  if (touchFirst)
-                    Text(
-                      '上划保存',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onSurface.withValues(alpha: 0.45),
-                      ),
-                    )
-                  else
+                  if (!touchFirst)
                     FilledButton.icon(
                       onPressed: onSave,
                       icon: const Icon(Icons.check, size: 20),
