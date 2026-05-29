@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:speech_to_text/speech_to_text.dart';
@@ -6,6 +7,8 @@ import 'package:todo_app/core/models/task.dart';
 import 'package:todo_app/core/repositories/task_repository.dart';
 import 'package:todo_app/core/sync/sync_engine.dart';
 import 'package:todo_app/shared/utils/haptics.dart';
+import 'package:todo_app/shared/utils/platform_capabilities.dart';
+import 'package:todo_app/shared/widgets/app_snackbar.dart';
 import 'package:todo_app/shared/widgets/big_task_card.dart';
 import 'package:todo_app/shared/widgets/swipeable_card.dart';
 
@@ -50,11 +53,12 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
     if (!_hasContent) {
       await AppHaptics.light();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('先记下点什么'),
-            duration: Duration(seconds: 1),
-          ),
+        showAppSnackBar(
+          context,
+          message: '先记下点什么',
+          icon: Icons.edit_note_outlined,
+          type: AppSnackType.warning,
+          duration: const Duration(seconds: 1),
         );
       }
       return;
@@ -75,11 +79,12 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
     setState(() {});
 
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('已收集，去处理页看看'),
-          duration: Duration(seconds: 2),
-        ),
+      showAppSnackBar(
+        context,
+        message: '已收集，去处理页看看',
+        icon: Icons.check_circle_outline,
+        type: AppSnackType.success,
+        duration: const Duration(seconds: 2),
       );
     }
   }
@@ -118,19 +123,33 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: SwipeableCard(
-        onSwipeUp: _save,
-        rightLabel: '',
-        leftLabel: '',
-        child: BigTaskCard(
-          mode: BigTaskCardMode.collect,
-          controller: _controller,
-          focusNode: _focusNode,
-          onChanged: (_) => setState(() {}),
-          onPickImage: _pickImage,
-          onStartSpeech: _toggleSpeech,
-          isListening: _listening,
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.enter): _save,
+        const SingleActivator(
+          LogicalKeyboardKey.enter,
+          control: true,
+        ): _save,
+      },
+      child: Focus(
+        autofocus: true,
+        child: SafeArea(
+          child: SwipeableCard(
+            enabled: isTouchFirstPlatform,
+            onSwipeUp: _save,
+            rightLabel: '',
+            leftLabel: '',
+            child: BigTaskCard(
+              mode: BigTaskCardMode.collect,
+              controller: _controller,
+              focusNode: _focusNode,
+              onChanged: (_) => setState(() {}),
+              onPickImage: _pickImage,
+              onStartSpeech: _toggleSpeech,
+              isListening: _listening,
+              onSave: _save,
+            ),
+          ),
         ),
       ),
     );

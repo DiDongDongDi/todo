@@ -7,9 +7,12 @@ import 'package:todo_app/core/repositories/task_repository.dart';
 import 'package:todo_app/core/stats/stats_provider.dart';
 import 'package:todo_app/core/sync/sync_engine.dart';
 import 'package:todo_app/shared/utils/haptics.dart';
+import 'package:todo_app/shared/utils/platform_capabilities.dart';
+import 'package:todo_app/shared/widgets/app_snackbar.dart';
 import 'package:todo_app/shared/widgets/big_task_card.dart';
 import 'package:todo_app/shared/widgets/progress_widgets.dart';
 import 'package:todo_app/shared/widgets/swipeable_card.dart';
+import 'package:todo_app/shared/widgets/task_action_bar.dart';
 
 class ProcessScreen extends ConsumerStatefulWidget {
   const ProcessScreen({super.key});
@@ -41,16 +44,19 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     _lastUndoFrom = null;
   }
 
-  void _showUndoSnackbar(String message) {
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        duration: const Duration(seconds: 3),
-        action: SnackBarAction(
-          label: '撤销',
-          onPressed: _undo,
-        ),
+  void _showUndoSnackbar({
+    required String message,
+    required IconData icon,
+    required AppSnackType type,
+  }) {
+    showAppSnackBar(
+      context,
+      message: message,
+      icon: icon,
+      type: type,
+      action: SnackBarAction(
+        label: '撤销',
+        onPressed: _undo,
       ),
     );
   }
@@ -59,6 +65,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
   Widget build(BuildContext context) {
     final inboxAsync = ref.watch(inboxTasksProvider);
     final statsAsync = ref.watch(statsProvider);
+    final touchFirst = isTouchFirstPlatform;
 
     return inboxAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -122,8 +129,8 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
                         const Spacer(),
                         StreakBadge(streak: streak),
                         IconButton(
-                          icon: const Icon(Icons.inventory_2_outlined),
-                          tooltip: '归档',
+                          icon: const Icon(Icons.task_alt_outlined),
+                          tooltip: '已完成',
                           onPressed: () => context.push('/archive'),
                         ),
                         IconButton(
@@ -141,6 +148,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
                   ),
                   Expanded(
                     child: SwipeableCard(
+                      enabled: touchFirst && !_editing,
                       onSwipeLeft: () => _trash(task),
                       onSwipeRight: () => _archive(task),
                       onSwipeUp: () async => _move(1, tasks.length),
@@ -176,11 +184,33 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
                         ],
                       ),
                     )
+                  else if (!touchFirst)
+                    TaskActionBar(
+                      onTrash: () => _trash(task),
+                      onComplete: () => _archive(task),
+                      onPrevious: () => _move(-1, tasks.length),
+                      onNext: () => _move(1, tasks.length),
+                      canGoPrevious: _index > 0,
+                      canGoNext: _index < tasks.length - 1,
+                    )
                   else
                     Padding(
                       padding: const EdgeInsets.only(bottom: 8),
                       child: Text(
                         '← 放弃   → 完成   ↑↓ 切换',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurface
+                                  .withValues(alpha: 0.4),
+                            ),
+                      ),
+                    ),
+                  if (!touchFirst && !_editing)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Text(
+                        '方向键或下方按钮操作',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                               color: Theme.of(context)
                                   .colorScheme
@@ -226,7 +256,11 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     await ref.read(statsProvider.notifier).recordArchive();
     _lastUndoTask = task;
     _lastUndoFrom = TaskStatus.archived;
-    _showUndoSnackbar('已归档');
+    _showUndoSnackbar(
+      message: '已完成',
+      icon: Icons.check_circle_outline,
+      type: AppSnackType.success,
+    );
     if (mounted) {
       final remaining = (ref.read(inboxTasksProvider).value?.length ?? 1) - 1;
       if (remaining <= 0) showCelebrateOverlay(context);
@@ -239,6 +273,10 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     await triggerSyncIfSignedIn(ref);
     _lastUndoTask = task;
     _lastUndoFrom = TaskStatus.trashed;
-    _showUndoSnackbar('已移至回收站');
+    _showUndoSnackbar(
+      message: '已移至回收站',
+      icon: Icons.delete_outline,
+      type: AppSnackType.error,
+    );
   }
 }

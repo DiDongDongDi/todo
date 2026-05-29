@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:todo_app/core/auth/auth_service.dart';
 import 'package:todo_app/core/sync/sync_engine.dart';
+import 'package:todo_app/shared/widgets/app_snackbar.dart';
 
 class AuthScreen extends ConsumerStatefulWidget {
   const AuthScreen({super.key});
@@ -23,8 +24,11 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
 
   Future<void> _signIn() async {
     if (!AuthService.instance.isConfigured) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请先配置 Supabase（见 README）')),
+      showAppSnackBar(
+        context,
+        message: '请先配置 Supabase（见 README）',
+        icon: Icons.settings_outlined,
+        type: AppSnackType.warning,
       );
       return;
     }
@@ -37,8 +41,11 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       await ref.read(syncEngineProvider).sync();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('登录失败: $e')),
+        showAppSnackBar(
+          context,
+          message: '登录失败: $e',
+          icon: Icons.error_outline,
+          type: AppSnackType.error,
         );
       }
     } finally {

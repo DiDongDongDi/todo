@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:todo_app/shared/theme/app_semantic_colors.dart';
 import 'package:todo_app/shared/utils/haptics.dart';
 
 enum SwipeDirection { left, right, up, down }
@@ -35,12 +36,15 @@ class SwipeableCard extends StatefulWidget {
   State<SwipeableCard> createState() => _SwipeableCardState();
 }
 
-class _SwipeableCardState extends State<SwipeableCard>
-    with SingleTickerProviderStateMixin {
+class _SwipeableCardState extends State<SwipeableCard> {
   Offset _drag = Offset.zero;
   bool _animating = false;
 
   static const _threshold = 80.0;
+
+  double _bandOpacity(double drag, double threshold) {
+    return ((drag.abs() - 20) / threshold).clamp(0.0, 0.55);
+  }
 
   Future<void> _onDragEnd(DragEndDetails details) async {
     if (!widget.enabled || _animating) return;
@@ -93,8 +97,8 @@ class _SwipeableCardState extends State<SwipeableCard>
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final colorScheme = Theme.of(context).colorScheme;
+    final successColor = context.semanticColors.success;
 
     return GestureDetector(
       onPanUpdate: widget.enabled
@@ -103,6 +107,26 @@ class _SwipeableCardState extends State<SwipeableCard>
       onPanEnd: widget.enabled ? _onDragEnd : null,
       child: Stack(
         children: [
+          if (_drag.dx < -20)
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: colorScheme.error.withValues(
+                    alpha: _bandOpacity(_drag.dx, _threshold),
+                  ),
+                ),
+              ),
+            ),
+          if (_drag.dx > 20)
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: successColor.withValues(
+                    alpha: _bandOpacity(_drag.dx, _threshold),
+                  ),
+                ),
+              ),
+            ),
           if (_drag.dx < -20)
             Positioned.fill(
               child: Align(
@@ -129,7 +153,7 @@ class _SwipeableCardState extends State<SwipeableCard>
                   child: Text(
                     widget.rightLabel,
                     style: TextStyle(
-                      color: colorScheme.primary,
+                      color: successColor,
                       fontWeight: FontWeight.bold,
                       fontSize: 18,
                     ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:todo_app/core/models/task.dart';
+import 'package:todo_app/shared/utils/platform_capabilities.dart';
 
 enum BigTaskCardMode { collect, process, readOnly }
 
@@ -14,6 +15,7 @@ class BigTaskCard extends StatelessWidget {
     this.onPickImage,
     this.onStartSpeech,
     this.isListening = false,
+    this.onSave,
   });
 
   final BigTaskCardMode mode;
@@ -24,11 +26,13 @@ class BigTaskCard extends StatelessWidget {
   final VoidCallback? onPickImage;
   final VoidCallback? onStartSpeech;
   final bool isListening;
+  final VoidCallback? onSave;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final touchFirst = isTouchFirstPlatform;
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -38,9 +42,7 @@ class BigTaskCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Expanded(
-              child: SingleChildScrollView(
-                child: _buildContent(context),
-              ),
+              child: _buildContentArea(context),
             ),
             if (mode == BigTaskCardMode.collect) ...[
               const SizedBox(height: 16),
@@ -63,18 +65,39 @@ class BigTaskCard extends StatelessWidget {
                     ),
                   ),
                   const Spacer(),
-                  Text(
-                    '上划保存',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurface.withValues(alpha: 0.45),
+                  if (touchFirst)
+                    Text(
+                      '上划保存',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurface.withValues(alpha: 0.45),
+                      ),
+                    )
+                  else
+                    FilledButton.icon(
+                      onPressed: onSave,
+                      icon: const Icon(Icons.check, size: 20),
+                      label: const Text('保存'),
                     ),
-                  ),
                 ],
               ),
             ],
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildContentArea(BuildContext context) {
+    if (mode == BigTaskCardMode.collect) {
+      return GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: () => focusNode?.requestFocus(),
+        child: _buildContent(context),
+      );
+    }
+
+    return SingleChildScrollView(
+      child: _buildContent(context),
     );
   }
 
@@ -87,7 +110,9 @@ class BigTaskCard extends StatelessWidget {
         controller: controller,
         focusNode: focusNode,
         onChanged: onChanged,
+        expands: true,
         maxLines: null,
+        textAlignVertical: TextAlignVertical.top,
         style: theme.textTheme.headlineMedium?.copyWith(
           color: colorScheme.onSurface,
           height: 1.35,

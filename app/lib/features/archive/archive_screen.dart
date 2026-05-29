@@ -10,13 +10,13 @@ class ArchiveScreen extends ConsumerWidget {
     final tasksAsync = ref.watch(archivedTasksProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('归档')),
+      appBar: AppBar(title: const Text('已完成')),
       body: tasksAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('加载失败: $e')),
         data: (tasks) {
           if (tasks.isEmpty) {
-            return const Center(child: Text('暂无归档任务'));
+            return const Center(child: Text('暂无已完成任务'));
           }
           return ListView.separated(
             padding: const EdgeInsets.all(16),
