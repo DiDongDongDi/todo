@@ -17,9 +17,9 @@
 | A1 | Android 权限配置 | `AndroidManifest.xml`：INTERNET、RECORD_AUDIO、READ_MEDIA_IMAGES 等 | `[x]` |
 | A2 | 插件 Android 配置核对 | 见 [ANDROID-PLUGIN-NOTES.md](ANDROID-PLUGIN-NOTES.md) | `[x]` |
 | A3 | 应用显示名 | 启动器名称已改为 **Todo** | `[x]` |
-| A4 | Gradle 国内镜像 | `settings.gradle.kts`、`build.gradle.kts` 已加阿里云 Maven | `[x]` |
+| A4 | Gradle 国内镜像 | `settings.gradle.kts`、`build.gradle.kts` 已加阿里云 Maven；`gradle-wrapper.properties` 已改腾讯云 Gradle 发行包镜像 | `[x]` |
 | A5 | 环境检查脚本 | `scripts/check_android_env.ps1` | `[x]` |
-| A6 | 验证构建 | 已尝试；**阻塞：JAVA_HOME 未设置**（需你完成 U1） | `[ ]` 待 U1 |
+| A6 | 验证构建 | `flutter build apk --debug` 成功，产出 `app-debug.apk` | `[x]` |
 | A7 | 验证真机运行 | 需 `flutter devices` 可见手机（需你完成 U4–U7） | `[ ]` 待你 |
 | A8 | 文档同步 | 本清单、README、插件说明已更新 | `[x]` |
 
@@ -28,6 +28,7 @@
 - `app/android/app/src/main/AndroidManifest.xml`
 - `app/android/settings.gradle.kts`
 - `app/android/build.gradle.kts`
+- `app/android/gradle/wrapper/gradle-wrapper.properties`
 - `scripts/check_android_env.ps1`
 - `docs/ANDROID-PLUGIN-NOTES.md`
 
@@ -39,15 +40,30 @@
 
 | # | 事项 | 说明 | 状态 |
 |---|------|------|------|
-| U1 | 安装 Android Studio | 下载安装 [Android Studio](https://developer.android.com/studio)（**Stable** 即可；代号 Panda 见 [ANDROID-STUDIO-VERSION-NAMES.md](ANDROID-STUDIO-VERSION-NAMES.md)）；勾选 SDK、Platform、**Command-line Tools** | `[ ]` |
-| U2 | 接受 SDK 许可 | 终端执行 `flutter doctor --android-licenses`，逐项输入 `y` | `[ ]` |
-| U3 | 确认工具链 | 执行 `flutter doctor`，**Android toolchain** 为 ✓ | `[ ]` |
+| U1 | 安装 Android Studio | 下载安装 [Android Studio](https://developer.android.com/studio)（**Stable** 即可；代号 Panda 见 [ANDROID-STUDIO-VERSION-NAMES.md](ANDROID-STUDIO-VERSION-NAMES.md)）；安装类型选 **Standard（标准）**；见下方「U1 补充」 | `[x]` |
+| U2 | 接受 SDK 许可 | 终端执行 `flutter doctor --android-licenses`，逐项输入 `y` | `[x]` |
+| U3 | 确认工具链 | 执行 `flutter doctor`，**Android toolchain** 为 ✓ | `[x]` |
 | U4 | 手机开启开发者模式 | 设置 → 关于手机 → 连点版本号 7 次 | `[ ]` |
 | U5 | 开启 USB 调试 | 设置 → 开发者选项 → **USB 调试** 打开 | `[ ]` |
 | U6 | 连接电脑并授权 | USB 连接电脑；手机弹窗点 **允许 USB 调试**（可勾选始终允许） | `[ ]` |
 | U7 | 确认设备可见 | 执行 `flutter devices`，列表中出现你的手机（非仅 Windows / Chrome） | `[ ]` |
 | U8 | USB 驱动（若 U7 失败） | 安装手机厂商官方驱动，或换一根支持数据传输的线 | `[ ]` |
 | U9 | Windows 开发者模式（可选） | 若构建提示 symlink：`start ms-settings:developers` 开启 **开发人员模式** | `[ ]` |
+
+### U1 补充：标准安装后必查两项
+
+Flutter 真机调试选 **Standard（标准）** 即可，不必 Custom。标准安装会带上 IDE、Android SDK、模拟器组件，对当前目标已够用。
+
+标准安装完成后，**还要手动确认 SDK 组件**（标准安装有时不会自动勾选 Command-line Tools，而 Flutter 依赖它）：
+
+1. 打开 Android Studio → **More Actions** → **SDK Manager**（或 **Settings → Languages & Frameworks → Android SDK**）
+2. 切到 **SDK Tools** 标签，勾选并安装：
+   - **Android SDK Command-line Tools (latest)**（必装）
+   - **Android SDK Platform-Tools**（一般已有，确认一下）
+
+装完后继续 **U2 → U3**（接受许可、`flutter doctor` 确认 Android toolchain 为 ✓），再运行下方检查脚本。
+
+> 只有 C 盘空间不足、需改安装路径等特殊情况，才选 **Custom（自定义）**。
 
 ### 你完成 U1–U3 后请运行
 
@@ -77,7 +93,7 @@ powershell -ExecutionPolicy Bypass -File scripts/check_android_env.ps1
 
 全部满足即表示「可以在安卓手机上体验」：
 
-- [ ] `flutter doctor` 中 Android toolchain 为 ✓
+- [x] `flutter doctor` 中 Android toolchain 为 ✓
 - [ ] `flutter devices` 能看到真机
 - [ ] `cd app && flutter run -d android` 成功安装并启动
 - [ ] 收集 Tab：输入文字 → 上划保存
@@ -89,11 +105,11 @@ powershell -ExecutionPolicy Bypass -File scripts/check_android_env.ps1
 
 | 阻塞点 | 负责方 | 对应编号 | 状态 |
 |--------|--------|----------|------|
-| `cmdline-tools` 缺失 | 你 | U1 | 待处理 |
-| `JAVA_HOME is not set` | 你 | U1 | 待处理 |
+| `cmdline-tools` 缺失 | 你 | U1 | **已解决** |
+| `JAVA_HOME is not set` | 你（可选） | U1 / 第七节 | `flutter doctor` 已通过；脚本仍可能报 FAIL，见第七节 |
 | `adb devices` 无手机 | 你 | U4–U8 | 待处理 |
 | 语音 / 相册权限未声明 | Agent | A1 | **已解决** |
-| APK 未构建验证 | Agent | A6 | 等你 U1 后我继续 |
+| APK 未构建验证 | Agent | A6 | **已解决** |
 | 真机未跑通 | Agent | A7 | 等你 U7 后我继续 |
 
 ---
