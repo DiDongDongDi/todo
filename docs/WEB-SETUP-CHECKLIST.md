@@ -39,7 +39,7 @@
 | # | 事项 | 说明 | 状态 |
 |---|------|------|------|
 | U1 | 安装 Chrome | [Google Chrome](https://www.google.com/chrome/) 或已安装的 Chromium 系浏览器 | `[ ]` |
-| U2 | Flutter 在 PATH 中 | 终端能执行 `flutter --version` | `[ ]` |
+| U2 | Flutter 在 PATH 中 | 终端能执行 `flutter --version`；改 Path 后需**完全退出并重启 Cursor**，见 [WINDOWS-DEV-ENV-NOTES.md](WINDOWS-DEV-ENV-NOTES.md) | `[ ]` |
 | U3 | 启用 Web 支持（若未启用） | `flutter config --enable-web`（新版 Flutter 通常默认已启用） | `[ ]` |
 | U4 | 确认设备可见 | `flutter devices` 中出现 **Chrome (web)** 或 **Edge (web)** | `[ ]` |
 | U5 | 首次运行 | `cd app` → `flutter pub get` → `flutter run -d chrome` | `[ ]` |
@@ -49,6 +49,8 @@
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/check_web_env.ps1
 ```
+
+若 Path 已配置仍报 `[FAIL] flutter in PATH`，多半是 Cursor 未重启导致终端继承旧环境，见 [WINDOWS-DEV-ENV-NOTES.md](WINDOWS-DEV-ENV-NOTES.md)。
 
 ---
 

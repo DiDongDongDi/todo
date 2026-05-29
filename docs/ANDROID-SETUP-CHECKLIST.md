@@ -57,6 +57,8 @@ powershell -ExecutionPolicy Bypass -File scripts/check_android_env.ps1
 
 脚本会检查 Java、adb、cmdline-tools、已连接设备，并输出 `flutter doctor` 摘要。
 
+改过系统 Path 后终端仍找不到 `flutter` / `adb`：见 [WINDOWS-DEV-ENV-NOTES.md](WINDOWS-DEV-ENV-NOTES.md)。
+
 ---
 
 ## 三、建议解决顺序

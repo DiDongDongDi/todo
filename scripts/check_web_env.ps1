@@ -1,6 +1,9 @@
 # Web (Chrome) dev environment check
 # Usage: powershell -ExecutionPolicy Bypass -File scripts/check_web_env.ps1
 
+. (Join-Path $PSScriptRoot "_flutter_ps_helpers.ps1")
+Initialize-ScriptConsoleUtf8
+
 $ErrorActionPreference = "Continue"
 $script:ok = 0
 $script:fail = 0
@@ -36,14 +39,14 @@ $flutterCmd = Get-Command flutter -ErrorAction SilentlyContinue
 Test-ItemOk "flutter in PATH" ($null -ne $flutterCmd) "Install Flutter and add to PATH"
 
 if ($flutterCmd) {
-    $fv = & flutter --version 2>&1 | Select-Object -First 1
-    Write-Host "       $fv" -ForegroundColor DarkGray
+    $fv = (Get-FlutterOutput -FlutterArgs @("--version") | Select-Object -First 1)
+    if ($fv) { Write-Host "       $fv" -ForegroundColor DarkGray }
 }
 
 # Web enabled
 $webEnabled = $false
 if ($flutterCmd) {
-    $cfg = & flutter config 2>&1 | Out-String
+    $cfg = (Get-FlutterOutput -FlutterArgs @("config")) -join "`n"
     $webEnabled = $cfg -match "enable-web:\s*true" -or $cfg -notmatch "enable-web:\s*false"
 }
 Test-ItemWarn "Flutter web enabled" $webEnabled "Run: flutter config --enable-web"
@@ -61,7 +64,7 @@ Test-ItemOk "Chrome or Edge installed" ($null -ne $browserFound) "Install Google
 # flutter devices - web
 $hasWebDevice = $false
 if ($flutterCmd) {
-    $devOut = & flutter devices 2>&1 | Out-String
+    $devOut = (Get-FlutterOutput -FlutterArgs @("devices")) -join "`n"
     $hasWebDevice = $devOut -match "chrome\s+.*web-javascript" -or $devOut -match "edge\s+.*web-javascript"
 }
 Test-ItemOk "flutter devices lists web target" $hasWebDevice "Reopen terminal after installing Chrome"
@@ -76,14 +79,22 @@ Write-Host ""
 Write-Host "--- flutter doctor (Chrome line) ---" -ForegroundColor Cyan
 Write-Host ""
 if ($flutterCmd) {
-    & flutter doctor 2>&1 | Select-String -Pattern "Chrome|Edge|Web|Flutter"
+    Get-FlutterOutput -FlutterArgs @("doctor") | Where-Object {
+        $_ -match "Chrome|Edge|Web|Flutter"
+    } | ForEach-Object {
+        if ($_ -match 'Flutter assets will be downloaded from') {
+            Write-Host "       $_" -ForegroundColor DarkGray
+        } else {
+            Write-Host $_
+        }
+    }
 }
 
 Write-Host ""
 Write-Host "--- flutter devices ---" -ForegroundColor Cyan
 Write-Host ""
 if ($flutterCmd) {
-    & flutter devices 2>&1
+    Write-FlutterOutput -FlutterArgs @("devices")
 }
 
 Write-Host ""

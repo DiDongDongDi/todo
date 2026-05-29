@@ -338,7 +338,7 @@ Flutter · Riverpod · go_router · Supabase · SharedPreferences（本地存储
 
 | 问题 | 处理 |
 |------|------|
-| `flutter` 命令找不到 | 安装 Flutter SDK 并将其 `bin` 目录加入 PATH |
+| `flutter` 命令找不到 | 安装 Flutter SDK 并将其 `bin` 目录加入 PATH；已加仍找不到时见 [WINDOWS-DEV-ENV-NOTES.md](docs/WINDOWS-DEV-ENV-NOTES.md)（需重启 Cursor，非仅新开终端） |
 | `flutter run` 报缺少平台目录 | 执行 `scripts/init_platforms.ps1` 或 `flutter create .` |
 | App 显示「Supabase 未配置」 | 检查 `supabase_config.example.dart` 是否已填入 URL 和 anon key |
 | 登录后不同步 | 确认 SQL 迁移已执行，且邮箱已完成魔法链接验证 |

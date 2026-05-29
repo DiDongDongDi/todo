@@ -1,6 +1,9 @@
 # Android dev environment check
 # Usage: powershell -ExecutionPolicy Bypass -File scripts/check_android_env.ps1
 
+. (Join-Path $PSScriptRoot "_flutter_ps_helpers.ps1")
+Initialize-ScriptConsoleUtf8
+
 $ErrorActionPreference = "Continue"
 $script:ok = 0
 $script:fail = 0
@@ -37,8 +40,8 @@ $flutterCmd = Get-Command flutter -ErrorAction SilentlyContinue
 Test-ItemOk "flutter in PATH" ($null -ne $flutterCmd) "Add Flutter bin to PATH"
 
 if ($flutterCmd) {
-    $fv = & flutter --version 2>&1 | Select-Object -First 1
-    Write-Host "       $fv" -ForegroundColor DarkGray
+    $fv = (Get-FlutterOutput -FlutterArgs @("--version") | Select-Object -First 1)
+    if ($fv) { Write-Host "       $fv" -ForegroundColor DarkGray }
 }
 
 # Java
@@ -87,7 +90,7 @@ Write-Host ""
 Write-Host "--- flutter doctor ---" -ForegroundColor Cyan
 Write-Host ""
 if ($flutterCmd) {
-    & flutter doctor 2>&1
+    Write-FlutterOutput -FlutterArgs @("doctor")
 } else {
     Write-Host "Skipped (flutter not found)" -ForegroundColor Yellow
 }
@@ -96,7 +99,7 @@ Write-Host ""
 Write-Host "--- flutter devices ---" -ForegroundColor Cyan
 Write-Host ""
 if ($flutterCmd) {
-    & flutter devices 2>&1
+    Write-FlutterOutput -FlutterArgs @("devices")
 }
 
 Write-Host ""
