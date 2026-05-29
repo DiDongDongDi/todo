@@ -18,6 +18,7 @@ Android · iOS · macOS · Windows · Web
 - [交互与手势](docs/UX-GESTURES.md)
 - [架构设计](docs/ARCHITECTURE.md)
 - [路线图](docs/ROADMAP.md)
+- [Android 真机分工清单](docs/ANDROID-SETUP-CHECKLIST.md) — Agent / 用户各自事项，逐项攻克
 
 ## 环境要求
 
@@ -147,6 +148,8 @@ flutter run -d chrome
 ### Android 真机调试（手势 / 动效）
 
 **适合：** 上划保存、左右滑归档 / 回收站、卡片切换动画、触觉反馈（haptic）、语音输入、贴图等**真实触控体验**。
+
+> 环境与分工见 **[Android 真机分工清单](docs/ANDROID-SETUP-CHECKLIST.md)**（哪些需你安装 Studio / 连手机，哪些可由 Agent 改代码）。
 
 #### 前置条件
 
