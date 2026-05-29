@@ -18,6 +18,9 @@ Android · iOS · macOS · Windows · Web
 - [交互与手势](docs/UX-GESTURES.md)
 - [架构设计](docs/ARCHITECTURE.md)
 - [路线图](docs/ROADMAP.md)
+- [Web 调试分工清单](docs/WEB-SETUP-CHECKLIST.md) — Chrome 日常开发，几乎即开即用
+- [Web 局限说明](docs/WEB-LIMITATIONS.md)
+- [Android 真机分工清单](docs/ANDROID-SETUP-CHECKLIST.md) — 手势 / 动效打磨
 - [Android 真机分工清单](docs/ANDROID-SETUP-CHECKLIST.md) — Agent / 用户各自事项，逐项攻克
 - [Android Studio 版本命名说明](docs/ANDROID-STUDIO-VERSION-NAMES.md) — Panda / Panda 4 等代号含义
 
@@ -100,8 +103,8 @@ flutter test
 
 | 场景 | 推荐平台 | 说明 |
 |------|----------|------|
-| **日常开发**（约 80%） | **Chrome（Web）** | 启动快、热重载方便，适合改 UI、逻辑、状态 |
-| **手势 / 动效打磨** | **Android 真机** | 划动、触觉、语音等以手机手感为准 |
+| 日常开发（约 80%） | **Chrome（Web）** | 启动快、热重载方便；清单见 [WEB-SETUP-CHECKLIST.md](docs/WEB-SETUP-CHECKLIST.md) |
+| 手势 / 动效打磨 | **Android 真机** | 清单见 [ANDROID-SETUP-CHECKLIST.md](docs/ANDROID-SETUP-CHECKLIST.md) |
 
 ```
 日常改代码 → Chrome 热重载
@@ -112,6 +115,8 @@ flutter test
 
 ### Web 调试（Chrome，日常首选）
 
+> 完整分工与差距说明：[WEB-SETUP-CHECKLIST.md](docs/WEB-SETUP-CHECKLIST.md) · 局限：[WEB-LIMITATIONS.md](docs/WEB-LIMITATIONS.md)
+
 **适合：** 布局与主题、收集 / 处理 Tab 逻辑、本地存储、Riverpod 状态、路由。
 
 **局限：** 滑动手势与手机不完全一致；语音、触觉反馈在 Web 上较弱或不可用。
@@ -119,6 +124,7 @@ flutter test
 #### 前置条件
 
 - 已安装 Flutter，`flutter doctor` 中 **Chrome** 为 ✓（一般安装 Chrome 浏览器即可）
+- 运行 `scripts/check_web_env.ps1` 可一键检查
 
 #### 运行
 
@@ -338,7 +344,7 @@ Flutter · Riverpod · go_router · Supabase · SharedPreferences（本地存储
 | 登录后不同步 | 确认 SQL 迁移已执行，且邮箱已完成魔法链接验证 |
 | 离线能用、联网不同步 | 进入同步页点击「立即同步」，查看控制台是否有网络错误 |
 | Chrome 能跑、真机看不到设备 | 见 [Android 真机调试](#android-真机调试手势--动效) |
-| 手势在 Web 上不顺手 | 属正常，请在 Android 真机上验证 |
+| 手势在 Web 上不顺手 | 属正常，见 [WEB-LIMITATIONS.md](docs/WEB-LIMITATIONS.md)；真机见 Android 清单 |
 
 ## License
 

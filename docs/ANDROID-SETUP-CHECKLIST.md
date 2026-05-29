@@ -2,6 +2,8 @@
 
 目标：在 **Android 真机** 上安装并运行 Todo App，验证划动手势与动效。
 
+相关：[Web 调试清单](WEB-SETUP-CHECKLIST.md)（日常开发，无需 Android Studio）
+
 请按编号逐项完成；完成一项可在 `[ ]` 中打 `x` 变为 `[x]`。
 
 ---
