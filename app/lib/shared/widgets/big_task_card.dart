@@ -34,47 +34,50 @@ class BigTaskCard extends StatelessWidget {
     final colorScheme = theme.colorScheme;
     final touchFirst = isTouchFirstPlatform;
 
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(
-              child: _buildContentArea(context),
-            ),
-            if (mode == BigTaskCardMode.collect) ...[
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  IconButton.filledTonal(
-                    onPressed: onPickImage,
-                    icon: const Icon(Icons.image_outlined),
-                    tooltip: '添加图片',
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton.filledTonal(
-                    onPressed: onStartSpeech,
-                    icon: Icon(isListening ? Icons.mic : Icons.mic_none_outlined),
-                    tooltip: '语音输入',
-                    style: IconButton.styleFrom(
-                      backgroundColor: isListening
-                          ? colorScheme.errorContainer
-                          : null,
-                    ),
-                  ),
-                  const Spacer(),
-                  if (!touchFirst)
-                    FilledButton.icon(
-                      onPressed: onSave,
-                      icon: const Icon(Icons.check, size: 20),
-                      label: const Text('保存'),
-                    ),
-                ],
+    return SizedBox.expand(
+      child: Card(
+        margin: EdgeInsets.zero,
+        clipBehavior: Clip.antiAlias,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: _buildContentArea(context),
               ),
+              if (mode == BigTaskCardMode.collect) ...[
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    IconButton.filledTonal(
+                      onPressed: onPickImage,
+                      icon: const Icon(Icons.image_outlined),
+                      tooltip: '添加图片',
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton.filledTonal(
+                      onPressed: onStartSpeech,
+                      icon: Icon(isListening ? Icons.mic : Icons.mic_none_outlined),
+                      tooltip: '语音输入',
+                      style: IconButton.styleFrom(
+                        backgroundColor: isListening
+                            ? colorScheme.errorContainer
+                            : null,
+                      ),
+                    ),
+                    const Spacer(),
+                    if (!touchFirst)
+                      FilledButton.icon(
+                        onPressed: onSave,
+                        icon: const Icon(Icons.check, size: 20),
+                        label: const Text('保存'),
+                      ),
+                  ],
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );

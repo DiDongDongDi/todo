@@ -118,15 +118,17 @@ class SwipeableCardState extends State<SwipeableCard> {
     final colorScheme = Theme.of(context).colorScheme;
     final successColor = context.semanticColors.success;
 
-    return GestureDetector(
-      onPanUpdate: widget.enabled
-          ? (d) => setState(() => _drag += d.delta)
-          : null,
-      onPanEnd: widget.enabled ? _onDragEnd : null,
-      child: ClipRect(
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
+    return SizedBox.expand(
+      child: GestureDetector(
+        onPanUpdate: widget.enabled
+            ? (d) => setState(() => _drag += d.delta)
+            : null,
+        onPanEnd: widget.enabled ? _onDragEnd : null,
+        child: ClipRect(
+          child: Stack(
+            clipBehavior: Clip.none,
+            fit: StackFit.expand,
+            children: [
             if (_drag.dx < -20)
               Positioned.fill(
                 child: DecoratedBox(
@@ -185,12 +187,13 @@ class SwipeableCardState extends State<SwipeableCard> {
               offset: _drag,
               child: Transform.rotate(
                 angle: _drag.dx * 0.0008,
-                child: widget.child,
+                child: SizedBox.expand(child: widget.child),
               ),
             ),
           ],
         ),
       ),
+    ),
     );
   }
 }

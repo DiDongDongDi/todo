@@ -29,16 +29,15 @@ class CardStage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cardHeight = AppLayout.cardMaxHeight(context);
+
     return Expanded(
-      child: Align(
-        alignment: Alignment.center,
+      child: Center(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxWidth: AppLayout.cardMaxWidth,
-              maxHeight: AppLayout.cardMaxHeight(context),
-            ),
+          child: SizedBox(
+            width: AppLayout.cardMaxWidth,
+            height: cardHeight,
             child: SwipeableCard(
               key: swipeKey,
               enabled: enabled,
@@ -48,7 +47,7 @@ class CardStage extends StatelessWidget {
               onSwipeDown: onSwipeDown,
               leftLabel: leftLabel,
               rightLabel: rightLabel,
-              child: child,
+              child: SizedBox.expand(child: child),
             ),
           ),
         ),
