@@ -149,9 +149,9 @@ flutter run -d chrome
 
 **适合：** 上划保存、左右滑归档 / 回收站、卡片切换动画、触觉反馈（haptic）、语音输入、贴图等**真实触控体验**。
 
-> 环境与分工见 **[Android 真机分工清单](docs/ANDROID-SETUP-CHECKLIST.md)**（哪些需你安装 Studio / 连手机，哪些可由 Agent 改代码）。
+> **Agent 侧已完成：** 权限、Gradle 国内镜像、应用名「Todo」、环境检查脚本。详见 [分工清单](docs/ANDROID-SETUP-CHECKLIST.md)（A1–A5 已勾选）。**仍需你完成 U1–U7** 才能真机运行。
 
-#### 前置条件
+#### 前置条件（用户清单 U1–U3）
 
 1. 安装 [Android Studio](https://developer.android.com/studio)
 2. 打开 Android Studio → **SDK Manager**，安装：
@@ -171,6 +171,12 @@ flutter doctor
 ```
 
 `Android toolchain` 应为 ✓。若提示缺少 `cmdline-tools`，在 SDK Manager 中勾选 **Android SDK Command-line Tools (latest)** 后重试。
+
+完成 U1–U3 后运行环境检查：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/check_android_env.ps1
+```
 
 #### 手机端设置
 

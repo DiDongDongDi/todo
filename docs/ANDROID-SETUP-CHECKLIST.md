@@ -12,14 +12,22 @@
 
 | # | 事项 | 说明 | 状态 |
 |---|------|------|------|
-| A1 | Android 权限配置 | 在 `AndroidManifest.xml` 增加麦克风、相册等权限，保证语音 / 选图在真机可用 | `[ ]` |
-| A2 | 插件 Android 配置核对 | 检查 `speech_to_text`、`image_picker` 等是否还需额外 manifest / Gradle 配置 | `[ ]` |
-| A3 | 应用显示名 | 将启动器名称改为「Todo」等中文名（`android:label`） | `[ ]` |
-| A4 | Gradle / 构建脚本优化 | 必要时添加国内 Maven 镜像，减轻首次 `flutter run` 下载失败 | `[ ]` |
-| A5 | 环境检查脚本 | 添加 `scripts/check_android_env.ps1`，自动检测 Java、adb、flutter doctor | `[ ]` |
-| A6 | 验证构建 | 在你完成「用户清单」后，执行 `flutter build apk --debug` 并修编译错误 | `[ ]` |
-| A7 | 验证真机运行 | 在 `flutter devices` 能看到手机后，执行 `flutter run -d android` 并修运行期问题 | `[ ]` |
-| A8 | 文档同步 | 根据实际排错结果更新 README / 本清单 | `[ ]` |
+| A1 | Android 权限配置 | `AndroidManifest.xml`：INTERNET、RECORD_AUDIO、READ_MEDIA_IMAGES 等 | `[x]` |
+| A2 | 插件 Android 配置核对 | 见 [ANDROID-PLUGIN-NOTES.md](ANDROID-PLUGIN-NOTES.md) | `[x]` |
+| A3 | 应用显示名 | 启动器名称已改为 **Todo** | `[x]` |
+| A4 | Gradle 国内镜像 | `settings.gradle.kts`、`build.gradle.kts` 已加阿里云 Maven | `[x]` |
+| A5 | 环境检查脚本 | `scripts/check_android_env.ps1` | `[x]` |
+| A6 | 验证构建 | 已尝试；**阻塞：JAVA_HOME 未设置**（需你完成 U1） | `[ ]` 待 U1 |
+| A7 | 验证真机运行 | 需 `flutter devices` 可见手机（需你完成 U4–U7） | `[ ]` 待你 |
+| A8 | 文档同步 | 本清单、README、插件说明已更新 | `[x]` |
+
+### Agent 已改动的文件
+
+- `app/android/app/src/main/AndroidManifest.xml`
+- `app/android/settings.gradle.kts`
+- `app/android/build.gradle.kts`
+- `scripts/check_android_env.ps1`
+- `docs/ANDROID-PLUGIN-NOTES.md`
 
 ---
 
@@ -39,15 +47,23 @@
 | U8 | USB 驱动（若 U7 失败） | 安装手机厂商官方驱动，或换一根支持数据传输的线 | `[ ]` |
 | U9 | Windows 开发者模式（可选） | 若构建提示 symlink：`start ms-settings:developers` 开启 **开发人员模式** | `[ ]` |
 
+### 你完成 U1–U3 后请运行
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/check_android_env.ps1
+```
+
+脚本会检查 Java、adb、cmdline-tools、已连接设备，并输出 `flutter doctor` 摘要。
+
 ---
 
 ## 三、建议解决顺序
 
 ```
 你：U1 → U2 → U3
-我：A1 → A2 → A3 → A4 → A5（可并行）
+我：A1–A5、A8（已完成）
 你：U4 → U5 → U6 → U7（不行再做 U8、U9）
-我：A6 → A7 → A8
+我：A6 → A7（你完成后叫我）
 你：真机体验收集 / 处理手势
 ```
 
@@ -65,24 +81,37 @@
 
 ---
 
-## 五、当前阻塞摘要（2025-05-29 检查时）
+## 五、当前阻塞摘要
 
-| 阻塞点 | 负责方 | 对应编号 |
-|--------|--------|----------|
-| `cmdline-tools` 缺失 | 你 | U1 |
-| `JAVA_HOME is not set` | 你（随 Android Studio 安装 JDK 可解） | U1 |
-| `adb devices` 无手机 | 你 | U4–U8 |
-| 语音 / 相册权限未声明 | Agent | A1 |
-| 尚未在真机跑通过 | Agent（依赖 U1–U7 完成后） | A6、A7 |
+| 阻塞点 | 负责方 | 对应编号 | 状态 |
+|--------|--------|----------|------|
+| `cmdline-tools` 缺失 | 你 | U1 | 待处理 |
+| `JAVA_HOME is not set` | 你 | U1 | 待处理 |
+| `adb devices` 无手机 | 你 | U4–U8 | 待处理 |
+| 语音 / 相册权限未声明 | Agent | A1 | **已解决** |
+| APK 未构建验证 | Agent | A6 | 等你 U1 后我继续 |
+| 真机未跑通 | Agent | A7 | 等你 U7 后我继续 |
 
 ---
 
-## 六、你怎么触发 Agent 项
+## 六、你怎么叫我继续
 
-在 Cursor 对话中直接说，例如：
+完成 **U1–U3** 后说：
 
-- 「请完成 A1–A5」
-- 「我 U1–U3 做完了，帮我检查并做 A6」
-- 「flutter devices 已经能看到手机了，帮我 run android」
+> 「U1–U3 做完了，帮我检查并构建」
 
-每次最好说明刚完成了用户清单哪几项，便于对症排查。
+完成 **U4–U7** 后说：
+
+> 「手机已连接，帮我 run android」
+
+---
+
+## 七、U1 完成后可选：自动设置 JAVA_HOME
+
+Android Studio 自带 JDK，路径通常为：
+
+```
+C:\Program Files\Android\Android Studio\jbr
+```
+
+可在「系统环境变量」中新建 `JAVA_HOME` 指向该目录，并将 `%JAVA_HOME%\bin` 加入 Path（安装 Studio 后若 `flutter doctor` 仍报 Java 错误再设）。
