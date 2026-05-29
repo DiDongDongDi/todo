@@ -37,7 +37,7 @@
 
 | # | 事项 | 说明 | 状态 |
 |---|------|------|------|
-| U1 | 安装 Android Studio | 下载安装 [Android Studio](https://developer.android.com/studio)；安装时勾选 SDK、Platform、**Command-line Tools** | `[ ]` |
+| U1 | 安装 Android Studio | 下载安装 [Android Studio](https://developer.android.com/studio)（**Stable** 即可；代号 Panda 见 [ANDROID-STUDIO-VERSION-NAMES.md](ANDROID-STUDIO-VERSION-NAMES.md)）；勾选 SDK、Platform、**Command-line Tools** | `[ ]` |
 | U2 | 接受 SDK 许可 | 终端执行 `flutter doctor --android-licenses`，逐项输入 `y` | `[ ]` |
 | U3 | 确认工具链 | 执行 `flutter doctor`，**Android toolchain** 为 ✓ | `[ ]` |
 | U4 | 手机开启开发者模式 | 设置 → 关于手机 → 连点版本号 7 次 | `[ ]` |

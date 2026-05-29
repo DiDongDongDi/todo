@@ -19,6 +19,7 @@ Android · iOS · macOS · Windows · Web
 - [架构设计](docs/ARCHITECTURE.md)
 - [路线图](docs/ROADMAP.md)
 - [Android 真机分工清单](docs/ANDROID-SETUP-CHECKLIST.md) — Agent / 用户各自事项，逐项攻克
+- [Android Studio 版本命名说明](docs/ANDROID-STUDIO-VERSION-NAMES.md) — Panda / Panda 4 等代号含义
 
 ## 环境要求
 
