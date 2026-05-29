@@ -1,0 +1,11 @@
+{
+    "name": "Todo",
+    "short_name": "Todo",
+    "start_url": ".",
+    "display": "standalone",
+    "background_color": "#1A1A1E",
+    "theme_color": "#2D6A4F",
+    "description": "上瘾式跨平台 Todo",
+    "orientation": "portrait-primary",
+    "prefer_related_applications": false
+}

@@ -1,0 +1,37 @@
+# Flutter
+app/.dart_tool/
+app/.flutter-plugins
+app/.flutter-plugins-dependencies
+app/.packages
+app/build/
+app/.pub-cache/
+app/.pub/
+
+# Generated
+app/**/*.g.dart
+app/**/*.freezed.dart
+app/lib/core/config/supabase_config.dart
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Env / secrets
+.env
+.env.*
+*.pem
+
+# Supabase local
+supabase/.branches/
+supabase/.temp/
+
+# Cursor
+.cursor/

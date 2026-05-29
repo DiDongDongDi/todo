@@ -1,0 +1,102 @@
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:todo_app/core/models/task.dart';
+
+abstract class TaskStore {
+  Future<void> init();
+  Future<List<Task>> getByStatus(TaskStatus status);
+  Stream<List<Task>> watchByStatus(TaskStatus status);
+  Future<Task?> getById(String id);
+  Future<void> upsert(Task task);
+  Future<void> delete(String id);
+  Future<List<Task>> getAll();
+}
+
+class JsonTaskStore implements TaskStore {
+  JsonTaskStore({
+    required Future<void> Function(String json) persist,
+    required Future<String?> Function() load,
+  })  : _persist = persist,
+        _load = load;
+
+  final Future<void> Function(String json) _persist;
+  final Future<String?> Function() _load;
+
+  final List<Task> _tasks = [];
+  final _changeController = StreamController<void>.broadcast();
+
+  @override
+  Future<void> init() async {
+    final raw = await _load();
+    if (raw != null && raw.isNotEmpty) {
+      final list = jsonDecode(raw) as List<dynamic>;
+      _tasks
+        ..clear()
+        ..addAll(
+          list.map((e) => Task.fromJson(Map<String, dynamic>.from(e as Map))),
+        );
+    }
+  }
+
+  @override
+  Future<List<Task>> getByStatus(TaskStatus status) async {
+    return _sorted(_tasks.where((t) => t.status == status && t.deletedAt == null));
+  }
+
+  @override
+  Stream<List<Task>> watchByStatus(TaskStatus status) async* {
+    yield await getByStatus(status);
+    await for (final _ in _changeController.stream) {
+      yield await getByStatus(status);
+    }
+  }
+
+  List<Task> _sorted(Iterable<Task> items) {
+    final list = items.toList()
+      ..sort((a, b) {
+        final order = b.sortOrder.compareTo(a.sortOrder);
+        if (order != 0) return order;
+        return b.createdAt.compareTo(a.createdAt);
+      });
+    return list;
+  }
+
+  @override
+  Future<Task?> getById(String id) async {
+    try {
+      return _tasks.firstWhere((t) => t.id == id);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
+  Future<void> upsert(Task task) async {
+    final index = _tasks.indexWhere((t) => t.id == task.id);
+    if (index >= 0) {
+      _tasks[index] = task;
+    } else {
+      _tasks.add(task);
+    }
+    await _save();
+    _changeController.add(null);
+  }
+
+  @override
+  Future<void> delete(String id) async {
+    _tasks.removeWhere((t) => t.id == id);
+    await _save();
+    _changeController.add(null);
+  }
+
+  @override
+  Future<List<Task>> getAll() async => List.unmodifiable(_tasks);
+
+  Future<void> _save() async {
+    final json = jsonEncode(_tasks.map((t) => t.toJson()).toList());
+    await _persist(json);
+  }
+
+  void dispose() => _changeController.close();
+}

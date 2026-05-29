@@ -1,0 +1,92 @@
+import 'dart:async';
+
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:todo_app/core/auth/auth_service.dart';
+import 'package:todo_app/core/models/task.dart';
+import 'package:todo_app/core/repositories/task_repository.dart';
+import 'package:todo_app/core/sync/sync_repository.dart';
+
+final syncEngineProvider = Provider<SyncEngine>((ref) {
+  return SyncEngine(ref);
+});
+
+final syncStatusProvider = StateProvider<SyncStatus>((ref) => SyncStatus.idle);
+
+enum SyncStatus { idle, syncing, error, offline }
+
+Future<void> triggerSyncIfSignedIn(Ref ref) async {
+  if (AuthService.instance.isSignedIn) {
+    await ref.read(syncEngineProvider).sync();
+  }
+}
+
+class SyncBootstrap {
+  static Future<void> initialize() async {
+    await AuthService.instance.initialize();
+  }
+}
+
+class SyncEngine {
+  SyncEngine(this._ref);
+
+  final Ref _ref;
+  Timer? _timer;
+  SyncRepository? _repo;
+
+  Future<SyncRepository?> _repository() async {
+    if (!AuthService.instance.isConfigured || !AuthService.instance.isSignedIn) {
+      return null;
+    }
+    _repo ??= SyncRepository(AuthService.instance.client!);
+    return _repo;
+  }
+
+  void startPeriodicSync() {
+    _timer?.cancel();
+    _timer = Timer.periodic(const Duration(seconds: 30), (_) => sync());
+  }
+
+  void stop() => _timer?.cancel();
+
+  Future<void> sync() async {
+    final repo = await _repository();
+    if (repo == null) return;
+
+    final connectivity = await Connectivity().checkConnectivity();
+    if (connectivity.contains(ConnectivityResult.none)) {
+      _ref.read(syncStatusProvider.notifier).state = SyncStatus.offline;
+      return;
+    }
+
+    _ref.read(syncStatusProvider.notifier).state = SyncStatus.syncing;
+    try {
+      final taskRepo = await _ref.read(taskRepositoryProvider.future);
+      final local = await taskRepo.getAll();
+      await repo.pushTasks(local);
+      final remote = await repo.pullTasks();
+      await _mergeRemote(taskRepo, remote);
+      _ref.read(syncStatusProvider.notifier).state = SyncStatus.idle;
+    } catch (e, st) {
+      debugPrint('Sync error: $e\n$st');
+      _ref.read(syncStatusProvider.notifier).state = SyncStatus.error;
+    }
+  }
+
+  Future<void> _mergeRemote(TaskRepository taskRepo, List<Task> remote) async {
+    final local = await taskRepo.getAll();
+    final localMap = {for (final t in local) t.id: t};
+
+    for (final r in remote) {
+      final l = localMap[r.id];
+      if (l == null) {
+        await taskRepo.update(r);
+      } else if (r.updatedAt.isAfter(l.updatedAt)) {
+        await taskRepo.update(r);
+      } else if (l.updatedAt.isAfter(r.updatedAt)) {
+        // local wins — will push on next sync
+      }
+    }
+  }
+}
