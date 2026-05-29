@@ -33,10 +33,10 @@ class SwipeableCard extends StatefulWidget {
   final String? downLabel;
 
   @override
-  State<SwipeableCard> createState() => _SwipeableCardState();
+  SwipeableCardState createState() => SwipeableCardState();
 }
 
-class _SwipeableCardState extends State<SwipeableCard> {
+class SwipeableCardState extends State<SwipeableCard> {
   Offset _drag = Offset.zero;
   bool _animating = false;
 
@@ -44,6 +44,29 @@ class _SwipeableCardState extends State<SwipeableCard> {
 
   double _bandOpacity(double drag, double threshold) {
     return ((drag.abs() - 20) / threshold).clamp(0.0, 0.55);
+  }
+
+  Future<void> animateFlyout(Offset flyout, SwipeCallback action) async {
+    if (_animating || !mounted) return;
+
+    setState(() => _animating = true);
+    final size = context.size ?? Size.zero;
+    await AppHaptics.medium();
+
+    if (!mounted) return;
+
+    setState(() {
+      _drag = Offset(flyout.dx * size.width, flyout.dy * size.height);
+    });
+
+    await Future<void>.delayed(const Duration(milliseconds: 220));
+    await action();
+    if (mounted) {
+      setState(() {
+        _drag = Offset.zero;
+        _animating = false;
+      });
+    }
   }
 
   Future<void> _onDragEnd(DragEndDetails details) async {
@@ -77,22 +100,7 @@ class _SwipeableCardState extends State<SwipeableCard> {
       return;
     }
 
-    setState(() => _animating = true);
-    await AppHaptics.medium();
-
-    final size = context.size ?? Size.zero;
-    setState(() {
-      _drag = Offset(flyout.dx * size.width, flyout.dy * size.height);
-    });
-
-    await Future<void>.delayed(const Duration(milliseconds: 220));
-    await action();
-    if (mounted) {
-      setState(() {
-        _drag = Offset.zero;
-        _animating = false;
-      });
-    }
+    await animateFlyout(flyout, action);
   }
 
   @override

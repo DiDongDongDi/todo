@@ -88,7 +88,7 @@ class BigTaskCard extends StatelessWidget {
   }
 
   Widget _buildContentArea(BuildContext context) {
-    if (mode == BigTaskCardMode.collect) {
+    if (mode == BigTaskCardMode.collect || mode == BigTaskCardMode.process) {
       return GestureDetector(
         behavior: HitTestBehavior.translucent,
         onTap: () => focusNode?.requestFocus(),
@@ -140,8 +140,13 @@ class BigTaskCard extends StatelessWidget {
         controller: controller,
         focusNode: focusNode,
         onChanged: onChanged,
+        expands: true,
         maxLines: null,
-        style: theme.textTheme.headlineMedium,
+        textAlignVertical: TextAlignVertical.top,
+        style: theme.textTheme.headlineMedium?.copyWith(
+          color: colorScheme.onSurface,
+          height: 1.35,
+        ),
         decoration: const InputDecoration(border: InputBorder.none),
       );
     }

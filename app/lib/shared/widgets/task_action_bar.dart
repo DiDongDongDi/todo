@@ -53,7 +53,7 @@ class TaskActionBar extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 24),
           IconButton.filledTonal(
             onPressed: canGoPrevious ? onPrevious : null,
             icon: const Icon(Icons.keyboard_arrow_up),

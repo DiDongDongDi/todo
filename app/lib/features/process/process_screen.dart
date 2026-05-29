@@ -25,12 +25,15 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
   int _index = 0;
   bool _editing = false;
   final _editController = TextEditingController();
+  final _editFocusNode = FocusNode();
+  final _swipeKey = GlobalKey<SwipeableCardState>();
   Task? _lastUndoTask;
   TaskStatus? _lastUndoFrom;
 
   @override
   void dispose() {
     _editController.dispose();
+    _editFocusNode.dispose();
     super.dispose();
   }
 
@@ -61,6 +64,24 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     );
   }
 
+  Widget _buildHint(BuildContext context, String text) {
+    return Align(
+      alignment: Alignment.center,
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Text(
+          text,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.4),
+              ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final inboxAsync = ref.watch(inboxTasksProvider);
@@ -86,30 +107,39 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
           );
         }
 
-        if (_index >= tasks.length) _index = tasks.length - 1;
-        if (_index < 0) _index = 0;
-        final task = tasks[_index];
+        final clampedIndex = _index.clamp(0, tasks.length - 1);
+        if (clampedIndex != _index) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) setState(() => _index = clampedIndex);
+          });
+        }
+        final task = tasks[clampedIndex];
         final archivedToday = statsAsync.value?.archivedToday ?? 0;
         final streak = statsAsync.value?.streak ?? 0;
         final progress = inboxProgress(archivedToday, tasks.length);
 
-        if (_editing && _editController.text != task.title) {
-          _editController.text = task.title;
-        }
+        final shortcuts = _editing
+            ? {
+                const SingleActivator(LogicalKeyboardKey.enter): () =>
+                    _saveEdit(task),
+                const SingleActivator(LogicalKeyboardKey.escape): () =>
+                    setState(() => _editing = false),
+              }
+            : {
+                const SingleActivator(LogicalKeyboardKey.arrowLeft): () =>
+                    _trash(task),
+                const SingleActivator(LogicalKeyboardKey.arrowRight): () =>
+                    _archive(task),
+                const SingleActivator(LogicalKeyboardKey.arrowUp): () =>
+                    _move(-1, tasks.length),
+                const SingleActivator(LogicalKeyboardKey.arrowDown): () =>
+                    _move(1, tasks.length),
+              };
 
         return CallbackShortcuts(
-          bindings: {
-            const SingleActivator(LogicalKeyboardKey.arrowLeft): () =>
-                _trash(task),
-            const SingleActivator(LogicalKeyboardKey.arrowRight): () =>
-                _archive(task),
-            const SingleActivator(LogicalKeyboardKey.arrowUp): () =>
-                _move(-1, tasks.length),
-            const SingleActivator(LogicalKeyboardKey.arrowDown): () =>
-                _move(1, tasks.length),
-          },
+          bindings: shortcuts,
           child: Focus(
-            autofocus: true,
+            autofocus: !_editing,
             child: SafeArea(
               child: Column(
                 children: [
@@ -148,25 +178,32 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
                   ),
                   Expanded(
                     child: SwipeableCard(
+                      key: _swipeKey,
                       enabled: touchFirst && !_editing,
                       onSwipeLeft: () => _trash(task),
                       onSwipeRight: () => _archive(task),
-                      onSwipeUp: () async => _move(1, tasks.length),
-                      onSwipeDown: () async => _move(-1, tasks.length),
+                      onSwipeUp: () async =>
+                          _move(1, tasks.length, animated: false),
+                      onSwipeDown: () async =>
+                          _move(-1, tasks.length, animated: false),
                       child: GestureDetector(
-                        onTap: () => _startEdit(task),
+                        onTap: _editing ? null : () => _startEdit(task),
                         child: BigTaskCard(
                           mode: _editing
                               ? BigTaskCardMode.process
                               : BigTaskCardMode.readOnly,
                           task: task,
-                          controller:
-                              _editing ? _editController : null,
+                          controller: _editing ? _editController : null,
+                          focusNode: _editing ? _editFocusNode : null,
                           onChanged: _editing ? (_) => setState(() {}) : null,
                         ),
                       ),
                     ),
                   ),
+                  if (!_editing)
+                    touchFirst
+                        ? _buildHint(context, '← 放弃   → 完成   ↑↓ 切换')
+                        : _buildHint(context, '方向键或下方按钮操作'),
                   if (_editing)
                     Padding(
                       padding: const EdgeInsets.all(16),
@@ -190,34 +227,8 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
                       onComplete: () => _archive(task),
                       onPrevious: () => _move(-1, tasks.length),
                       onNext: () => _move(1, tasks.length),
-                      canGoPrevious: _index > 0,
-                      canGoNext: _index < tasks.length - 1,
-                    )
-                  else
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: Text(
-                        '← 放弃   → 完成   ↑↓ 切换',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onSurface
-                                  .withValues(alpha: 0.4),
-                            ),
-                      ),
-                    ),
-                  if (!touchFirst && !_editing)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: Text(
-                        '方向键或下方按钮操作',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onSurface
-                                  .withValues(alpha: 0.4),
-                            ),
-                      ),
+                      canGoPrevious: clampedIndex > 0,
+                      canGoNext: clampedIndex < tasks.length - 1,
                     ),
                   if (progress >= 1 && tasks.isNotEmpty)
                     const SizedBox(height: 4),
@@ -230,17 +241,33 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     );
   }
 
-  void _move(int delta, int length) {
-    setState(() {
-      _index = (_index + delta).clamp(0, length - 1);
-      _editing = false;
-    });
+  Future<void> _move(int delta, int length, {bool animated = true}) async {
+    final newIndex = (_index + delta).clamp(0, length - 1);
+    if (newIndex == _index) return;
+
+    Future<void> applyMove() async {
+      setState(() {
+        _index = newIndex;
+        _editing = false;
+      });
+    }
+
+    if (animated && (delta == 1 || delta == -1)) {
+      final flyout =
+          delta > 0 ? const Offset(0, -1.5) : const Offset(0, 1.5);
+      await _swipeKey.currentState?.animateFlyout(flyout, applyMove);
+    } else {
+      await applyMove();
+    }
     AppHaptics.selection();
   }
 
   void _startEdit(Task task) {
     _editController.text = task.title;
     setState(() => _editing = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _editFocusNode.requestFocus();
+    });
   }
 
   Future<void> _saveEdit(Task task) async {
