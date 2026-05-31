@@ -45,14 +45,6 @@ class SwipeableCardState extends State<SwipeableCard> {
     return ((drag.abs() - 20) / threshold).clamp(0.0, 0.55);
   }
 
-  Size _resolveSize() {
-    final box = context.findRenderObject() as RenderBox?;
-    if (box != null && box.hasSize && box.size.longestSide > 0) {
-      return box.size;
-    }
-    return MediaQuery.sizeOf(context);
-  }
-
   Future<void> animateFlyout(Offset flyout, SwipeCallback action) async {
     if (_animating || !mounted) return;
 
@@ -64,7 +56,11 @@ class SwipeableCardState extends State<SwipeableCard> {
     await WidgetsBinding.instance.endOfFrame;
     if (!mounted) return;
 
-    final size = _resolveSize();
+    final box = context.findRenderObject() as RenderBox?;
+    final size = box != null && box.hasSize && box.size.longestSide > 0
+        ? box.size
+        : MediaQuery.sizeOf(context);
+
     setState(() {
       _drag = Offset(flyout.dx * size.width, flyout.dy * size.height);
     });
@@ -118,82 +114,95 @@ class SwipeableCardState extends State<SwipeableCard> {
     final colorScheme = Theme.of(context).colorScheme;
     final successColor = context.semanticColors.success;
 
-    return SizedBox.expand(
-      child: GestureDetector(
-        onPanUpdate: widget.enabled
-            ? (d) => setState(() => _drag += d.delta)
-            : null,
-        onPanEnd: widget.enabled ? _onDragEnd : null,
-        child: ClipRect(
-          child: Stack(
-            clipBehavior: Clip.none,
-            fit: StackFit.expand,
-            children: [
-            if (_drag.dx < -20)
-              Positioned.fill(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: colorScheme.error.withValues(
-                      alpha: _bandOpacity(_drag.dx, _threshold),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        final height = constraints.maxHeight;
+
+        return GestureDetector(
+          onPanUpdate: widget.enabled
+              ? (d) => setState(() => _drag += d.delta)
+              : null,
+          onPanEnd: widget.enabled ? _onDragEnd : null,
+          child: ClipRect(
+            child: SizedBox(
+              width: width,
+              height: height,
+              child: Stack(
+                clipBehavior: Clip.none,
+                fit: StackFit.expand,
+                children: [
+                  if (_drag.dx < -20)
+                    Positioned.fill(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: colorScheme.error.withValues(
+                            alpha: _bandOpacity(_drag.dx, _threshold),
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-              ),
-            if (_drag.dx > 20)
-              Positioned.fill(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: successColor.withValues(
-                      alpha: _bandOpacity(_drag.dx, _threshold),
+                  if (_drag.dx > 20)
+                    Positioned.fill(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: successColor.withValues(
+                            alpha: _bandOpacity(_drag.dx, _threshold),
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-              ),
-            if (_drag.dx < -20)
-              Positioned.fill(
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Padding(
-                    padding: const EdgeInsets.only(left: 32),
-                    child: Text(
-                      widget.leftLabel,
-                      style: TextStyle(
-                        color: colorScheme.error,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
+                  if (_drag.dx < -20)
+                    Positioned.fill(
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Padding(
+                          padding: const EdgeInsets.only(left: 32),
+                          child: Text(
+                            widget.leftLabel,
+                            style: TextStyle(
+                              color: colorScheme.error,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  if (_drag.dx > 20)
+                    Positioned.fill(
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: Padding(
+                          padding: const EdgeInsets.only(right: 32),
+                          child: Text(
+                            widget.rightLabel,
+                            style: TextStyle(
+                              color: successColor,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  Transform.translate(
+                    offset: _drag,
+                    child: Transform.rotate(
+                      angle: _drag.dx * 0.0008,
+                      child: SizedBox(
+                        width: width,
+                        height: height,
+                        child: widget.child,
                       ),
                     ),
                   ),
-                ),
-              ),
-            if (_drag.dx > 20)
-              Positioned.fill(
-                child: Align(
-                  alignment: Alignment.centerRight,
-                  child: Padding(
-                    padding: const EdgeInsets.only(right: 32),
-                    child: Text(
-                      widget.rightLabel,
-                      style: TextStyle(
-                        color: successColor,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            Transform.translate(
-              offset: _drag,
-              child: Transform.rotate(
-                angle: _drag.dx * 0.0008,
-                child: SizedBox.expand(child: widget.child),
+                ],
               ),
             ),
-          ],
-        ),
-      ),
-    ),
+          ),
+        );
+      },
     );
   }
 }

@@ -178,24 +178,27 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
                           ? '← 放弃   → 完成   ↑↓ 切换'
                           : '方向键或下方按钮操作',
                     ),
-                  CardStage(
-                    swipeKey: _swipeKey,
-                    enabled: touchFirst && !_editing,
-                    onSwipeLeft: () => _trash(task),
-                    onSwipeRight: () => _archive(task),
-                    onSwipeUp: () => _setIndex(clampedIndex + 1, tasks.length),
-                    onSwipeDown: () =>
-                        _setIndex(clampedIndex - 1, tasks.length),
-                    child: GestureDetector(
-                      onTap: _editing ? null : () => _startEdit(task),
-                      child: BigTaskCard(
-                        mode: _editing
-                            ? BigTaskCardMode.process
-                            : BigTaskCardMode.readOnly,
-                        task: task,
-                        controller: _editing ? _editController : null,
-                        focusNode: _editing ? _editFocusNode : null,
-                        onChanged: _editing ? (_) => setState(() {}) : null,
+                  Expanded(
+                    child: CardStage(
+                      swipeKey: _swipeKey,
+                      enabled: touchFirst && !_editing,
+                      onSwipeLeft: () => _trash(task),
+                      onSwipeRight: () => _archive(task),
+                      onSwipeUp: () =>
+                          _setIndex(clampedIndex + 1, tasks.length),
+                      onSwipeDown: () =>
+                          _setIndex(clampedIndex - 1, tasks.length),
+                      child: GestureDetector(
+                        onTap: _editing ? null : () => _startEdit(task),
+                        child: BigTaskCard(
+                          mode: _editing
+                              ? BigTaskCardMode.process
+                              : BigTaskCardMode.readOnly,
+                          task: task,
+                          controller: _editing ? _editController : null,
+                          focusNode: _editing ? _editFocusNode : null,
+                          onChanged: _editing ? (_) => setState(() {}) : null,
+                        ),
                       ),
                     ),
                   ),

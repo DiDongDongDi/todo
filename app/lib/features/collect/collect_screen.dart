@@ -158,21 +158,23 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
               HintChip(
                 text: touchFirst ? '上划保存' : 'Enter 保存',
               ),
-              CardStage(
-                swipeKey: _swipeKey,
-                enabled: touchFirst,
-                onSwipeUp: () => _save(),
-                rightLabel: '',
-                leftLabel: '',
-                child: BigTaskCard(
-                  mode: BigTaskCardMode.collect,
-                  controller: _controller,
-                  focusNode: _focusNode,
-                  onChanged: (_) => setState(() {}),
-                  onPickImage: _pickImage,
-                  onStartSpeech: _toggleSpeech,
-                  isListening: _listening,
-                  onSave: () => _save(animated: true),
+              Expanded(
+                child: CardStage(
+                  swipeKey: _swipeKey,
+                  enabled: touchFirst,
+                  onSwipeUp: () => _save(),
+                  rightLabel: '',
+                  leftLabel: '',
+                  child: BigTaskCard(
+                    mode: BigTaskCardMode.collect,
+                    controller: _controller,
+                    focusNode: _focusNode,
+                    onChanged: (_) => setState(() {}),
+                    onPickImage: _pickImage,
+                    onStartSpeech: _toggleSpeech,
+                    isListening: _listening,
+                    onSave: () => _save(animated: true),
+                  ),
                 ),
               ),
             ],

@@ -34,9 +34,13 @@ class BigTaskCard extends StatelessWidget {
     final colorScheme = theme.colorScheme;
     final touchFirst = isTouchFirstPlatform;
 
-    return SizedBox.expand(
-      child: Card(
-        margin: EdgeInsets.zero,
+    return SizedBox(
+      width: double.infinity,
+      height: double.infinity,
+      child: Material(
+        color: colorScheme.surfaceContainerHighest,
+        elevation: 0,
+        borderRadius: BorderRadius.circular(20),
         clipBehavior: Clip.antiAlias,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
