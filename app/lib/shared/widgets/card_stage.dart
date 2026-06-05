@@ -17,6 +17,7 @@ class CardStage extends StatelessWidget {
     this.onSwipeRight,
     this.onSwipeUp,
     this.onSwipeDown,
+    this.onDragStart,
     this.leftLabel = '放弃',
     this.rightLabel = '完成',
   });
@@ -30,6 +31,7 @@ class CardStage extends StatelessWidget {
   final SwipeCallback? onSwipeRight;
   final SwipeCallback? onSwipeUp;
   final SwipeCallback? onSwipeDown;
+  final VoidCallback? onDragStart;
   final String leftLabel;
   final String rightLabel;
 
@@ -54,6 +56,7 @@ class CardStage extends StatelessWidget {
                   onSwipeRight: onSwipeRight,
                   onSwipeUp: onSwipeUp,
                   onSwipeDown: onSwipeDown,
+                  onDragStart: onDragStart,
                   leftLabel: leftLabel,
                   rightLabel: rightLabel,
                   child: child,

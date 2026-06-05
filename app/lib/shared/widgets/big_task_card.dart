@@ -136,6 +136,7 @@ class BigTaskCard extends StatelessWidget {
                 onChanged: onChanged,
                 expands: true,
                 maxLines: null,
+                scrollPhysics: const NeverScrollableScrollPhysics(),
                 textAlignVertical: TextAlignVertical.top,
                 style: theme.textTheme.headlineMedium?.copyWith(
                   color: colorScheme.onSurface,

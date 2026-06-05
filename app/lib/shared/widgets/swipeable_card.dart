@@ -12,6 +12,7 @@ class SwipeableCard extends StatefulWidget {
     this.onSwipeRight,
     this.onSwipeUp,
     this.onSwipeDown,
+    this.onDragStart,
     this.enabled = true,
     this.resetAfterAction = true,
     this.leftLabel = '放弃',
@@ -25,6 +26,7 @@ class SwipeableCard extends StatefulWidget {
   final SwipeCallback? onSwipeRight;
   final SwipeCallback? onSwipeUp;
   final SwipeCallback? onSwipeDown;
+  final VoidCallback? onDragStart;
   final bool enabled;
   final bool resetAfterAction;
   final String leftLabel;
@@ -42,8 +44,12 @@ class SwipeableCardState extends State<SwipeableCard>
   Offset _drag = Offset.zero;
   Animation<Offset>? _dragAnimation;
   bool _animating = false;
+  bool _pointerActive = false;
+  double _pointerTravel = 0;
+  bool _dragStarted = false;
 
   static const _threshold = 80.0;
+  static const _dragDeadZone = 8.0;
   static const _flyoutDuration = Duration(milliseconds: 180);
   static const _resetDuration = Duration(milliseconds: 220);
 
@@ -156,7 +162,46 @@ class SwipeableCardState extends State<SwipeableCard>
     if (mounted) setState(() => _animating = false);
   }
 
-  Future<void> _onDragEnd(DragEndDetails details) async {
+  void _onPointerDown(PointerDownEvent event) {
+    if (!widget.enabled || _animating) return;
+    _pointerActive = true;
+    _pointerTravel = 0;
+    _dragStarted = false;
+  }
+
+  void _onPointerMove(PointerMoveEvent event) {
+    if (!widget.enabled || _animating || !_pointerActive) return;
+
+    _pointerTravel += event.delta.distance;
+    if (_pointerTravel < _dragDeadZone) return;
+
+    if (!_dragStarted) {
+      _dragStarted = true;
+      widget.onDragStart?.call();
+    }
+
+    setState(() => _drag += event.delta);
+  }
+
+  Future<void> _onPointerUp(PointerUpEvent event) async {
+    if (!_pointerActive) return;
+    _pointerActive = false;
+    _pointerTravel = 0;
+    _dragStarted = false;
+
+    if (!widget.enabled || _animating) return;
+    await _onDragEnd();
+  }
+
+  void _onPointerCancel(PointerCancelEvent event) {
+    _pointerActive = false;
+    _pointerTravel = 0;
+    _dragStarted = false;
+    if (!widget.enabled || _animating) return;
+    setState(() => _drag = Offset.zero);
+  }
+
+  Future<void> _onDragEnd() async {
     if (!widget.enabled || _animating) return;
 
     final dx = _drag.dx;
@@ -308,11 +353,11 @@ class SwipeableCardState extends State<SwipeableCard>
                 cardChild: cardChild,
               );
 
-        return GestureDetector(
-          onPanUpdate: widget.enabled
-              ? (d) => setState(() => _drag += d.delta)
-              : null,
-          onPanEnd: widget.enabled ? _onDragEnd : null,
+        return Listener(
+          onPointerDown: widget.enabled ? _onPointerDown : null,
+          onPointerMove: widget.enabled ? _onPointerMove : null,
+          onPointerUp: widget.enabled ? _onPointerUp : null,
+          onPointerCancel: widget.enabled ? _onPointerCancel : null,
           child: ClipRect(
             child: SizedBox(
               width: width,

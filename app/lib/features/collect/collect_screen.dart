@@ -463,11 +463,6 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
   @override
 
   Widget build(BuildContext context) {
-
-    final touchFirst = isTouchFirstPlatform;
-
-
-
     final body = Column(
 
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -480,11 +475,13 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
 
             swipeKey: _swipeKey,
 
-            enabled: touchFirst,
+            enabled: true,
 
             resetAfterAction: false,
 
             overlay: _buildStageOverlay(context),
+
+            onDragStart: () => _focusNode.unfocus(),
 
             onSwipeUp: _onSwipeUp,
 
