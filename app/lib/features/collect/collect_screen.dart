@@ -11,7 +11,6 @@ import 'package:todo_app/shared/utils/platform_capabilities.dart';
 import 'package:todo_app/shared/widgets/app_snackbar.dart';
 import 'package:todo_app/shared/widgets/big_task_card.dart';
 import 'package:todo_app/shared/widgets/card_stage.dart';
-import 'package:todo_app/shared/widgets/hint_chip.dart';
 import 'package:todo_app/shared/widgets/swipeable_card.dart';
 
 class CollectScreen extends ConsumerStatefulWidget {
@@ -23,7 +22,7 @@ class CollectScreen extends ConsumerStatefulWidget {
 
 class _CollectScreenState extends ConsumerState<CollectScreen> {
   final _controller = TextEditingController();
-  final _focusNode = FocusNode();
+  late final FocusNode _focusNode;
   final _speech = SpeechToText();
   final _swipeKey = GlobalKey<SwipeableCardState>();
   bool _listening = false;
@@ -32,10 +31,24 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
   @override
   void initState() {
     super.initState();
+    _focusNode = FocusNode(onKeyEvent: _handleKeyEvent);
     _initSpeech();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _focusNode.requestFocus();
     });
+  }
+
+  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+    if (event.logicalKey != LogicalKeyboardKey.enter) {
+      return KeyEventResult.ignored;
+    }
+    // Shift+Enter 换行，Enter 保存。
+    if (HardwareKeyboard.instance.isShiftPressed) {
+      return KeyEventResult.ignored;
+    }
+    _save(animated: true);
+    return KeyEventResult.handled;
   }
 
   Future<void> _initSpeech() async {
@@ -86,10 +99,11 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
       if (mounted) {
         showAppSnackBar(
           context,
-          message: '已收集，去处理页看看',
-          icon: Icons.check_circle_outline,
+          message: '已收集',
+          icon: Icons.check_rounded,
           type: AppSnackType.success,
           duration: const Duration(seconds: 2),
+          position: AppSnackPosition.top,
         );
       }
     }
@@ -142,6 +156,31 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
   Widget build(BuildContext context) {
     final touchFirst = isTouchFirstPlatform;
 
+    final body = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(
+          child: CardStage(
+            swipeKey: _swipeKey,
+            enabled: touchFirst,
+            onSwipeUp: () => _save(),
+            rightLabel: '',
+            leftLabel: '',
+            child: BigTaskCard(
+              mode: BigTaskCardMode.collect,
+              controller: _controller,
+              focusNode: _focusNode,
+              onChanged: (_) => setState(() {}),
+              onPickImage: _pickImage,
+              onStartSpeech: _toggleSpeech,
+              isListening: _listening,
+              onSave: () => _save(animated: true),
+            ),
+          ),
+        ),
+      ],
+    );
+
     return CallbackShortcuts(
       bindings: {
         const SingleActivator(LogicalKeyboardKey.enter): () => _save(animated: true),
@@ -152,34 +191,7 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
       },
       child: Focus(
         autofocus: true,
-        child: SafeArea(
-          child: Column(
-            children: [
-              HintChip(
-                text: touchFirst ? '上划保存' : 'Enter 保存',
-              ),
-              Expanded(
-                child: CardStage(
-                  swipeKey: _swipeKey,
-                  enabled: touchFirst,
-                  onSwipeUp: () => _save(),
-                  rightLabel: '',
-                  leftLabel: '',
-                  child: BigTaskCard(
-                    mode: BigTaskCardMode.collect,
-                    controller: _controller,
-                    focusNode: _focusNode,
-                    onChanged: (_) => setState(() {}),
-                    onPickImage: _pickImage,
-                    onStartSpeech: _toggleSpeech,
-                    isListening: _listening,
-                    onSave: () => _save(animated: true),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
+        child: body,
       ),
     );
   }

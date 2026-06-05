@@ -1,13 +1,9 @@
 import 'package:flutter/material.dart';
 
-/// Shared layout constraints for a compact, centered card UI.
+/// Shared layout constraints for the card-first shell UI.
 abstract final class AppLayout {
-  static const double cardMaxWidth = 480;
   static const double contentMaxWidth = 520;
-  static const double navBarMaxWidth = 320;
 
-  static double cardMaxHeight(BuildContext context) {
-    final screenHeight = MediaQuery.sizeOf(context).height;
-    return (screenHeight * 0.48).clamp(280.0, 400.0);
-  }
+  /// Insets around the big task card: edges of the screen and gap above the tab bar.
+  static const EdgeInsets cardPadding = EdgeInsets.fromLTRB(20, 16, 20, 12);
 }

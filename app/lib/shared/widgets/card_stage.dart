@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:todo_app/shared/layout/app_layout.dart';
 import 'package:todo_app/shared/widgets/swipeable_card.dart';
 
-/// Centers a [SwipeableCard] with shared max width/height constraints.
+/// Fills available space with a [SwipeableCard], keeping [AppLayout.cardPadding].
 ///
 /// Must be placed inside an [Expanded] or other bounded-height parent.
 class CardStage extends StatelessWidget {
@@ -31,22 +31,13 @@ class CardStage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final maxW = constraints.maxWidth.isFinite
-            ? constraints.maxWidth
-            : AppLayout.cardMaxWidth;
-        final maxH = constraints.maxHeight.isFinite
-            ? constraints.maxHeight
-            : AppLayout.cardMaxHeight(context);
-
-        final cardWidth = AppLayout.cardMaxWidth.clamp(280.0, maxW).toDouble();
-        final cardHeight = maxH.clamp(240.0, AppLayout.cardMaxHeight(context)).toDouble();
-
-        return Center(
-          child: SizedBox(
-            width: cardWidth,
-            height: cardHeight,
+    return Padding(
+      padding: AppLayout.cardPadding,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return SizedBox(
+            width: constraints.maxWidth,
+            height: constraints.maxHeight,
             child: SwipeableCard(
               key: swipeKey,
               enabled: enabled,
@@ -58,9 +49,9 @@ class CardStage extends StatelessWidget {
               rightLabel: rightLabel,
               child: child,
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 }

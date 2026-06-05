@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -89,15 +90,13 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
       error: (e, _) => Center(child: Text('加载失败: $e')),
       data: (tasks) {
         if (tasks.isEmpty) {
-          return const SafeArea(
-            child: Center(
-              child: Padding(
-                padding: EdgeInsets.all(32),
-                child: Text(
-                  '收集箱是空的，去收集页记一条吧',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 18),
-                ),
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(32),
+              child: Text(
+                '收集箱是空的，去收集页记一条吧',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 18),
               ),
             ),
           );
@@ -132,110 +131,112 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
                     _setIndex(clampedIndex + 1, tasks.length, animated: true),
               };
 
+        final content = Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+              child: Row(
+                children: [
+                  ProcessProgressRing(
+                    completed: archivedToday,
+                    total: archivedToday + tasks.length,
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    '${tasks.length} 待处理',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  const Spacer(),
+                  StreakBadge(streak: streak),
+                  IconButton(
+                    icon: const Icon(Icons.task_alt_outlined),
+                    tooltip: '已完成',
+                    onPressed: () => context.push('/archive'),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline),
+                    tooltip: '回收站',
+                    onPressed: () => context.push('/trash'),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.sync_outlined),
+                    tooltip: '同步',
+                    onPressed: () => context.push('/auth'),
+                  ),
+                ],
+              ),
+            ),
+            if (!_editing)
+              HintChip(
+                text: touchFirst
+                    ? '← 放弃   → 完成   ↑↓ 切换'
+                    : '方向键或下方按钮操作',
+              ),
+            Expanded(
+              child: CardStage(
+                swipeKey: _swipeKey,
+                enabled: touchFirst && !_editing,
+                onSwipeLeft: () => _trash(task),
+                onSwipeRight: () => _archive(task),
+                onSwipeUp: () =>
+                    _setIndex(clampedIndex + 1, tasks.length),
+                onSwipeDown: () =>
+                    _setIndex(clampedIndex - 1, tasks.length),
+                child: GestureDetector(
+                  onTap: _editing ? null : () => _startEdit(task),
+                  child: BigTaskCard(
+                    mode: _editing
+                        ? BigTaskCardMode.process
+                        : BigTaskCardMode.readOnly,
+                    task: task,
+                    controller: _editing ? _editController : null,
+                    focusNode: _editing ? _editFocusNode : null,
+                    onChanged: _editing ? (_) => setState(() {}) : null,
+                  ),
+                ),
+              ),
+            ),
+            if (_editing)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    TextButton(
+                      onPressed: () => setState(() => _editing = false),
+                      child: const Text('取消'),
+                    ),
+                    const SizedBox(width: 16),
+                    FilledButton(
+                      onPressed: () => _saveEdit(task),
+                      child: const Text('保存'),
+                    ),
+                  ],
+                ),
+              )
+            else if (!touchFirst)
+              TaskActionBar(
+                onTrash: () => _trash(task, animated: true),
+                onComplete: () => _archive(task, animated: true),
+                onPrevious: () =>
+                    _setIndex(clampedIndex - 1, tasks.length, animated: true),
+                onNext: () =>
+                    _setIndex(clampedIndex + 1, tasks.length, animated: true),
+                canGoPrevious: clampedIndex > 0,
+                canGoNext: clampedIndex < tasks.length - 1,
+              ),
+            if (progress >= 1 && tasks.isNotEmpty) const SizedBox(height: 4),
+          ],
+        );
+
+        if (kIsWeb) return content;
+
         return CallbackShortcuts(
           bindings: shortcuts,
           child: Focus(
             autofocus: !_editing,
-            child: SafeArea(
-              child: Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-                    child: Row(
-                      children: [
-                        ProcessProgressRing(
-                          completed: archivedToday,
-                          total: archivedToday + tasks.length,
-                        ),
-                        const SizedBox(width: 12),
-                        Text(
-                          '${tasks.length} 待处理',
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
-                        const Spacer(),
-                        StreakBadge(streak: streak),
-                        IconButton(
-                          icon: const Icon(Icons.task_alt_outlined),
-                          tooltip: '已完成',
-                          onPressed: () => context.push('/archive'),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.delete_outline),
-                          tooltip: '回收站',
-                          onPressed: () => context.push('/trash'),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.sync_outlined),
-                          tooltip: '同步',
-                          onPressed: () => context.push('/auth'),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (!_editing)
-                    HintChip(
-                      text: touchFirst
-                          ? '← 放弃   → 完成   ↑↓ 切换'
-                          : '方向键或下方按钮操作',
-                    ),
-                  Expanded(
-                    child: CardStage(
-                      swipeKey: _swipeKey,
-                      enabled: touchFirst && !_editing,
-                      onSwipeLeft: () => _trash(task),
-                      onSwipeRight: () => _archive(task),
-                      onSwipeUp: () =>
-                          _setIndex(clampedIndex + 1, tasks.length),
-                      onSwipeDown: () =>
-                          _setIndex(clampedIndex - 1, tasks.length),
-                      child: GestureDetector(
-                        onTap: _editing ? null : () => _startEdit(task),
-                        child: BigTaskCard(
-                          mode: _editing
-                              ? BigTaskCardMode.process
-                              : BigTaskCardMode.readOnly,
-                          task: task,
-                          controller: _editing ? _editController : null,
-                          focusNode: _editing ? _editFocusNode : null,
-                          onChanged: _editing ? (_) => setState(() {}) : null,
-                        ),
-                      ),
-                    ),
-                  ),
-                  if (_editing)
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          TextButton(
-                            onPressed: () => setState(() => _editing = false),
-                            child: const Text('取消'),
-                          ),
-                          const SizedBox(width: 16),
-                          FilledButton(
-                            onPressed: () => _saveEdit(task),
-                            child: const Text('保存'),
-                          ),
-                        ],
-                      ),
-                    )
-                  else if (!touchFirst)
-                    TaskActionBar(
-                      onTrash: () => _trash(task, animated: true),
-                      onComplete: () => _archive(task, animated: true),
-                      onPrevious: () =>
-                          _setIndex(clampedIndex - 1, tasks.length, animated: true),
-                      onNext: () =>
-                          _setIndex(clampedIndex + 1, tasks.length, animated: true),
-                      canGoPrevious: clampedIndex > 0,
-                      canGoNext: clampedIndex < tasks.length - 1,
-                    ),
-                  if (progress >= 1 && tasks.isNotEmpty)
-                    const SizedBox(height: 4),
-                ],
-              ),
-            ),
+            child: content,
           ),
         );
       },

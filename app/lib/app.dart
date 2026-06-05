@@ -48,6 +48,12 @@ class _TodoAppState extends ConsumerState<TodoApp> {
       darkTheme: AppTheme.dark(),
       themeMode: ThemeMode.system,
       routerConfig: router,
+      builder: (context, child) {
+        // Web 上 go_router 页面有时拿不到满屏约束，强制撑满视口。
+        return SizedBox.expand(
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
     );
   }
 }

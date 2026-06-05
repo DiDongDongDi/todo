@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:todo_app/features/archive/archive_screen.dart';
@@ -9,14 +10,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: '/',
     routes: [
-      ShellRoute(
-        builder: (context, state, child) => child,
-        routes: [
-          GoRoute(
-            path: '/',
-            builder: (context, state) => const ShellScreen(),
-          ),
-        ],
+      GoRoute(
+        path: '/',
+        pageBuilder: (context, state) => NoTransitionPage(
+          key: state.pageKey,
+          child: const ShellScreen(),
+        ),
       ),
       GoRoute(
         path: '/archive',

@@ -9,7 +9,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
-  testWidgets('Collect tab shows card and hint', (WidgetTester tester) async {
+  testWidgets('Collect tab shows card', (WidgetTester tester) async {
     await tester.binding.setSurfaceSize(const Size(800, 600));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
@@ -18,8 +18,6 @@ void main() {
     await tester.pump(const Duration(milliseconds: 800));
 
     expect(find.byType(TextField), findsOneWidget);
-    expect(find.text('Enter 保存').evaluate().isNotEmpty ||
-        find.text('上划保存').evaluate().isNotEmpty, isTrue);
   });
 
   testWidgets('Process tab shows content', (WidgetTester tester) async {

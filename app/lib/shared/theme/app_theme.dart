@@ -29,8 +29,9 @@ class AppTheme {
       scaffoldBackgroundColor: colorScheme.surface,
       navigationBarTheme: NavigationBarThemeData(
         elevation: 0,
-        height: 56,
+        height: 72,
         labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
+        labelPadding: const EdgeInsets.only(top: 4, bottom: 6),
         indicatorColor: colorScheme.primaryContainer,
       ),
       cardTheme: CardTheme(
