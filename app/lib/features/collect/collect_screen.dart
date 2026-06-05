@@ -64,6 +64,8 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
 
   int _feedbackEpoch = 0;
 
+  bool _saving = false;
+
   static const _switcherDuration = Duration(milliseconds: 200);
 
   void _ensureCaretVisible() {
@@ -292,6 +294,7 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
 
 
   Future<void> _save({bool animated = false}) async {
+    if (_saving) return;
 
     if (!_hasContent) {
 
@@ -315,38 +318,41 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
 
     }
 
+    _saving = true;
+    try {
+      if (animated) {
 
+        if (isTouchFirstPlatform) {
+          _focusNode.unfocus();
+        }
 
-    if (animated) {
+        final state = _swipeKey.currentState;
 
-      if (isTouchFirstPlatform) {
-        _focusNode.unfocus();
-      }
+        if (state != null) {
 
-      final state = _swipeKey.currentState;
+          await state.animateFlyout(
 
-      if (state != null) {
+            const Offset(0, -1.2),
 
-        await state.animateFlyout(
+            _performSave,
 
-          const Offset(0, -1.2),
+            resetAfter: false,
 
-          _performSave,
+          );
 
-          resetAfter: false,
+        } else {
 
-        );
+          await _performSave();
+
+        }
 
       } else {
 
         await _performSave();
 
       }
-
-    } else {
-
-      await _performSave();
-
+    } finally {
+      _saving = false;
     }
 
   }
@@ -475,25 +481,7 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
 
 
 
-    return CallbackShortcuts(
-
-      bindings: {
-
-        const SingleActivator(LogicalKeyboardKey.enter): () => _save(animated: true),
-
-        const SingleActivator(
-
-          LogicalKeyboardKey.enter,
-
-          control: true,
-
-        ): () => _save(animated: true),
-
-      },
-
-      child: body,
-
-    );
+    return body;
 
   }
 
