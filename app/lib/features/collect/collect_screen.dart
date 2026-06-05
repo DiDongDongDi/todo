@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'package:flutter/services.dart';
@@ -59,8 +61,6 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
   String? _stageMessage;
 
   int _feedbackEpoch = 0;
-
-  int _cardGeneration = 0;
 
 
 
@@ -178,10 +178,7 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
 
     if (!mounted || epoch != _feedbackEpoch) return;
 
-    setState(() {
-      _stageMessage = null;
-      _cardGeneration++;
-    });
+    setState(() => _stageMessage = null);
 
     await _swipeKey.currentState?.resetPosition(enterFromBottom: true);
 
@@ -245,15 +242,11 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
 
     );
 
-    await triggerSyncIfSignedIn(ref);
-
-
+    unawaited(triggerSyncIfSignedIn(ref));
 
     _controller.clear();
 
     _attachments.clear();
-
-    setState(() {});
 
 
 
@@ -294,6 +287,8 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
 
 
     if (animated) {
+
+      _focusNode.unfocus();
 
       final state = _swipeKey.currentState;
 
@@ -472,7 +467,6 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
             leftLabel: '',
 
             child: BigTaskCard(
-              key: ValueKey('collect-card-$_cardGeneration'),
               mode: BigTaskCardMode.collect,
 
               controller: _controller,

@@ -40,6 +40,7 @@ class SwipeableCardState extends State<SwipeableCard>
     with SingleTickerProviderStateMixin {
   late final AnimationController _motionController;
   Offset _drag = Offset.zero;
+  Animation<Offset>? _dragAnimation;
   bool _animating = false;
 
   static const _threshold = 80.0;
@@ -111,20 +112,20 @@ class SwipeableCardState extends State<SwipeableCard>
   ) async {
     final begin = _drag;
     _motionController.duration = duration;
-    final animation = Tween<Offset>(begin: begin, end: target).animate(
+    _dragAnimation = Tween<Offset>(begin: begin, end: target).animate(
       CurvedAnimation(parent: _motionController, curve: curve),
     );
+    setState(() {});
 
-    void tick() {
-      if (mounted) setState(() => _drag = animation.value);
-    }
-
-    animation.addListener(tick);
     _motionController.stop();
     _motionController.reset();
     await _motionController.forward();
-    animation.removeListener(tick);
-    if (mounted) setState(() => _drag = target);
+
+    if (!mounted) return;
+    setState(() {
+      _drag = target;
+      _dragAnimation = null;
+    });
   }
 
   Future<void> resetPosition({
@@ -189,6 +190,83 @@ class SwipeableCardState extends State<SwipeableCard>
     await animateFlyout(flyout, action);
   }
 
+  Widget _buildCardStack({
+    required double width,
+    required double height,
+    required Offset offset,
+    required ColorScheme colorScheme,
+    required Color successColor,
+    required Widget cardChild,
+  }) {
+    return Stack(
+      clipBehavior: Clip.none,
+      fit: StackFit.expand,
+      children: [
+        if (offset.dx < -20)
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: colorScheme.error.withValues(
+                  alpha: _bandOpacity(offset.dx, _threshold),
+                ),
+              ),
+            ),
+          ),
+        if (offset.dx > 20)
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: successColor.withValues(
+                  alpha: _bandOpacity(offset.dx, _threshold),
+                ),
+              ),
+            ),
+          ),
+        if (offset.dx < -20)
+          Positioned.fill(
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Padding(
+                padding: const EdgeInsets.only(left: 32),
+                child: Text(
+                  widget.leftLabel,
+                  style: TextStyle(
+                    color: colorScheme.error,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        if (offset.dx > 20)
+          Positioned.fill(
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: Padding(
+                padding: const EdgeInsets.only(right: 32),
+                child: Text(
+                  widget.rightLabel,
+                  style: TextStyle(
+                    color: successColor,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        Transform.translate(
+          offset: offset,
+          child: Transform.rotate(
+            angle: offset.dx * 0.0008,
+            child: cardChild,
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -198,6 +276,37 @@ class SwipeableCardState extends State<SwipeableCard>
       builder: (context, constraints) {
         final width = constraints.maxWidth;
         final height = constraints.maxHeight;
+        final cardChild = RepaintBoundary(
+          child: SizedBox(
+            width: width,
+            height: height,
+            child: widget.child,
+          ),
+        );
+
+        final stack = _dragAnimation != null
+            ? AnimatedBuilder(
+                animation: _dragAnimation!,
+                builder: (context, child) {
+                  return _buildCardStack(
+                    width: width,
+                    height: height,
+                    offset: _dragAnimation!.value,
+                    colorScheme: colorScheme,
+                    successColor: successColor,
+                    cardChild: child!,
+                  );
+                },
+                child: cardChild,
+              )
+            : _buildCardStack(
+                width: width,
+                height: height,
+                offset: _drag,
+                colorScheme: colorScheme,
+                successColor: successColor,
+                cardChild: cardChild,
+              );
 
         return GestureDetector(
           onPanUpdate: widget.enabled
@@ -208,77 +317,7 @@ class SwipeableCardState extends State<SwipeableCard>
             child: SizedBox(
               width: width,
               height: height,
-              child: Stack(
-                clipBehavior: Clip.none,
-                fit: StackFit.expand,
-                children: [
-                  if (_drag.dx < -20)
-                    Positioned.fill(
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: colorScheme.error.withValues(
-                            alpha: _bandOpacity(_drag.dx, _threshold),
-                          ),
-                        ),
-                      ),
-                    ),
-                  if (_drag.dx > 20)
-                    Positioned.fill(
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: successColor.withValues(
-                            alpha: _bandOpacity(_drag.dx, _threshold),
-                          ),
-                        ),
-                      ),
-                    ),
-                  if (_drag.dx < -20)
-                    Positioned.fill(
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: Padding(
-                          padding: const EdgeInsets.only(left: 32),
-                          child: Text(
-                            widget.leftLabel,
-                            style: TextStyle(
-                              color: colorScheme.error,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 18,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  if (_drag.dx > 20)
-                    Positioned.fill(
-                      child: Align(
-                        alignment: Alignment.centerRight,
-                        child: Padding(
-                          padding: const EdgeInsets.only(right: 32),
-                          child: Text(
-                            widget.rightLabel,
-                            style: TextStyle(
-                              color: successColor,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 18,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  Transform.translate(
-                    offset: _drag,
-                    child: Transform.rotate(
-                      angle: _drag.dx * 0.0008,
-                      child: SizedBox(
-                        width: width,
-                        height: height,
-                        child: widget.child,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+              child: stack,
             ),
           ),
         );
