@@ -4,6 +4,8 @@ import 'package:todo_app/shared/utils/platform_capabilities.dart';
 
 enum BigTaskCardMode { collect, process, readOnly }
 
+enum CollectCardFeedback { none, emptyHint }
+
 class BigTaskCard extends StatelessWidget {
   const BigTaskCard({
     super.key,
@@ -16,6 +18,7 @@ class BigTaskCard extends StatelessWidget {
     this.onStartSpeech,
     this.isListening = false,
     this.onSave,
+    this.feedback = CollectCardFeedback.none,
   });
 
   final BigTaskCardMode mode;
@@ -27,6 +30,7 @@ class BigTaskCard extends StatelessWidget {
   final VoidCallback? onStartSpeech;
   final bool isListening;
   final VoidCallback? onSave;
+  final CollectCardFeedback feedback;
 
   @override
   Widget build(BuildContext context) {
@@ -52,32 +56,35 @@ class BigTaskCard extends StatelessWidget {
               ),
               if (mode == BigTaskCardMode.collect) ...[
                 const SizedBox(height: 16),
-                Row(
-                  children: [
-                    IconButton.filledTonal(
-                      onPressed: onPickImage,
-                      icon: const Icon(Icons.image_outlined),
-                      tooltip: '添加图片',
-                    ),
-                    const SizedBox(width: 8),
-                    IconButton.filledTonal(
-                      onPressed: onStartSpeech,
-                      icon: Icon(isListening ? Icons.mic : Icons.mic_none_outlined),
-                      tooltip: '语音输入',
-                      style: IconButton.styleFrom(
-                        backgroundColor: isListening
-                            ? colorScheme.errorContainer
-                            : null,
+                Opacity(
+                  opacity: feedback == CollectCardFeedback.none ? 1 : 0.35,
+                  child: Row(
+                    children: [
+                      IconButton.filledTonal(
+                        onPressed: onPickImage,
+                        icon: const Icon(Icons.image_outlined),
+                        tooltip: '添加图片',
                       ),
-                    ),
-                    const Spacer(),
-                    if (!touchFirst)
-                      FilledButton.icon(
-                        onPressed: onSave,
-                        icon: const Icon(Icons.check, size: 20),
-                        label: const Text('保存'),
+                      const SizedBox(width: 8),
+                      IconButton.filledTonal(
+                        onPressed: onStartSpeech,
+                        icon: Icon(isListening ? Icons.mic : Icons.mic_none_outlined),
+                        tooltip: '语音输入',
+                        style: IconButton.styleFrom(
+                          backgroundColor: isListening
+                              ? colorScheme.errorContainer
+                              : null,
+                        ),
                       ),
-                  ],
+                      const Spacer(),
+                      if (!touchFirst)
+                        FilledButton.icon(
+                          onPressed: onSave,
+                          icon: const Icon(Icons.check, size: 20),
+                          label: const Text('保存'),
+                        ),
+                    ],
+                  ),
                 ),
               ],
             ],
@@ -106,20 +113,39 @@ class BigTaskCard extends StatelessWidget {
     final colorScheme = theme.colorScheme;
 
     if (mode == BigTaskCardMode.collect) {
-      return TextField(
-        controller: controller,
-        focusNode: focusNode,
-        onChanged: onChanged,
-        expands: true,
-        maxLines: null,
-        textAlignVertical: TextAlignVertical.top,
-        style: theme.textTheme.headlineMedium?.copyWith(
-          color: colorScheme.onSurface,
-          height: 1.35,
-        ),
-        decoration: const InputDecoration(
-          hintText: '记下一件事…',
-        ),
+      final hintStyle = theme.textTheme.headlineMedium?.copyWith(
+        color: colorScheme.onSurface.withValues(alpha: 0.45),
+        fontWeight: FontWeight.w400,
+        height: 1.35,
+      );
+
+      return AnimatedSwitcher(
+        duration: const Duration(milliseconds: 200),
+        child: feedback == CollectCardFeedback.none
+            ? TextField(
+                key: const ValueKey('collect-input'),
+                controller: controller,
+                focusNode: focusNode,
+                onChanged: onChanged,
+                expands: true,
+                maxLines: null,
+                textAlignVertical: TextAlignVertical.top,
+                style: theme.textTheme.headlineMedium?.copyWith(
+                  color: colorScheme.onSurface,
+                  height: 1.35,
+                ),
+                decoration: const InputDecoration(
+                  hintText: '记下一件事…',
+                ),
+              )
+            : Center(
+                key: ValueKey(feedback),
+                child: Text(
+                  _feedbackMessage(feedback),
+                  style: hintStyle,
+                  textAlign: TextAlign.center,
+                ),
+              ),
       );
     }
 
@@ -182,5 +208,12 @@ class BigTaskCard extends StatelessWidget {
         ],
       ],
     );
+  }
+
+  String _feedbackMessage(CollectCardFeedback value) {
+    return switch (value) {
+      CollectCardFeedback.emptyHint => '先记下点什么',
+      CollectCardFeedback.none => '',
+    };
   }
 }

@@ -11,6 +11,8 @@ class CardStage extends StatelessWidget {
     required this.swipeKey,
     required this.child,
     this.enabled = true,
+    this.resetAfterAction = true,
+    this.overlay,
     this.onSwipeLeft,
     this.onSwipeRight,
     this.onSwipeUp,
@@ -22,6 +24,8 @@ class CardStage extends StatelessWidget {
   final GlobalKey<SwipeableCardState> swipeKey;
   final Widget child;
   final bool enabled;
+  final bool resetAfterAction;
+  final Widget? overlay;
   final SwipeCallback? onSwipeLeft;
   final SwipeCallback? onSwipeRight;
   final SwipeCallback? onSwipeUp;
@@ -38,16 +42,23 @@ class CardStage extends StatelessWidget {
           return SizedBox(
             width: constraints.maxWidth,
             height: constraints.maxHeight,
-            child: SwipeableCard(
-              key: swipeKey,
-              enabled: enabled,
-              onSwipeLeft: onSwipeLeft,
-              onSwipeRight: onSwipeRight,
-              onSwipeUp: onSwipeUp,
-              onSwipeDown: onSwipeDown,
-              leftLabel: leftLabel,
-              rightLabel: rightLabel,
-              child: child,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                if (overlay != null) overlay!,
+                SwipeableCard(
+                  key: swipeKey,
+                  enabled: enabled,
+                  resetAfterAction: resetAfterAction,
+                  onSwipeLeft: onSwipeLeft,
+                  onSwipeRight: onSwipeRight,
+                  onSwipeUp: onSwipeUp,
+                  onSwipeDown: onSwipeDown,
+                  leftLabel: leftLabel,
+                  rightLabel: rightLabel,
+                  child: child,
+                ),
+              ],
             ),
           );
         },

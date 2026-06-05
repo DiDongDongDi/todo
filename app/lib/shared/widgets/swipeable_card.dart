@@ -13,6 +13,7 @@ class SwipeableCard extends StatefulWidget {
     this.onSwipeUp,
     this.onSwipeDown,
     this.enabled = true,
+    this.resetAfterAction = true,
     this.leftLabel = '放弃',
     this.rightLabel = '完成',
     this.upLabel,
@@ -25,6 +26,7 @@ class SwipeableCard extends StatefulWidget {
   final SwipeCallback? onSwipeUp;
   final SwipeCallback? onSwipeDown;
   final bool enabled;
+  final bool resetAfterAction;
   final String leftLabel;
   final String rightLabel;
   final String? upLabel;
@@ -34,18 +36,37 @@ class SwipeableCard extends StatefulWidget {
   SwipeableCardState createState() => SwipeableCardState();
 }
 
-class SwipeableCardState extends State<SwipeableCard> {
+class SwipeableCardState extends State<SwipeableCard>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _motionController;
   Offset _drag = Offset.zero;
   bool _animating = false;
 
   static const _threshold = 80.0;
-  static const _flyoutDuration = Duration(milliseconds: 220);
+  static const _flyoutDuration = Duration(milliseconds: 180);
+  static const _resetDuration = Duration(milliseconds: 220);
+
+  @override
+  void initState() {
+    super.initState();
+    _motionController = AnimationController(vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _motionController.dispose();
+    super.dispose();
+  }
 
   double _bandOpacity(double drag, double threshold) {
     return ((drag.abs() - 20) / threshold).clamp(0.0, 0.55);
   }
 
-  Future<void> animateFlyout(Offset flyout, SwipeCallback action) async {
+  Future<void> animateFlyout(
+    Offset flyout,
+    SwipeCallback action, {
+    bool? resetAfter,
+  }) async {
     if (_animating || !mounted) return;
 
     setState(() => _animating = true);
@@ -56,23 +77,82 @@ class SwipeableCardState extends State<SwipeableCard> {
     await WidgetsBinding.instance.endOfFrame;
     if (!mounted) return;
 
-    final box = context.findRenderObject() as RenderBox?;
-    final size = box != null && box.hasSize && box.size.longestSide > 0
-        ? box.size
-        : MediaQuery.sizeOf(context);
+    final size = _cardSize();
+    final target = Offset(
+      flyout.dx * size.width,
+      flyout.dy * size.height,
+    );
+    await _animateDragTo(target, _flyoutDuration, Curves.easeIn);
+    if (!mounted) return;
 
-    setState(() {
-      _drag = Offset(flyout.dx * size.width, flyout.dy * size.height);
-    });
-
-    await Future<void>.delayed(_flyoutDuration);
     await action();
-    if (mounted) {
-      setState(() {
-        _drag = Offset.zero;
-        _animating = false;
-      });
+    if (!mounted) return;
+
+    final shouldReset = resetAfter ?? widget.resetAfterAction;
+    if (shouldReset) {
+      await resetPosition();
+    } else if (mounted) {
+      setState(() => _animating = false);
     }
+  }
+
+  Size _cardSize() {
+    final box = context.findRenderObject() as RenderBox?;
+    if (box != null && box.hasSize && box.size.longestSide > 0) {
+      return box.size;
+    }
+    return MediaQuery.sizeOf(context);
+  }
+
+  Future<void> _animateDragTo(
+    Offset target,
+    Duration duration,
+    Curve curve,
+  ) async {
+    final begin = _drag;
+    _motionController.duration = duration;
+    final animation = Tween<Offset>(begin: begin, end: target).animate(
+      CurvedAnimation(parent: _motionController, curve: curve),
+    );
+
+    void tick() {
+      if (mounted) setState(() => _drag = animation.value);
+    }
+
+    animation.addListener(tick);
+    _motionController.stop();
+    _motionController.reset();
+    await _motionController.forward();
+    animation.removeListener(tick);
+    if (mounted) setState(() => _drag = target);
+  }
+
+  Future<void> resetPosition({
+    bool animated = true,
+    bool enterFromBottom = false,
+  }) async {
+    if (!mounted) return;
+
+    if (enterFromBottom && animated) {
+      final height = _cardSize().height;
+      setState(() => _drag = Offset(0, height * 1.2));
+      await _animateDragTo(Offset.zero, _resetDuration, Curves.easeOut);
+      if (mounted) setState(() => _animating = false);
+      return;
+    }
+
+    if (_drag == Offset.zero) {
+      setState(() => _animating = false);
+      return;
+    }
+
+    if (animated) {
+      await _animateDragTo(Offset.zero, _resetDuration, Curves.easeOut);
+    } else {
+      setState(() => _drag = Offset.zero);
+    }
+
+    if (mounted) setState(() => _animating = false);
   }
 
   Future<void> _onDragEnd(DragEndDetails details) async {
