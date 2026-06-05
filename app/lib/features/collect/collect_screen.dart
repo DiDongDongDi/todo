@@ -62,7 +62,19 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
 
   int _feedbackEpoch = 0;
 
+  static const _switcherDuration = Duration(milliseconds: 200);
 
+  void _requestInputFocus({Duration delay = Duration.zero}) {
+    if (!mounted) return;
+    unawaited(
+      Future<void>.delayed(delay, () {
+        if (!mounted) return;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _focusNode.requestFocus();
+        });
+      }),
+    );
+  }
 
   @override
 
@@ -74,11 +86,7 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
 
     _initSpeech();
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-
-      _focusNode.requestFocus();
-
-    });
+    _requestInputFocus();
 
   }
 
@@ -160,7 +168,7 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
 
     if (refocus) {
 
-      _focusNode.requestFocus();
+      _requestInputFocus(delay: _switcherDuration);
 
     }
 
@@ -182,7 +190,7 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
 
     await _swipeKey.currentState?.resetPosition(enterFromBottom: true);
 
-    if (mounted) _focusNode.requestFocus();
+    _requestInputFocus();
 
   }
 
@@ -513,13 +521,7 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
 
       },
 
-      child: Focus(
-
-        autofocus: true,
-
-        child: body,
-
-      ),
+      child: body,
 
     );
 

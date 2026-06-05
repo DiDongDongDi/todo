@@ -126,6 +126,7 @@ class BigTaskCard extends StatelessWidget {
                 key: const ValueKey('collect-input'),
                 controller: controller,
                 focusNode: focusNode,
+                autofocus: true,
                 onChanged: onChanged,
                 expands: true,
                 maxLines: null,
