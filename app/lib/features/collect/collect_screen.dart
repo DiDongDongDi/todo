@@ -2,8 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import 'package:flutter/services.dart';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:image_picker/image_picker.dart';
@@ -94,7 +92,7 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
 
     super.initState();
 
-    _focusNode = FocusNode(onKeyEvent: _handleKeyEvent);
+    _focusNode = FocusNode();
     _focusNode.addListener(_onInputFocusChange);
 
     _initSpeech();
@@ -107,32 +105,6 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
     if (_focusNode.hasFocus && mounted) {
       _ensureCaretVisible();
     }
-  }
-
-
-
-  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
-
-    if (event is! KeyDownEvent) return KeyEventResult.ignored;
-
-    if (event.logicalKey != LogicalKeyboardKey.enter) {
-
-      return KeyEventResult.ignored;
-
-    }
-
-    // Shift+Enter 换行，Enter 保存。
-
-    if (HardwareKeyboard.instance.isShiftPressed) {
-
-      return KeyEventResult.ignored;
-
-    }
-
-    _save(animated: true);
-
-    return KeyEventResult.handled;
-
   }
 
 
