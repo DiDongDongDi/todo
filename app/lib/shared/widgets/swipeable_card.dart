@@ -69,6 +69,41 @@ class SwipeableCardState extends State<SwipeableCard>
     return ((drag.abs() - 20) / threshold).clamp(0.0, 0.55);
   }
 
+  /// Locks drag to directions that have registered swipe callbacks.
+  Offset _constrainDrag(Offset drag) {
+    var dx = drag.dx;
+    var dy = drag.dy;
+
+    final allowHorizontal =
+        widget.onSwipeLeft != null || widget.onSwipeRight != null;
+    final allowVertical =
+        widget.onSwipeUp != null || widget.onSwipeDown != null;
+
+    if (!allowHorizontal) {
+      dx = 0;
+    } else {
+      if (widget.onSwipeLeft == null) {
+        dx = dx.clamp(0, double.infinity);
+      }
+      if (widget.onSwipeRight == null) {
+        dx = dx.clamp(double.negativeInfinity, 0);
+      }
+    }
+
+    if (!allowVertical) {
+      dy = 0;
+    } else {
+      if (widget.onSwipeUp == null) {
+        dy = dy.clamp(0, double.infinity);
+      }
+      if (widget.onSwipeDown == null) {
+        dy = dy.clamp(double.negativeInfinity, 0);
+      }
+    }
+
+    return Offset(dx, dy);
+  }
+
   Future<void> animateFlyout(
     Offset flyout,
     SwipeCallback action, {
@@ -180,7 +215,7 @@ class SwipeableCardState extends State<SwipeableCard>
       widget.onDragStart?.call();
     }
 
-    setState(() => _drag += event.delta);
+    setState(() => _drag = _constrainDrag(_drag + event.delta));
   }
 
   Future<void> _onPointerUp(PointerUpEvent event) async {
