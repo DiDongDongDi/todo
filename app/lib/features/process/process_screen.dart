@@ -167,11 +167,9 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
                 ],
               ),
             ),
-            if (!_editing)
-              HintChip(
-                text: touchFirst
-                    ? '← 放弃   → 完成   ↑↓ 切换'
-                    : '方向键或下方按钮操作',
+            if (!_editing && touchFirst)
+              const HintChip(
+                text: '← 放弃   → 完成   ↑↓ 切换',
               ),
             Expanded(
               child: CardStage(

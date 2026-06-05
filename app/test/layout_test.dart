@@ -36,8 +36,5 @@ void main() {
     final hasTasks = find.textContaining('待处理').evaluate().isNotEmpty;
 
     expect(hasEmpty || hasTasks, isTrue);
-    if (!hasEmpty) {
-      expect(find.text('方向键或下方按钮操作'), findsOneWidget);
-    }
   });
 }
