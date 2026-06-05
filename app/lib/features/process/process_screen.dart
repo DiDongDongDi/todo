@@ -110,7 +110,6 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
         }
         final task = tasks[clampedIndex];
         final archivedToday = statsAsync.value?.archivedToday ?? 0;
-        final streak = statsAsync.value?.streak ?? 0;
         final progress = inboxProgress(archivedToday, tasks.length);
 
         final shortcuts = _editing
@@ -148,7 +147,6 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
                   const Spacer(),
-                  StreakBadge(streak: streak),
                   IconButton(
                     icon: const Icon(Icons.task_alt_outlined),
                     tooltip: '已完成',
