@@ -95,7 +95,13 @@ class BigTaskCard extends StatelessWidget {
   }
 
   Widget _buildContentArea(BuildContext context) {
-    if (mode == BigTaskCardMode.collect || mode == BigTaskCardMode.process) {
+    if (mode == BigTaskCardMode.collect) {
+      // TextField(expands: true) 已铺满点击区域；外层 GestureDetector 会与
+      // TextField 争用手势，Web 上常导致需双击才出现光标。
+      return _buildContent(context);
+    }
+
+    if (mode == BigTaskCardMode.process) {
       return GestureDetector(
         behavior: HitTestBehavior.translucent,
         onTap: () => focusNode?.requestFocus(),

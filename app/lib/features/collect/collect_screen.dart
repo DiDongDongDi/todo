@@ -64,14 +64,22 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
 
   static const _switcherDuration = Duration(milliseconds: 200);
 
+  void _ensureCaretVisible() {
+    final offset = _controller.text.length;
+    _controller.selection = TextSelection.collapsed(offset: offset);
+  }
+
   void _requestInputFocus({Duration delay = Duration.zero}) {
     if (!mounted) return;
     unawaited(
-      Future<void>.delayed(delay, () {
+      Future<void>.delayed(delay, () async {
         if (!mounted) return;
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) _focusNode.requestFocus();
-        });
+        await WidgetsBinding.instance.endOfFrame;
+        if (!mounted) return;
+        await WidgetsBinding.instance.endOfFrame;
+        if (!mounted) return;
+        _focusNode.requestFocus();
+        _ensureCaretVisible();
       }),
     );
   }
@@ -83,11 +91,18 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
     super.initState();
 
     _focusNode = FocusNode(onKeyEvent: _handleKeyEvent);
+    _focusNode.addListener(_onInputFocusChange);
 
     _initSpeech();
 
     _requestInputFocus();
 
+  }
+
+  void _onInputFocusChange() {
+    if (_focusNode.hasFocus && mounted) {
+      _ensureCaretVisible();
+    }
   }
 
 
@@ -130,6 +145,7 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
 
   void dispose() {
 
+    _focusNode.removeListener(_onInputFocusChange);
     _controller.dispose();
 
     _focusNode.dispose();
@@ -296,7 +312,9 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
 
     if (animated) {
 
-      _focusNode.unfocus();
+      if (isTouchFirstPlatform) {
+        _focusNode.unfocus();
+      }
 
       final state = _swipeKey.currentState;
 
