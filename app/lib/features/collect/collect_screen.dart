@@ -20,6 +20,8 @@ import 'package:todo_app/shared/utils/haptics.dart';
 
 import 'package:todo_app/shared/utils/platform_capabilities.dart';
 
+import 'package:todo_app/shared/widgets/app_snackbar.dart';
+
 import 'package:todo_app/shared/widgets/big_task_card.dart';
 
 import 'package:todo_app/shared/widgets/card_stage.dart';
@@ -58,7 +60,7 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
 
   CollectCardFeedback _feedback = CollectCardFeedback.none;
 
-  String? _stageMessage;
+  Task? _lastUndoTask;
 
   int _feedbackEpoch = 0;
 
@@ -192,25 +194,26 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
 
 
 
-  Future<void> _showStageSavedMessage() async {
-
-    final epoch = ++_feedbackEpoch;
-
-    setState(() => _stageMessage = '已收集');
-
-    await Future<void>.delayed(const Duration(milliseconds: 900));
-
-    if (!mounted || epoch != _feedbackEpoch) return;
-
-    setState(() => _stageMessage = null);
-
-    await _swipeKey.currentState?.resetPosition(enterFromBottom: true);
-
-    _requestInputFocus();
-
+  Future<void> _undoCreate() async {
+    final task = _lastUndoTask;
+    if (task == null) return;
+    final repo = await ref.read(taskRepositoryProvider.future);
+    await repo.trash(task.id);
+    _lastUndoTask = null;
   }
 
-
+  void _showSaveSnackbar() {
+    showAppSnackBar(
+      context,
+      message: '已收集',
+      icon: Icons.check_circle_outline,
+      type: AppSnackType.success,
+      action: SnackBarAction(
+        label: '撤销',
+        onPressed: _undoCreate,
+      ),
+    );
+  }
 
   Future<void> _onSwipeUp() async {
 
@@ -250,7 +253,7 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
 
     final repo = await ref.read(taskRepositoryProvider.future);
 
-    await repo.createInbox(
+    final task = await repo.createInbox(
 
       title: _controller.text.trim(),
 
@@ -272,11 +275,15 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
 
     _attachments.clear();
 
-
+    _lastUndoTask = task;
 
     if (mounted) {
 
-      await _showStageSavedMessage();
+      _showSaveSnackbar();
+
+      await _swipeKey.currentState?.resetPosition(enterFromBottom: true);
+
+      _requestInputFocus();
 
     }
 
@@ -410,56 +417,6 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
 
 
 
-  Widget? _buildStageOverlay(BuildContext context) {
-
-    if (_stageMessage == null) return null;
-
-
-
-    final theme = Theme.of(context);
-
-    final colorScheme = theme.colorScheme;
-
-
-
-    return IgnorePointer(
-
-      child: Center(
-
-        child: AnimatedSwitcher(
-
-          duration: const Duration(milliseconds: 200),
-
-          child: Text(
-
-            _stageMessage!,
-
-            key: ValueKey(_stageMessage),
-
-            style: theme.textTheme.headlineMedium?.copyWith(
-
-              color: colorScheme.onSurface.withValues(alpha: 0.45),
-
-              fontWeight: FontWeight.w400,
-
-              height: 1.35,
-
-            ),
-
-            textAlign: TextAlign.center,
-
-          ),
-
-        ),
-
-      ),
-
-    );
-
-  }
-
-
-
   @override
 
   Widget build(BuildContext context) {
@@ -478,8 +435,6 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
             enabled: true,
 
             resetAfterAction: false,
-
-            overlay: _buildStageOverlay(context),
 
             onDragStart: () => _focusNode.unfocus(),
 
