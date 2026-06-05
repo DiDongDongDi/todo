@@ -29,7 +29,7 @@ void showAppSnackBar(
   };
 
   if (position == AppSnackPosition.top) {
-    _showTopPillNotice(
+    _showFloatingPillNotice(
       context,
       message: message,
       icon: icon,
@@ -67,7 +67,14 @@ void showAppSnackBar(
   );
 }
 
-void _showTopPillNotice(
+double _pillBottomInset(BuildContext context) {
+  final viewPadding = MediaQuery.viewPaddingOf(context);
+  final navHeight =
+      NavigationBarTheme.of(context).height ?? kBottomNavigationBarHeight;
+  return viewPadding.bottom + navHeight + AppLayout.cardPadding.bottom + 8;
+}
+
+void _showFloatingPillNotice(
   BuildContext context, {
   required String message,
   required IconData icon,
@@ -81,14 +88,13 @@ void _showTopPillNotice(
   late final OverlayEntry entry;
   entry = OverlayEntry(
     builder: (overlayContext) {
-      final viewPadding = MediaQuery.viewPaddingOf(overlayContext);
       return Positioned(
-        top: viewPadding.top + AppLayout.cardPadding.top,
+        bottom: _pillBottomInset(overlayContext),
         left: AppLayout.cardPadding.left,
         right: AppLayout.cardPadding.right,
         child: Align(
-          alignment: Alignment.topCenter,
-          child: _AppTopPillNotice(
+          alignment: Alignment.bottomCenter,
+          child: _AppPillNotice(
             message: message,
             icon: icon,
             type: type,
@@ -109,8 +115,8 @@ void _showTopPillNotice(
   overlay.insert(entry);
 }
 
-class _AppTopPillNotice extends StatefulWidget {
-  const _AppTopPillNotice({
+class _AppPillNotice extends StatefulWidget {
+  const _AppPillNotice({
     required this.message,
     required this.icon,
     required this.type,
@@ -125,10 +131,10 @@ class _AppTopPillNotice extends StatefulWidget {
   final VoidCallback onDismiss;
 
   @override
-  State<_AppTopPillNotice> createState() => _AppTopPillNoticeState();
+  State<_AppPillNotice> createState() => _AppPillNoticeState();
 }
 
-class _AppTopPillNoticeState extends State<_AppTopPillNotice>
+class _AppPillNoticeState extends State<_AppPillNotice>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   late final Animation<double> _fade;
@@ -145,7 +151,7 @@ class _AppTopPillNoticeState extends State<_AppTopPillNotice>
     final curve = CurvedAnimation(parent: _controller, curve: Curves.easeOut);
     _fade = curve;
     _slide = Tween<Offset>(
-      begin: const Offset(0, -0.5),
+      begin: const Offset(0, 0.5),
       end: Offset.zero,
     ).animate(curve);
 
