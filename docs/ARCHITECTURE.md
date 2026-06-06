@@ -138,6 +138,7 @@ sequenceDiagram
 - Bucket: `attachments`
 - 路径: `{user_id}/{task_id}/{filename}`
 - 图片、音频上传后更新 `remoteUrl`
+- RLS 与迁移：见 [SUPABASE-STORAGE-RLS.md](./SUPABASE-STORAGE-RLS.md)
 
 ### Auth
 

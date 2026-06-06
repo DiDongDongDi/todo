@@ -62,5 +62,4 @@ DROP POLICY IF EXISTS operations_insert_own ON public.operations;
 CREATE POLICY operations_insert_own ON public.operations
   FOR INSERT WITH CHECK (auth.uid() = user_id);
 
--- Storage bucket（在 Supabase Dashboard 创建 attachments 桶后执行策略）
--- INSERT INTO storage.buckets (id, name, public) VALUES ('attachments', 'attachments', false);
+-- Storage：见 002_storage_rls.sql 与 docs/SUPABASE-STORAGE-RLS.md

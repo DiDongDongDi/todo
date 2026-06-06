@@ -311,11 +311,9 @@ class SupabaseConfig {
 
 ### 6. 附件存储（可选，Phase 2+）
 
-若需同步图片 / 录音附件：
+若需同步图片 / 录音附件，在 SQL Editor 中执行 [`supabase/migrations/002_storage_rls.sql`](supabase/migrations/002_storage_rls.sql)（会创建 Private bucket `attachments` 并配置 RLS）。
 
-1. 在 Supabase Dashboard → **Storage** 中新建 bucket：`attachments`
-2. 设为私有（Private）
-3. 为 bucket 配置 RLS，限制用户只能读写自己的文件路径 `{user_id}/*`
+详细步骤、Dashboard 手动配置与 App 上传示例见 **[docs/SUPABASE-STORAGE-RLS.md](docs/SUPABASE-STORAGE-RLS.md)**。
 
 ---
 
