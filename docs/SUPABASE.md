@@ -52,6 +52,20 @@ class SupabaseConfig {
 
 未配置时，`AuthService.isConfigured` 为 `false`，应用可纯本地运行；配置后才会初始化 Supabase 客户端。
 
+### Site URL 与端口
+
+在 Dashboard **Authentication → URL Configuration** 中配置 **Site URL** 时：
+
+| 场景 | 推荐 Site URL |
+|------|---------------|
+| 原生 App（当前）+ 邮件魔法链接 | `http://localhost`（无需端口） |
+| Flutter Web 本地开发 | `http://localhost:端口号`（如 `8080`） |
+| 正式 Web 站点 | `https://你的域名` |
+
+**Site URL** 是用户点击邮件魔法链接、Supabase 完成验证后，浏览器默认跳转的地址。当前流程为：App 发链接 → 用户在邮件中点击 → 浏览器完成验证 → **手动回到 App** 同步。会话已在 Supabase 侧建立，不依赖跳转页能否打开，因此原生 App 用 `http://localhost` 作占位即可。
+
+若做 Web 本地开发，除 Site URL 外还需在 **Redirect URLs** 中添加对应地址（如 `http://localhost:8080/**`）。
+
 ## 典型使用流程
 
 1. 在 Supabase 官网注册并创建项目

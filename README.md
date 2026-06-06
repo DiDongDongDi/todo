@@ -273,12 +273,15 @@ flutter run -d ios
 
 1. 进入 **Authentication → Providers**
 2. 确认 **Email** 已启用
-3. 在 **Authentication → URL Configuration** 中，将 **Site URL** 设为你的应用地址（本地开发可先用 `http://localhost`）
+3. 在 **Authentication → URL Configuration** 中，将 **Site URL** 设为你的应用地址（本地开发可先用 `http://localhost`，**无需加端口**）
+   - Site URL 是用户点击邮件魔法链接后，浏览器验证完成时的默认跳转地址
+   - 本项目为原生 App 登录：点邮件链接后手动回到 App 即可，不要求 Site URL 精确对应 App 地址
+   - 仅在做 **Flutter Web** 本地开发时才需带端口（如 `http://localhost:8080`），并同步在 **Redirect URLs** 中添加
 
 ### 4. 填入 API 密钥
 
 1. 进入 **Project Settings → API**
-2. 复制 **Project URL** 和 **anon public** key
+2. 复制 **Project URL** 和 **anon public** key，在 https://supabase.com/dashboard/project/gurtakyggjaphkagzmgf/integrations/data_api/docs 查看 URL
 3. 编辑 [`app/lib/core/config/supabase_config.example.dart`](app/lib/core/config/supabase_config.example.dart)，替换占位值：
 
 ```dart

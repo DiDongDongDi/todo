@@ -66,7 +66,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (!AuthService.instance.isConfigured)
+            if (!AuthService.instance.isConfigured) ...[
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -78,6 +78,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                   ),
                 ),
               ),
+              const SizedBox(height: 24),
+            ],
             if (user != null) ...[
               Text('已登录: ${user.email ?? user.id}'),
               const SizedBox(height: 8),
