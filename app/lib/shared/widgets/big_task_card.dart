@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:todo_app/core/models/task.dart';
 import 'package:todo_app/shared/theme/app_semantic_colors.dart';
+import 'package:todo_app/shared/widgets/image_preview.dart';
 import 'package:todo_app/shared/widgets/local_image.dart';
 enum BigTaskCardMode { collect, process, readOnly }
 
@@ -158,13 +159,7 @@ class BigTaskCard extends StatelessWidget {
 
   Widget _buildContentArea(BuildContext context) {
     if (mode == BigTaskCardMode.collect) {
-      // expands 空态时 TextField 命中区常小于视觉区域；用 Listener（非
-      // GestureDetector）在首次 pointerDown 即聚焦，避免与 TextField 手势冲突。
-      return Listener(
-        behavior: HitTestBehavior.translucent,
-        onPointerDown: (_) => onActivateInput?.call(),
-        child: _buildContent(context),
-      );
+      return _buildContent(context);
     }
 
     if (mode == BigTaskCardMode.process) {
@@ -189,43 +184,50 @@ class BigTaskCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Expanded(
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                Opacity(
-                  opacity: feedback == CollectCardFeedback.emptyHint ? 0 : 1,
-                  child: TextField(
-                    controller: controller,
-                    focusNode: focusNode,
-                    autofocus: true,
-                    showCursor: true,
-                    onTap: onActivateInput,
-                    onChanged: onChanged,
-                    expands: true,
-                    maxLines: null,
-                    scrollPhysics: const NeverScrollableScrollPhysics(),
-                    textAlignVertical: TextAlignVertical.top,
-                    style: theme.textTheme.headlineMedium?.copyWith(
-                      color: colorScheme.onSurface,
-                      height: 1.35,
-                    ),
-                    decoration: const InputDecoration(
-                      hintText: '记下一件事…',
-                    ),
-                  ),
-                ),
-                if (feedback == CollectCardFeedback.emptyHint)
-                  Positioned.fill(
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: onDismissFeedback,
-                      child: _buildCollectCenterHint(
-                        context,
-                        _feedbackMessage(feedback),
+            // expands 空态时 TextField 命中区常小于视觉区域；用 Listener（非
+            // GestureDetector）在首次 pointerDown 即聚焦，避免与 TextField 手势冲突。
+            // 仅包裹文本区，附件缩略图不在其内，避免点图预览时唤起键盘。
+            child: Listener(
+              behavior: HitTestBehavior.translucent,
+              onPointerDown: (_) => onActivateInput?.call(),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Opacity(
+                    opacity: feedback == CollectCardFeedback.emptyHint ? 0 : 1,
+                    child: TextField(
+                      controller: controller,
+                      focusNode: focusNode,
+                      autofocus: true,
+                      showCursor: true,
+                      onTap: onActivateInput,
+                      onChanged: onChanged,
+                      expands: true,
+                      maxLines: null,
+                      scrollPhysics: const NeverScrollableScrollPhysics(),
+                      textAlignVertical: TextAlignVertical.top,
+                      style: theme.textTheme.headlineMedium?.copyWith(
+                        color: colorScheme.onSurface,
+                        height: 1.35,
+                      ),
+                      decoration: const InputDecoration(
+                        hintText: '记下一件事…',
                       ),
                     ),
                   ),
-              ],
+                  if (feedback == CollectCardFeedback.emptyHint)
+                    Positioned.fill(
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: onDismissFeedback,
+                        child: _buildCollectCenterHint(
+                          context,
+                          _feedbackMessage(feedback),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
           if (attachments.isNotEmpty) ...[
@@ -237,8 +239,11 @@ class BigTaskCard extends StatelessWidget {
                 itemCount: attachments.length,
                 separatorBuilder: (_, __) => const SizedBox(width: 8),
                 itemBuilder: (context, index) {
+                  final imagePaths = _imagePaths(attachments);
+                  final attachment = attachments[index];
                   return _AttachmentThumbnail(
-                    attachment: attachments[index],
+                    attachment: attachment,
+                    imagePaths: imagePaths,
                     onRemove: onRemoveAttachment == null
                         ? null
                         : () => onRemoveAttachment!(index),
@@ -292,12 +297,20 @@ class BigTaskCard extends StatelessWidget {
         ],
         if (displayTask.attachments.isNotEmpty) ...[
           const SizedBox(height: 20),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: displayTask.attachments.map((a) {
-              return _AttachmentThumbnail(attachment: a);
-            }).toList(),
+          Builder(
+            builder: (context) {
+              final imagePaths = _imagePaths(displayTask.attachments);
+              return Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: displayTask.attachments.map((a) {
+                  return _AttachmentThumbnail(
+                    attachment: a,
+                    imagePaths: imagePaths,
+                  );
+                }).toList(),
+              );
+            },
           ),
         ],
       ],
@@ -309,6 +322,13 @@ class BigTaskCard extends StatelessWidget {
       CollectCardFeedback.emptyHint => '先记下点什么',
       CollectCardFeedback.none => '',
     };
+  }
+
+  static List<String> _imagePaths(List<TaskAttachment> attachments) {
+    return attachments
+        .where((a) => a.type == AttachmentType.image)
+        .map((a) => a.localPath)
+        .toList();
   }
 
   /// 与保存成功时卡片内「已收集」轻提示一致。
@@ -333,36 +353,59 @@ class BigTaskCard extends StatelessWidget {
 class _AttachmentThumbnail extends StatelessWidget {
   const _AttachmentThumbnail({
     required this.attachment,
+    this.imagePaths = const [],
     this.onRemove,
   });
 
   final TaskAttachment attachment;
+  final List<String> imagePaths;
   final VoidCallback? onRemove;
+
+  void _openPreview(BuildContext context) {
+    if (attachment.type != AttachmentType.image) return;
+
+    FocusManager.instance.primaryFocus?.unfocus();
+
+    final paths = imagePaths.isNotEmpty
+        ? imagePaths
+        : [attachment.localPath];
+    final index = paths.indexOf(attachment.localPath);
+
+    showLocalImagePreview(
+      context,
+      paths: paths,
+      initialIndex: index >= 0 ? index : 0,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final isImage = attachment.type == AttachmentType.image;
 
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: SizedBox(
-            width: 80,
-            height: 80,
-            child: attachment.type == AttachmentType.image
-                ? LocalImage(
-                    attachment.localPath,
-                    fit: BoxFit.cover,
-                  )
-                : ColoredBox(
-                    color: colorScheme.secondaryContainer,
-                    child: Icon(
-                      Icons.mic_none_outlined,
-                      color: colorScheme.onSecondaryContainer,
+        GestureDetector(
+          onTap: isImage ? () => _openPreview(context) : null,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: SizedBox(
+              width: 80,
+              height: 80,
+              child: isImage
+                  ? LocalImage(
+                      attachment.localPath,
+                      fit: BoxFit.cover,
+                    )
+                  : ColoredBox(
+                      color: colorScheme.secondaryContainer,
+                      child: Icon(
+                        Icons.mic_none_outlined,
+                        color: colorScheme.onSecondaryContainer,
+                      ),
                     ),
-                  ),
+            ),
           ),
         ),
         if (onRemove != null)
