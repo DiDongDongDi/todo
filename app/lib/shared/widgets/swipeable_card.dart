@@ -36,7 +36,8 @@ class SwipeableCard extends StatefulWidget {
   final VoidCallback? onDragEnd;
   final bool enabled;
   final bool resetAfterAction;
-  /// After a vertical flyout, slide the next card in from top/bottom (collect-style).
+  /// After flyout, slide the next card in vertically instead of resetting horizontally.
+  /// Vertical flyouts enter from top/bottom; horizontal flyouts enter from bottom.
   final bool verticalEnterAnimation;
   final FlyoutGate? shouldAnimateFlyout;
   final FlyoutFeedback? onFlyoutFeedback;
@@ -156,6 +157,10 @@ class SwipeableCardState extends State<SwipeableCard>
           enterFromBottom: flyout.dy < 0,
           enterFromTop: flyout.dy > 0,
         );
+      } else if (widget.verticalEnterAnimation && flyout.dx != 0) {
+        await WidgetsBinding.instance.endOfFrame;
+        if (!mounted) return;
+        await resetPosition(enterFromBottom: true);
       } else {
         await resetPosition();
       }
