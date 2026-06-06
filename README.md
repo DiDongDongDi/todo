@@ -283,12 +283,15 @@ flutter run -d ios
      com.todo.app.todo_app://login-callback/
      ```
    - 若做 **Flutter Web** 本地开发，另加 `http://localhost:端口` 到 Redirect URLs
-4. **（推荐）修改邮件模板以支持 6 位验证码登录**  
-   进入 **Authentication → Email Templates → Magic Link**，在正文中加入验证码（QQ 邮箱等会预扫描链接，导致魔法链接一点就 `otp_expired`）：
+4. **修改邮件模板为验证码模式（必做）**  
+   进入 **Authentication → Email Templates → Magic Link**，将正文改为**仅**包含 `{{ .Token }}`，**删除** `{{ .ConfirmationURL }}` 那一行。  
+   Supabase 规则：模板里有 `ConfirmationURL` 或 App 传了 `emailRedirectTo` 时，只发魔法链接且**不会**填充 `Token`，所以你加的验证码行不会出现在邮件里。示例：
+   ```html
+   <h2>登录验证码</h2>
+   <p>请在 App 中输入以下 6 位验证码（约 1 小时内有效）：</p>
+   <p><strong>{{ .Token }}</strong></p>
    ```
-   您的登录验证码是：{{ .Token }}
-   ```
-   保留 `{{ .ConfirmationURL }}` 也可同时支持点击链接登录，但验证码方式更可靠。
+   QQ 邮箱等会预扫描魔法链接导致 `otp_expired`，验证码方式更可靠。
 
 > **开发时邮件发不出去 / 提示发送太频繁？** 免费项目默认邮件约 **2～4 封/小时**，很容易触发限流。请在 **Project Settings → Authentication → SMTP Settings** 配置自定义 SMTP（QQ 邮箱、SendGrid、Resend 等），限额更高。QQ 邮箱逐步配置见 **[docs/SUPABASE-SMTP.md](docs/SUPABASE-SMTP.md)**。
 

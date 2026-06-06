@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:todo_app/core/config/auth_redirect_config.dart';
 import 'package:todo_app/core/config/supabase_config.dart';
 
 final supabaseClientProvider = Provider<SupabaseClient?>((ref) {
@@ -50,10 +49,9 @@ class AuthService {
   Future<void> signInWithEmail(String email) async {
     final c = _client;
     if (c == null) throw StateError('Supabase 未配置');
-    await c.auth.signInWithOtp(
-      email: email,
-      emailRedirectTo: AuthRedirectConfig.url,
-    );
+    // 不传 emailRedirectTo，配合邮件模板仅含 {{ .Token }} 时发送 6 位验证码。
+    // 若传 redirect 或模板含 {{ .ConfirmationURL }}，Supabase 只发魔法链接且不填充 Token。
+    await c.auth.signInWithOtp(email: email);
   }
 
   Future<void> verifyEmailOtp({

@@ -248,9 +248,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              '请查收 ${_emailController.text.trim()} 的邮件。'
-                              '推荐在下方输入 6 位验证码登录（可避免 QQ 邮箱等预扫描链接导致链接失效）。'
-                              '也可点击邮件中的链接，成功后会自动打开本 App。',
+                              '请查收 ${_emailController.text.trim()} 的邮件，'
+                              '在下方输入邮件中的 6 位验证码并点击「验证码登录」。',
                               style: theme.textTheme.bodyMedium,
                             ),
                           ],
