@@ -168,6 +168,12 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
               child: CardStage(
                 swipeKey: _swipeKey,
                 enabled: touchFirst && !_editing,
+                verticalEnterAnimation: true,
+                shouldAnimateFlyout: (flyout) async {
+                  if (flyout.dy < 0) return clampedIndex < tasks.length - 1;
+                  if (flyout.dy > 0) return clampedIndex > 0;
+                  return true;
+                },
                 onSwipeLeft: () => _trash(task),
                 onSwipeRight: () => _archive(task),
                 onSwipeUp: () =>

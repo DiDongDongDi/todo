@@ -430,7 +430,7 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
 
             resetAfterAction: false,
 
-            shouldAnimateFlyout: () async => _hasContent,
+            shouldAnimateFlyout: (_) async => _hasContent,
 
             onFlyoutFeedback: _collectFlyoutFeedback,
 

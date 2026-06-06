@@ -4,7 +4,7 @@ import 'package:todo_app/shared/utils/haptics.dart';
 
 typedef SwipeCallback = Future<void> Function();
 typedef FlyoutFeedback = Future<void> Function();
-typedef FlyoutGate = Future<bool> Function();
+typedef FlyoutGate = Future<bool> Function(Offset flyout);
 
 class SwipeableCard extends StatefulWidget {
   const SwipeableCard({
@@ -18,6 +18,7 @@ class SwipeableCard extends StatefulWidget {
     this.onDragEnd,
     this.enabled = true,
     this.resetAfterAction = true,
+    this.verticalEnterAnimation = false,
     this.shouldAnimateFlyout,
     this.onFlyoutFeedback,
     this.leftLabel = '放弃',
@@ -35,6 +36,8 @@ class SwipeableCard extends StatefulWidget {
   final VoidCallback? onDragEnd;
   final bool enabled;
   final bool resetAfterAction;
+  /// After a vertical flyout, slide the next card in from top/bottom (collect-style).
+  final bool verticalEnterAnimation;
   final FlyoutGate? shouldAnimateFlyout;
   final FlyoutFeedback? onFlyoutFeedback;
   final String leftLabel;
@@ -146,7 +149,16 @@ class SwipeableCardState extends State<SwipeableCard>
 
     final shouldReset = resetAfter ?? widget.resetAfterAction;
     if (shouldReset) {
-      await resetPosition();
+      if (widget.verticalEnterAnimation && flyout.dy != 0) {
+        await WidgetsBinding.instance.endOfFrame;
+        if (!mounted) return;
+        await resetPosition(
+          enterFromBottom: flyout.dy < 0,
+          enterFromTop: flyout.dy > 0,
+        );
+      } else {
+        await resetPosition();
+      }
     } else if (mounted) {
       setState(() => _animating = false);
     }
@@ -186,12 +198,21 @@ class SwipeableCardState extends State<SwipeableCard>
   Future<void> resetPosition({
     bool animated = true,
     bool enterFromBottom = false,
+    bool enterFromTop = false,
   }) async {
     if (!mounted) return;
 
     if (enterFromBottom && animated) {
       final height = _cardSize().height;
       setState(() => _drag = Offset(0, height * 1.2));
+      await _animateDragTo(Offset.zero, _resetDuration, Curves.easeOut);
+      if (mounted) setState(() => _animating = false);
+      return;
+    }
+
+    if (enterFromTop && animated) {
+      final height = _cardSize().height;
+      setState(() => _drag = Offset(0, -height * 1.2));
       await _animateDragTo(Offset.zero, _resetDuration, Curves.easeOut);
       if (mounted) setState(() => _animating = false);
       return;
@@ -285,7 +306,7 @@ class SwipeableCardState extends State<SwipeableCard>
     }
 
     if (widget.shouldAnimateFlyout != null &&
-        !await widget.shouldAnimateFlyout!()) {
+        !await widget.shouldAnimateFlyout!(flyout)) {
       setState(() => _drag = Offset.zero);
       await action();
       return;
