@@ -410,6 +410,10 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
 
   }
 
+  void _removeAttachment(int index) {
+    setState(() => _attachments.removeAt(index));
+  }
+
 
 
   Future<void> _toggleSpeech() async {
@@ -501,6 +505,10 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
               onDismissFeedback: _dismissCardFeedback,
 
               onChanged: (_) => setState(() {}),
+
+              attachments: _attachments,
+
+              onRemoveAttachment: _removeAttachment,
 
               onPickImage: _pickImage,
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:todo_app/core/models/task.dart';
 import 'package:todo_app/shared/theme/app_semantic_colors.dart';
+import 'package:todo_app/shared/widgets/local_image.dart';
 enum BigTaskCardMode { collect, process, readOnly }
 
 enum CollectCardFeedback { none, emptyHint }
@@ -13,6 +14,8 @@ class BigTaskCard extends StatelessWidget {
     this.controller,
     this.focusNode,
     this.onChanged,
+    this.attachments = const [],
+    this.onRemoveAttachment,
     this.onPickImage,
     this.onStartSpeech,
     this.isListening = false,
@@ -33,6 +36,8 @@ class BigTaskCard extends StatelessWidget {
   final TextEditingController? controller;
   final FocusNode? focusNode;
   final ValueChanged<String>? onChanged;
+  final List<TaskAttachment> attachments;
+  final ValueChanged<int>? onRemoveAttachment;
   final VoidCallback? onPickImage;
   final VoidCallback? onStartSpeech;
   final bool isListening;
@@ -180,42 +185,68 @@ class BigTaskCard extends StatelessWidget {
     final colorScheme = theme.colorScheme;
 
     if (mode == BigTaskCardMode.collect) {
-      return Stack(
-        fit: StackFit.expand,
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Opacity(
-            opacity: feedback == CollectCardFeedback.emptyHint ? 0 : 1,
-            child: TextField(
-              controller: controller,
-              focusNode: focusNode,
-              autofocus: true,
-              showCursor: true,
-              onTap: onActivateInput,
-              onChanged: onChanged,
-              expands: true,
-              maxLines: null,
-              scrollPhysics: const NeverScrollableScrollPhysics(),
-              textAlignVertical: TextAlignVertical.top,
-              style: theme.textTheme.headlineMedium?.copyWith(
-                color: colorScheme.onSurface,
-                height: 1.35,
-              ),
-              decoration: const InputDecoration(
-                hintText: '记下一件事…',
-              ),
+          Expanded(
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Opacity(
+                  opacity: feedback == CollectCardFeedback.emptyHint ? 0 : 1,
+                  child: TextField(
+                    controller: controller,
+                    focusNode: focusNode,
+                    autofocus: true,
+                    showCursor: true,
+                    onTap: onActivateInput,
+                    onChanged: onChanged,
+                    expands: true,
+                    maxLines: null,
+                    scrollPhysics: const NeverScrollableScrollPhysics(),
+                    textAlignVertical: TextAlignVertical.top,
+                    style: theme.textTheme.headlineMedium?.copyWith(
+                      color: colorScheme.onSurface,
+                      height: 1.35,
+                    ),
+                    decoration: const InputDecoration(
+                      hintText: '记下一件事…',
+                    ),
+                  ),
+                ),
+                if (feedback == CollectCardFeedback.emptyHint)
+                  Positioned.fill(
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: onDismissFeedback,
+                      child: _buildCollectCenterHint(
+                        context,
+                        _feedbackMessage(feedback),
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
-          if (feedback == CollectCardFeedback.emptyHint)
-            Positioned.fill(
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: onDismissFeedback,
-                child: _buildCollectCenterHint(
-                  context,
-                  _feedbackMessage(feedback),
-                ),
+          if (attachments.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 80,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: attachments.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                itemBuilder: (context, index) {
+                  return _CollectAttachmentTile(
+                    attachment: attachments[index],
+                    onRemove: onRemoveAttachment == null
+                        ? null
+                        : () => onRemoveAttachment!(index),
+                  );
+                },
               ),
             ),
+          ],
         ],
       );
     }
@@ -303,6 +334,68 @@ class BigTaskCard extends StatelessWidget {
         ),
         textAlign: TextAlign.center,
       ),
+    );
+  }
+}
+
+class _CollectAttachmentTile extends StatelessWidget {
+  const _CollectAttachmentTile({
+    required this.attachment,
+    this.onRemove,
+  });
+
+  final TaskAttachment attachment;
+  final VoidCallback? onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: SizedBox(
+            width: 80,
+            height: 80,
+            child: attachment.type == AttachmentType.image
+                ? LocalImage(
+                    attachment.localPath,
+                    fit: BoxFit.cover,
+                  )
+                : ColoredBox(
+                    color: colorScheme.secondaryContainer,
+                    child: Icon(
+                      Icons.mic_none_outlined,
+                      color: colorScheme.onSecondaryContainer,
+                    ),
+                  ),
+          ),
+        ),
+        if (onRemove != null)
+          Positioned(
+            top: -6,
+            right: -6,
+            child: Material(
+              color: colorScheme.surfaceContainerHighest,
+              shape: const CircleBorder(),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                onTap: onRemove,
+                customBorder: const CircleBorder(),
+                child: Padding(
+                  padding: const EdgeInsets.all(2),
+                  child: Icon(
+                    Icons.close,
+                    size: 16,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
