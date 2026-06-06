@@ -271,17 +271,24 @@ flutter run -d ios
 - `operations` 表 — 增量同步日志
 - 行级安全策略（RLS）— 用户只能访问自己的数据
 
-### 3. 开启邮箱登录（魔法链接）
+### 3. 开启邮箱登录（验证码 + 魔法链接）
 
 1. 进入 **Authentication → Providers**
 2. 确认 **Email** 已启用
 3. 在 **Authentication → URL Configuration** 中配置回调地址：
-   - **Redirect URLs** 添加（须与代码中完全一致）：
+   - **Site URL** 建议设为 `com.todo.app.todo_app://login-callback/`（避免回退到 `http://localhost`）
+   - **Redirect URLs** 添加（建议两条都加）：
      ```
+     com.todo.app.todo_app://login-callback
      com.todo.app.todo_app://login-callback/
      ```
-   - **Site URL** 可保持默认；App 发送魔法链接时会指定上述 Deep Link，**不要**仅依赖 `http://localhost`——在手机上 localhost 指向手机自身，无法完成登录
    - 若做 **Flutter Web** 本地开发，另加 `http://localhost:端口` 到 Redirect URLs
+4. **（推荐）修改邮件模板以支持 6 位验证码登录**  
+   进入 **Authentication → Email Templates → Magic Link**，在正文中加入验证码（QQ 邮箱等会预扫描链接，导致魔法链接一点就 `otp_expired`）：
+   ```
+   您的登录验证码是：{{ .Token }}
+   ```
+   保留 `{{ .ConfirmationURL }}` 也可同时支持点击链接登录，但验证码方式更可靠。
 
 > **开发时邮件发不出去 / 提示发送太频繁？** 免费项目默认邮件约 **2～4 封/小时**，很容易触发限流。请在 **Project Settings → Authentication → SMTP Settings** 配置自定义 SMTP（QQ 邮箱、SendGrid、Resend 等），限额更高。QQ 邮箱逐步配置见 **[docs/SUPABASE-SMTP.md](docs/SUPABASE-SMTP.md)**。
 
@@ -302,10 +309,10 @@ class SupabaseConfig {
 
 ### 5. 在 App 内登录并同步
 
-1. 运行应用：`flutter run`
+1. 运行应用：`flutter run`（修改 AndroidManifest 后需 **完全重启** App，热重载不够）
 2. 进入 **处理** Tab，点击右上角 **同步** 图标
-3. 输入邮箱，点击 **发送魔法链接登录**
-4. 查收邮件中的登录链接并点击——应自动跳回 App 并完成登录（修改 AndroidManifest 后需 **完全重启** App，热重载不够）
+3. 输入邮箱，点击 **发送登录邮件**
+4. 查收邮件后，**推荐**在 App 内输入 6 位验证码并点击 **验证码登录**；也可点击邮件中的魔法链接（成功后会自动跳回 App）
 5. 确认账号与同步页显示 **云同步已开启**
 
 同步行为：

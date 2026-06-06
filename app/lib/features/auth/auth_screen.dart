@@ -15,13 +15,16 @@ class AuthScreen extends ConsumerStatefulWidget {
 
 class _AuthScreenState extends ConsumerState<AuthScreen> {
   final _emailController = TextEditingController();
+  final _otpController = TextEditingController();
   bool _sent = false;
   bool _loading = false;
+  bool _verifying = false;
   bool _manualSyncing = false;
 
   @override
   void dispose() {
     _emailController.dispose();
+    _otpController.dispose();
     super.dispose();
   }
 
@@ -39,9 +42,10 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     setState(() => _loading = true);
     try {
       await AuthService.instance.signInWithEmail(_emailController.text.trim());
-      setState(() => _sent = true);
-      ref.read(syncEngineProvider).startPeriodicSync();
-      await ref.read(syncEngineProvider).sync();
+      setState(() {
+        _sent = true;
+        _otpController.clear();
+      });
     } catch (e) {
       if (mounted) {
         final snackType = authSignInErrorSnackType(e);
@@ -56,6 +60,39 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       }
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _verifyOtp() async {
+    final email = _emailController.text.trim();
+    final token = _otpController.text.trim();
+    if (email.isEmpty || token.isEmpty) {
+      showAppSnackBar(
+        context,
+        message: '请输入邮箱和邮件中的 6 位验证码',
+        icon: Icons.info_outline,
+        type: AppSnackType.warning,
+      );
+      return;
+    }
+
+    setState(() => _verifying = true);
+    try {
+      await AuthService.instance.verifyEmailOtp(email: email, token: token);
+    } catch (e) {
+      if (mounted) {
+        final snackType = authSignInErrorSnackType(e);
+        showAppSnackBar(
+          context,
+          message: authSignInErrorMessage(e),
+          icon: snackType == AppSnackType.warning
+              ? Icons.schedule_outlined
+              : Icons.error_outline,
+          type: snackType,
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _verifying = false);
     }
   }
 
@@ -98,7 +135,12 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     ref.read(syncEngineProvider).stop();
     ref.read(lastSyncAtProvider.notifier).state = null;
     ref.read(syncStatusProvider.notifier).state = SyncStatus.idle;
-    if (mounted) setState(() => _sent = false);
+    if (mounted) {
+      setState(() {
+        _sent = false;
+        _otpController.clear();
+      });
+    }
   }
 
   String _formatLastSync(DateTime time) {
@@ -199,15 +241,16 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              '魔法链接已发送',
+                              '登录邮件已发送',
                               style: theme.textTheme.titleSmall?.copyWith(
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              '请查收 ${_emailController.text.trim()} 的邮件并点击链接。'
-                              '点击后会自动打开本 App 并完成登录，本页将显示「云同步已开启」。',
+                              '请查收 ${_emailController.text.trim()} 的邮件。'
+                              '推荐在下方输入 6 位验证码登录（可避免 QQ 邮箱等预扫描链接导致链接失效）。'
+                              '也可点击邮件中的链接，成功后会自动打开本 App。',
                               style: theme.textTheme.bodyMedium,
                             ),
                           ],
@@ -216,6 +259,28 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                     ],
                   ),
                 ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _otpController,
+                keyboardType: TextInputType.number,
+                maxLength: 6,
+                decoration: const InputDecoration(
+                  labelText: '邮件验证码（6 位）',
+                  border: OutlineInputBorder(),
+                  counterText: '',
+                ),
+              ),
+              const SizedBox(height: 12),
+              FilledButton(
+                onPressed: _verifying ? null : _verifyOtp,
+                child: _verifying
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('验证码登录'),
               ),
               const SizedBox(height: 16),
             ],
@@ -237,7 +302,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                       width: 20,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : Text(_sent ? '重新发送魔法链接' : '发送魔法链接登录'),
+                  : Text(_sent ? '重新发送登录邮件' : '发送登录邮件'),
             ),
           ],
         ],

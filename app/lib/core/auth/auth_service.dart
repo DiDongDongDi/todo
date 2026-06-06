@@ -56,6 +56,19 @@ class AuthService {
     );
   }
 
+  Future<void> verifyEmailOtp({
+    required String email,
+    required String token,
+  }) async {
+    final c = _client;
+    if (c == null) throw StateError('Supabase 未配置');
+    await c.auth.verifyOTP(
+      email: email,
+      token: token,
+      type: OtpType.email,
+    );
+  }
+
   Future<void> signOut() async {
     await _client?.auth.signOut();
   }
