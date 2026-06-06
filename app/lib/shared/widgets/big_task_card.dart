@@ -19,6 +19,7 @@ class BigTaskCard extends StatelessWidget {
     this.onSave,
     this.onActivateInput,
     this.feedback = CollectCardFeedback.none,
+    this.onDismissFeedback,
     this.onTrash,
     this.onComplete,
     this.onPrevious,
@@ -38,6 +39,7 @@ class BigTaskCard extends StatelessWidget {
   final VoidCallback? onSave;
   final VoidCallback? onActivateInput;
   final CollectCardFeedback feedback;
+  final VoidCallback? onDismissFeedback;
   final VoidCallback? onTrash;
   final VoidCallback? onComplete;
   final VoidCallback? onPrevious;
@@ -204,10 +206,14 @@ class BigTaskCard extends StatelessWidget {
             ),
           ),
           if (feedback == CollectCardFeedback.emptyHint)
-            IgnorePointer(
-              child: _buildCollectCenterHint(
-                context,
-                _feedbackMessage(feedback),
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: onDismissFeedback,
+                child: _buildCollectCenterHint(
+                  context,
+                  _feedbackMessage(feedback),
+                ),
               ),
             ),
         ],

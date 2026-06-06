@@ -22,20 +22,25 @@ void showAppSnackBar(
     AppSnackType.info => (colorScheme.inverseSurface, colorScheme.onInverseSurface),
   };
 
-  ScaffoldMessenger.of(context).hideCurrentSnackBar();
-  ScaffoldMessenger.of(context).showSnackBar(
+  final messenger = ScaffoldMessenger.of(context);
+  messenger.hideCurrentSnackBar();
+  messenger.showSnackBar(
     SnackBar(
-      content: Row(
-        children: [
-          Icon(icon, color: fg, size: 22),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              message,
-              style: theme.textTheme.bodyMedium?.copyWith(color: fg),
+      content: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: messenger.hideCurrentSnackBar,
+        child: Row(
+          children: [
+            Icon(icon, color: fg, size: 22),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                message,
+                style: theme.textTheme.bodyMedium?.copyWith(color: fg),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
       backgroundColor: bg,
       duration: duration,

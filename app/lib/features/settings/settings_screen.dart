@@ -4,6 +4,7 @@ import 'package:todo_app/core/settings/collect_sound_settings.dart';
 import 'package:todo_app/core/settings/notification_sound_platform.dart';
 import 'package:todo_app/shared/layout/app_layout.dart';
 import 'package:todo_app/shared/utils/sounds.dart';
+import 'package:todo_app/shared/widgets/app_snackbar.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -127,14 +128,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
 
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          updated?.enabled == true
-              ? '已选择：${updated!.displayTitle}'
-              : '已设为无声',
-        ),
-      ),
+    final enabled = updated?.enabled == true;
+    showAppSnackBar(
+      context,
+      message: enabled ? '已选择：${updated!.displayTitle}' : '已设为无声',
+      icon: enabled ? Icons.library_music_outlined : Icons.volume_off_outlined,
+      type: AppSnackType.success,
     );
   }
 }

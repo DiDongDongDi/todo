@@ -163,6 +163,12 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
 
 
 
+  void _dismissCardFeedback() {
+    if (_feedback == CollectCardFeedback.none) return;
+    _feedbackEpoch++;
+    setState(() => _feedback = CollectCardFeedback.none);
+  }
+
   Future<void> _showCardFeedback(
 
     CollectCardFeedback feedback,
@@ -491,6 +497,8 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
               onActivateInput: _activateInput,
 
               feedback: _feedback,
+
+              onDismissFeedback: _dismissCardFeedback,
 
               onChanged: (_) => setState(() {}),
 
