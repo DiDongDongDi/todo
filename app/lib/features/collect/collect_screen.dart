@@ -260,14 +260,19 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
 
   Future<void> _onSwipeUp() async {
     if (!_hasContent) {
+      final keepKeyboard = _focusNode.hasFocus;
+
       await AppHaptics.light();
 
       if (mounted) {
         await _showCardFeedback(
           CollectCardFeedback.emptyHint,
           const Duration(seconds: 1),
-          refocus: true,
         );
+      }
+
+      if (keepKeyboard && mounted && !_focusNode.hasFocus) {
+        _focusNode.requestFocus();
       }
 
       return;
@@ -320,25 +325,22 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
     if (_saving) return;
 
     if (!_hasContent) {
+      final keepKeyboard = _focusNode.hasFocus;
 
       await AppHaptics.light();
 
       if (mounted) {
-
         await _showCardFeedback(
-
           CollectCardFeedback.emptyHint,
-
           const Duration(seconds: 1),
-
-          refocus: true,
-
         );
+      }
 
+      if (keepKeyboard && mounted && !_focusNode.hasFocus) {
+        _focusNode.requestFocus();
       }
 
       return;
-
     }
 
     _saving = true;

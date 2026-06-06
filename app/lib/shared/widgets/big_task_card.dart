@@ -68,34 +68,42 @@ class BigTaskCard extends StatelessWidget {
               ),
               if (mode == BigTaskCardMode.collect) ...[
                 const SizedBox(height: 16),
-                Opacity(
-                  opacity: feedback == CollectCardFeedback.none ? 1 : 0.35,
-                  child: Row(
-                    children: [
-                      IconButton.filledTonal(
-                        onPressed: onPickImage,
-                        icon: const Icon(Icons.image_outlined),
-                        tooltip: '添加图片',
+                Row(
+                  children: [
+                    IconButton.filledTonal(
+                      onPressed: onPickImage,
+                      icon: const Icon(Icons.image_outlined),
+                      tooltip: '添加图片',
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton.filledTonal(
+                      onPressed: onStartSpeech,
+                      icon: Icon(isListening ? Icons.mic : Icons.mic_none_outlined),
+                      tooltip: '语音输入',
+                      style: IconButton.styleFrom(
+                        backgroundColor: isListening
+                            ? colorScheme.errorContainer
+                            : null,
                       ),
-                      const SizedBox(width: 8),
-                      IconButton.filledTonal(
-                        onPressed: onStartSpeech,
-                        icon: Icon(isListening ? Icons.mic : Icons.mic_none_outlined),
-                        tooltip: '语音输入',
-                        style: IconButton.styleFrom(
-                          backgroundColor: isListening
-                              ? colorScheme.errorContainer
-                              : null,
-                        ),
-                      ),
-                      const Spacer(),
-                      FilledButton.icon(
-                        onPressed: onSave,
+                    ),
+                    const Spacer(),
+                    Focus(
+                      canRequestFocus: false,
+                      child: FilledButton.icon(
+                        onPressed: () {
+                          final keepKeyboard = focusNode?.hasFocus ?? false;
+                          onSave?.call();
+                          if (keepKeyboard &&
+                              focusNode != null &&
+                              !focusNode!.hasFocus) {
+                            focusNode!.requestFocus();
+                          }
+                        },
                         icon: const Icon(Icons.check, size: 20),
                         label: const Text('保存'),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ] else if (mode == BigTaskCardMode.readOnly && task != null) ...[
                 const SizedBox(height: 16),
@@ -170,43 +178,39 @@ class BigTaskCard extends StatelessWidget {
     final colorScheme = theme.colorScheme;
 
     if (mode == BigTaskCardMode.collect) {
-      final hintStyle = theme.textTheme.headlineMedium?.copyWith(
-        color: colorScheme.onSurface.withValues(alpha: 0.45),
-        fontWeight: FontWeight.w400,
-        height: 1.35,
-      );
-
-      return AnimatedSwitcher(
-        duration: const Duration(milliseconds: 200),
-        child: feedback == CollectCardFeedback.none
-            ? TextField(
-                key: const ValueKey('collect-input'),
-                controller: controller,
-                focusNode: focusNode,
-                autofocus: true,
-                showCursor: true,
-                onTap: onActivateInput,
-                onChanged: onChanged,
-                expands: true,
-                maxLines: null,
-                scrollPhysics: const NeverScrollableScrollPhysics(),
-                textAlignVertical: TextAlignVertical.top,
-                style: theme.textTheme.headlineMedium?.copyWith(
-                  color: colorScheme.onSurface,
-                  height: 1.35,
-                ),
-                decoration: const InputDecoration(
-                  hintText: '记下一件事…',
-                ),
-              )
-            : Center(
-                key: ValueKey(feedback),
-                child: Text(
-                  _feedbackMessage(feedback),
-                  style: hintStyle,
-                  textAlign: TextAlign.center,
-                ),
+      return Stack(
+        fit: StackFit.expand,
+        children: [
+          Opacity(
+            opacity: feedback == CollectCardFeedback.emptyHint ? 0 : 1,
+            child: TextField(
+              controller: controller,
+              focusNode: focusNode,
+              autofocus: true,
+              showCursor: true,
+              onTap: onActivateInput,
+              onChanged: onChanged,
+              expands: true,
+              maxLines: null,
+              scrollPhysics: const NeverScrollableScrollPhysics(),
+              textAlignVertical: TextAlignVertical.top,
+              style: theme.textTheme.headlineMedium?.copyWith(
+                color: colorScheme.onSurface,
+                height: 1.35,
               ),
+              decoration: const InputDecoration(
+                hintText: '记下一件事…',
+              ),
+            ),
+          ),
+          if (feedback == CollectCardFeedback.emptyHint)
+            IgnorePointer(
+              child: _buildCollectCenterHint(
+                context,
+                _feedbackMessage(feedback),
+              ),
+            ),
+        ],
       );
     }
 
@@ -276,5 +280,23 @@ class BigTaskCard extends StatelessWidget {
       CollectCardFeedback.emptyHint => '先记下点什么',
       CollectCardFeedback.none => '',
     };
+  }
+
+  /// 与保存成功时卡片内「已收集」轻提示一致。
+  Widget _buildCollectCenterHint(BuildContext context, String message) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Center(
+      child: Text(
+        message,
+        style: theme.textTheme.headlineMedium?.copyWith(
+          color: colorScheme.onSurface.withValues(alpha: 0.45),
+          fontWeight: FontWeight.w400,
+          height: 1.35,
+        ),
+        textAlign: TextAlign.center,
+      ),
+    );
   }
 }
