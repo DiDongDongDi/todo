@@ -197,9 +197,44 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
   Future<void> _undoCreate() async {
     final task = _lastUndoTask;
     if (task == null) return;
-    final repo = await ref.read(taskRepositoryProvider.future);
-    await repo.trash(task.id);
-    _lastUndoTask = null;
+
+    Future<void> restoreContent() async {
+      final repo = await ref.read(taskRepositoryProvider.future);
+      await repo.trash(task.id);
+      unawaited(triggerSyncIfSignedIn(ref));
+
+      _lastUndoTask = null;
+      _feedbackEpoch++;
+
+      if (!mounted) return;
+
+      setState(() {
+        _feedback = CollectCardFeedback.none;
+        _controller.text = task.title;
+        _attachments
+          ..clear()
+          ..addAll(task.attachments);
+      });
+      _ensureCaretVisible();
+    }
+
+    final state = _swipeKey.currentState;
+    if (state != null) {
+      // 空白卡片向下滑出 → 恢复内容 → 原卡片从上方滑入
+      await state.animateFlyout(
+        const Offset(0, 1.2),
+        restoreContent,
+        resetAfter: false,
+        feedback: () async => AppHaptics.light(),
+      );
+      if (!mounted) return;
+      await _swipeKey.currentState?.resetPosition(enterFromTop: true);
+    } else {
+      await restoreContent();
+    }
+
+    if (!mounted) return;
+    await _requestInputFocus(recycleFocus: true);
   }
 
   void _showSaveSnackbar() {
