@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:todo_app/core/models/task.dart';
 import 'package:todo_app/shared/theme/app_semantic_colors.dart';
+import 'package:todo_app/shared/widgets/attachment_image.dart';
 import 'package:todo_app/shared/widgets/image_preview.dart';
-import 'package:todo_app/shared/widgets/local_image.dart';
 enum BigTaskCardMode { collect, process, readOnly }
 
 enum CollectCardFeedback { none, emptyHint }
@@ -239,11 +239,11 @@ class BigTaskCard extends StatelessWidget {
                 itemCount: attachments.length,
                 separatorBuilder: (_, __) => const SizedBox(width: 8),
                 itemBuilder: (context, index) {
-                  final imagePaths = _imagePaths(attachments);
+                  final imageAttachments = _imageAttachments(attachments);
                   final attachment = attachments[index];
                   return _AttachmentThumbnail(
                     attachment: attachment,
-                    imagePaths: imagePaths,
+                    imageAttachments: imageAttachments,
                     onRemove: onRemoveAttachment == null
                         ? null
                         : () => onRemoveAttachment!(index),
@@ -299,14 +299,14 @@ class BigTaskCard extends StatelessWidget {
           const SizedBox(height: 20),
           Builder(
             builder: (context) {
-              final imagePaths = _imagePaths(displayTask.attachments);
+              final imageAttachments = _imageAttachments(displayTask.attachments);
               return Wrap(
                 spacing: 8,
                 runSpacing: 8,
                 children: displayTask.attachments.map((a) {
                   return _AttachmentThumbnail(
                     attachment: a,
-                    imagePaths: imagePaths,
+                    imageAttachments: imageAttachments,
                   );
                 }).toList(),
               );
@@ -324,10 +324,9 @@ class BigTaskCard extends StatelessWidget {
     };
   }
 
-  static List<String> _imagePaths(List<TaskAttachment> attachments) {
+  static List<TaskAttachment> _imageAttachments(List<TaskAttachment> attachments) {
     return attachments
         .where((a) => a.type == AttachmentType.image)
-        .map((a) => a.localPath)
         .toList();
   }
 
@@ -353,12 +352,12 @@ class BigTaskCard extends StatelessWidget {
 class _AttachmentThumbnail extends StatelessWidget {
   const _AttachmentThumbnail({
     required this.attachment,
-    this.imagePaths = const [],
+    this.imageAttachments = const [],
     this.onRemove,
   });
 
   final TaskAttachment attachment;
-  final List<String> imagePaths;
+  final List<TaskAttachment> imageAttachments;
   final VoidCallback? onRemove;
 
   void _openPreview(BuildContext context) {
@@ -366,14 +365,18 @@ class _AttachmentThumbnail extends StatelessWidget {
 
     FocusManager.instance.primaryFocus?.unfocus();
 
-    final paths = imagePaths.isNotEmpty
-        ? imagePaths
-        : [attachment.localPath];
-    final index = paths.indexOf(attachment.localPath);
+    final images = imageAttachments.isNotEmpty
+        ? imageAttachments
+        : [attachment];
+    final index = images.indexWhere(
+      (a) =>
+          a.localPath == attachment.localPath &&
+          a.remoteUrl == attachment.remoteUrl,
+    );
 
-    showLocalImagePreview(
+    showAttachmentImagePreview(
       context,
-      paths: paths,
+      attachments: images,
       initialIndex: index >= 0 ? index : 0,
     );
   }
@@ -394,8 +397,8 @@ class _AttachmentThumbnail extends StatelessWidget {
               width: 80,
               height: 80,
               child: isImage
-                  ? LocalImage(
-                      attachment.localPath,
+                  ? AttachmentImage(
+                      attachment,
                       fit: BoxFit.cover,
                     )
                   : ColoredBox(

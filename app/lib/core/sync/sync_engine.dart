@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:todo_app/core/auth/auth_service.dart';
 import 'package:todo_app/core/models/task.dart';
 import 'package:todo_app/core/repositories/task_repository.dart';
+import 'package:todo_app/core/sync/attachment_upload_service.dart';
 import 'package:todo_app/core/sync/sync_repository.dart';
 
 final syncEngineProvider = Provider<SyncEngine>((ref) {
@@ -63,7 +64,8 @@ class SyncEngine {
     _ref.read(syncStatusProvider.notifier).state = SyncStatus.syncing;
     try {
       final taskRepo = await _ref.read(taskRepositoryProvider.future);
-      final local = await taskRepo.getAll();
+      var local = await taskRepo.getAll();
+      local = await _uploadPendingAttachments(taskRepo, local);
       await repo.pushTasks(local);
       final remote = await repo.pullTasks();
       await _mergeRemote(taskRepo, remote);
@@ -72,6 +74,49 @@ class SyncEngine {
       debugPrint('Sync error: $e\n$st');
       _ref.read(syncStatusProvider.notifier).state = SyncStatus.error;
     }
+  }
+
+  Future<List<Task>> _uploadPendingAttachments(
+    TaskRepository taskRepo,
+    List<Task> tasks,
+  ) async {
+    final client = AuthService.instance.client;
+    final userId = AuthService.instance.currentUser?.id;
+    if (client == null || userId == null) return tasks;
+
+    final uploadService = AttachmentUploadService();
+    var changed = false;
+
+    for (final task in tasks) {
+      if (!task.attachments.any(uploadService.attachmentNeedsUpload)) {
+        continue;
+      }
+
+      final uploaded = await uploadService.uploadPending(
+        client: client,
+        userId: userId,
+        taskId: task.id,
+        attachments: task.attachments,
+      );
+
+      if (!_attachmentsChanged(task.attachments, uploaded)) continue;
+
+      await taskRepo.update(task.copyWith(attachments: uploaded));
+      changed = true;
+    }
+
+    return changed ? await taskRepo.getAll() : tasks;
+  }
+
+  bool _attachmentsChanged(
+    List<TaskAttachment> before,
+    List<TaskAttachment> after,
+  ) {
+    if (before.length != after.length) return true;
+    for (var i = 0; i < before.length; i++) {
+      if (before[i].remoteUrl != after[i].remoteUrl) return true;
+    }
+    return false;
   }
 
   Future<void> _mergeRemote(TaskRepository taskRepo, List<Task> remote) async {

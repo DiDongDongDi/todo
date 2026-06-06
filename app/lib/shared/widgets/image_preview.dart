@@ -1,5 +1,33 @@
 import 'package:flutter/material.dart';
+import 'package:todo_app/core/models/task.dart';
+import 'package:todo_app/shared/widgets/attachment_image.dart';
 import 'package:todo_app/shared/widgets/local_image.dart';
+
+Future<void> showAttachmentImagePreview(
+  BuildContext context, {
+  required List<TaskAttachment> attachments,
+  int initialIndex = 0,
+}) {
+  if (attachments.isEmpty) return Future.value();
+
+  final index = initialIndex.clamp(0, attachments.length - 1);
+
+  return Navigator.of(context).push<void>(
+    PageRouteBuilder<void>(
+      opaque: false,
+      barrierColor: Colors.black87,
+      pageBuilder: (context, animation, secondaryAnimation) {
+        return _AttachmentPreviewPage(
+          attachments: attachments,
+          initialIndex: index,
+        );
+      },
+      transitionsBuilder: (context, animation, secondaryAnimation, child) {
+        return FadeTransition(opacity: animation, child: child);
+      },
+    ),
+  );
+}
 
 Future<void> showLocalImagePreview(
   BuildContext context, {
@@ -25,6 +53,103 @@ Future<void> showLocalImagePreview(
       },
     ),
   );
+}
+
+class _AttachmentPreviewPage extends StatefulWidget {
+  const _AttachmentPreviewPage({
+    required this.attachments,
+    required this.initialIndex,
+  });
+
+  final List<TaskAttachment> attachments;
+  final int initialIndex;
+
+  @override
+  State<_AttachmentPreviewPage> createState() => _AttachmentPreviewPageState();
+}
+
+class _AttachmentPreviewPageState extends State<_AttachmentPreviewPage> {
+  late final PageController _pageController;
+  late final TransformationController _transformController;
+  late int _currentIndex;
+  double _scale = 1.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentIndex = widget.initialIndex;
+    _pageController = PageController(initialPage: widget.initialIndex);
+    _transformController = TransformationController();
+    _transformController.addListener(_onTransformUpdate);
+  }
+
+  void _onTransformUpdate() {
+    final scale = _transformController.value.getMaxScaleOnAxis();
+    if ((scale - _scale).abs() > 0.01) {
+      setState(() => _scale = scale);
+    }
+  }
+
+  void _resetTransform() {
+    _transformController.value = Matrix4.identity();
+    _scale = 1.0;
+  }
+
+  void _onImageTap() {
+    Navigator.of(context).pop();
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    _transformController.removeListener(_onTransformUpdate);
+    _transformController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final multi = widget.attachments.length > 1;
+
+    return Scaffold(
+      backgroundColor: Colors.black,
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        foregroundColor: Colors.white,
+        title: multi
+            ? Text('${_currentIndex + 1} / ${widget.attachments.length}')
+            : null,
+      ),
+      body: PageView.builder(
+        controller: _pageController,
+        itemCount: widget.attachments.length,
+        onPageChanged: (index) {
+          setState(() => _currentIndex = index);
+          _resetTransform();
+        },
+        itemBuilder: (context, index) {
+          return InteractiveViewer(
+            transformationController: _transformController,
+            minScale: 0.5,
+            maxScale: 4,
+            panEnabled: _scale > 1.01,
+            child: GestureDetector(
+              onTap: _onImageTap,
+              behavior: HitTestBehavior.opaque,
+              child: Center(
+                child: AttachmentImage(
+                  widget.attachments[index],
+                  fit: BoxFit.contain,
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
 }
 
 class _ImagePreviewPage extends StatefulWidget {
