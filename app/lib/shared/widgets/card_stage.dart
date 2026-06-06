@@ -12,6 +12,8 @@ class CardStage extends StatelessWidget {
     required this.child,
     this.enabled = true,
     this.resetAfterAction = true,
+    this.shouldAnimateFlyout,
+    this.onFlyoutFeedback,
     this.overlay,
     this.onSwipeLeft,
     this.onSwipeRight,
@@ -26,6 +28,8 @@ class CardStage extends StatelessWidget {
   final Widget child;
   final bool enabled;
   final bool resetAfterAction;
+  final FlyoutGate? shouldAnimateFlyout;
+  final FlyoutFeedback? onFlyoutFeedback;
   final Widget? overlay;
   final SwipeCallback? onSwipeLeft;
   final SwipeCallback? onSwipeRight;
@@ -52,6 +56,8 @@ class CardStage extends StatelessWidget {
                   key: swipeKey,
                   enabled: enabled,
                   resetAfterAction: resetAfterAction,
+                  shouldAnimateFlyout: shouldAnimateFlyout,
+                  onFlyoutFeedback: onFlyoutFeedback,
                   onSwipeLeft: onSwipeLeft,
                   onSwipeRight: onSwipeRight,
                   onSwipeUp: onSwipeUp,

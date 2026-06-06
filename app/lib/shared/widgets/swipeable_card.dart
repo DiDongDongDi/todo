@@ -3,6 +3,8 @@ import 'package:todo_app/shared/theme/app_semantic_colors.dart';
 import 'package:todo_app/shared/utils/haptics.dart';
 
 typedef SwipeCallback = Future<void> Function();
+typedef FlyoutFeedback = Future<void> Function();
+typedef FlyoutGate = Future<bool> Function();
 
 class SwipeableCard extends StatefulWidget {
   const SwipeableCard({
@@ -15,6 +17,8 @@ class SwipeableCard extends StatefulWidget {
     this.onDragStart,
     this.enabled = true,
     this.resetAfterAction = true,
+    this.shouldAnimateFlyout,
+    this.onFlyoutFeedback,
     this.leftLabel = '放弃',
     this.rightLabel = '完成',
     this.upLabel,
@@ -29,6 +33,8 @@ class SwipeableCard extends StatefulWidget {
   final VoidCallback? onDragStart;
   final bool enabled;
   final bool resetAfterAction;
+  final FlyoutGate? shouldAnimateFlyout;
+  final FlyoutFeedback? onFlyoutFeedback;
   final String leftLabel;
   final String rightLabel;
   final String? upLabel;
@@ -108,11 +114,17 @@ class SwipeableCardState extends State<SwipeableCard>
     Offset flyout,
     SwipeCallback action, {
     bool? resetAfter,
+    FlyoutFeedback? feedback,
   }) async {
     if (_animating || !mounted) return;
 
     setState(() => _animating = true);
-    await AppHaptics.medium();
+    final flyoutFeedback = feedback ?? widget.onFlyoutFeedback;
+    if (flyoutFeedback != null) {
+      await flyoutFeedback();
+    } else {
+      await AppHaptics.medium();
+    }
 
     if (!mounted) return;
 
@@ -264,6 +276,13 @@ class SwipeableCardState extends State<SwipeableCard>
 
     if (action == null) {
       setState(() => _drag = Offset.zero);
+      return;
+    }
+
+    if (widget.shouldAnimateFlyout != null &&
+        !await widget.shouldAnimateFlyout!()) {
+      setState(() => _drag = Offset.zero);
+      await action();
       return;
     }
 

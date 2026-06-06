@@ -21,3 +21,9 @@
 ## 无需改动的插件
 
 - `shared_preferences`、`path_provider`、`sqlite3_flutter_libs` — 标准嵌入，无额外 manifest
+
+## 收集音效（系统通知音库）
+
+- **Android：** 通过 `MainActivity` 的 MethodChannel（`com.todo.app/notification_sound`）调用 `RingtoneManager.ACTION_RINGTONE_PICKER` 打开系统通知音选择器，并用 `RingtoneManager.getRingtone()` 播放
+- **权限：** 无需额外 manifest 权限（读取/播放系统铃声 URI）
+- **其他平台：** 暂不支持系统通知音库，设置页会提示仅保留震动

@@ -29,6 +29,7 @@
 - `app/android/settings.gradle.kts`
 - `app/android/build.gradle.kts`
 - `app/android/gradle/wrapper/gradle-wrapper.properties`
+- `app/android/app/build.gradle.kts`（含 `ndkVersion = "27.0.12077973"`）
 - `scripts/check_android_env.ps1`
 - `docs/ANDROID-PLUGIN-NOTES.md`
 
@@ -135,3 +136,62 @@ C:\Program Files\Android\Android Studio\jbr
 ```
 
 可在「系统环境变量」中新建 `JAVA_HOME` 指向该目录，并将 `%JAVA_HOME%\bin` 加入 Path（安装 Studio 后若 `flutter doctor` 仍报 Java 错误再设）。
+
+---
+
+## 八、NDK 版本不一致警告
+
+构建时若出现类似提示：
+
+```text
+Your project is configured with Android NDK 26.x, but the following plugin(s) depend on a different Android NDK version:
+- shared_preferences_android requires Android NDK 27.0.12077973
+...
+Fix this issue by using the highest Android NDK version (they are backward compatible).
+```
+
+表示项目使用的 NDK 版本低于部分 Flutter 插件要求。NDK 各版本**向后兼容**，将项目固定到**最高所需版本**即可消除警告。
+
+### 8.1 修改项目配置（必做）
+
+编辑 `app/android/app/build.gradle.kts`，在 `android { }` 块内指定：
+
+```kotlin
+android {
+    ndkVersion = "27.0.12077973"
+    // ...
+}
+```
+
+保存后重新执行 `flutter run` 或 `flutter build apk`，警告应消失。
+
+> 本仓库已按上述方式配置；若你拉取旧分支或本地被改回 `flutter.ndkVersion`，按本节改回即可。
+
+### 8.2 安装 NDK 27（本机尚未安装时）
+
+任选一种方式：
+
+**方式 A：Android Studio（推荐）**
+
+1. 打开 Android Studio → **Settings**（Mac：**Android Studio → Settings**）
+2. **Languages & Frameworks → Android SDK → SDK Tools**
+3. 勾选 **Show Package Details**
+4. 展开 **NDK (Side by side)**，勾选 **27.0.12077973**
+5. 点击 **Apply / OK** 等待下载完成
+
+**方式 B：命令行 sdkmanager**
+
+```powershell
+# 需已配置 Android SDK，且 sdkmanager 在 PATH 中
+sdkmanager "ndk;27.0.12077973"
+```
+
+接受许可后执行 `flutter doctor` 确认 Android toolchain 仍为 ✓。
+
+### 8.3 常见问题
+
+| 现象 | 处理 |
+|------|------|
+| 首次改 NDK 后构建很慢 | 正常，Gradle 会下载 NDK；只需一次 |
+| `Unexpected end of ZLIB input stream` | 执行 `flutter clean` 后重新 `flutter build apk` |
+| 仍提示 NDK 26 | 确认改的是 `app/android/app/build.gradle.kts`，不是根目录 `android/build.gradle.kts` |

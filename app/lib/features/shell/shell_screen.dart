@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:todo_app/features/collect/collect_screen.dart';
 import 'package:todo_app/features/process/process_screen.dart';
+import 'package:todo_app/features/settings/settings_screen.dart';
 
 class ShellScreen extends StatefulWidget {
   const ShellScreen({super.key});
@@ -18,6 +19,8 @@ class _ShellScreenState extends State<ShellScreen> {
         return const CollectScreen(key: ValueKey('collect'));
       case 1:
         return const ProcessScreen(key: ValueKey('process'));
+      case 2:
+        return const SettingsScreen(key: ValueKey('settings'));
       default:
         return const SizedBox.shrink();
     }
@@ -43,6 +46,11 @@ class _ShellScreenState extends State<ShellScreen> {
             icon: Icon(Icons.swipe_outlined),
             selectedIcon: Icon(Icons.swipe),
             label: '处理',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.settings_outlined),
+            selectedIcon: Icon(Icons.settings),
+            label: '设置',
           ),
         ],
       ),

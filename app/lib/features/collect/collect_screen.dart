@@ -8,13 +8,14 @@ import 'package:image_picker/image_picker.dart';
 
 import 'package:speech_to_text/speech_to_text.dart';
 
+import 'package:todo_app/core/settings/collect_sound_settings.dart';
 import 'package:todo_app/core/models/task.dart';
-
 import 'package:todo_app/core/repositories/task_repository.dart';
 
 import 'package:todo_app/core/sync/sync_engine.dart';
 
 import 'package:todo_app/shared/utils/haptics.dart';
+import 'package:todo_app/shared/utils/sounds.dart';
 
 import 'package:todo_app/shared/utils/platform_capabilities.dart';
 
@@ -189,42 +190,33 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
     );
   }
 
+  Future<void> _collectFlyoutFeedback() async {
+    final preference = await ref.read(collectSoundProvider.future);
+    await Future.wait([
+      AppHaptics.medium(),
+      AppSounds.playCollectSuccess(preference),
+    ]);
+  }
+
   Future<void> _onSwipeUp() async {
-
     if (!_hasContent) {
-
-      await _swipeKey.currentState?.resetPosition(animated: false);
-
       await AppHaptics.light();
 
       if (mounted) {
-
         await _showCardFeedback(
-
           CollectCardFeedback.emptyHint,
-
           const Duration(seconds: 1),
-
           refocus: true,
-
         );
-
       }
 
       return;
-
     }
 
-
-
     await _performSave();
-
   }
 
-
-
   Future<void> _performSave() async {
-
     final repo = await ref.read(taskRepositoryProvider.future);
 
     final task = await repo.createInbox(
@@ -413,6 +405,10 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
             enabled: true,
 
             resetAfterAction: false,
+
+            shouldAnimateFlyout: () async => _hasContent,
+
+            onFlyoutFeedback: _collectFlyoutFeedback,
 
             onDragStart: () => _focusNode.unfocus(),
 
