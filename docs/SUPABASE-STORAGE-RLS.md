@@ -32,48 +32,26 @@ INSERT INTO storage.buckets (id, name, public)
 VALUES ('attachments', 'attachments', false)
 ON CONFLICT (id) DO NOTHING;
 
-ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
+-- storage.objects 由 supabase_storage_admin 管理：
+-- 勿 ALTER TABLE / DROP POLICY（会报 must be owner of table objects）
+-- 用 pg_policies 判断后 CREATE POLICY，可重复执行
 
-DROP POLICY IF EXISTS "attachments_select_own" ON storage.objects;
-DROP POLICY IF EXISTS "attachments_insert_own" ON storage.objects;
-DROP POLICY IF EXISTS "attachments_update_own" ON storage.objects;
-DROP POLICY IF EXISTS "attachments_delete_own" ON storage.objects;
-
-CREATE POLICY "attachments_select_own"
-ON storage.objects FOR SELECT
-TO authenticated
-USING (
-  bucket_id = 'attachments'
-  AND (storage.foldername(name))[1] = auth.uid()::text
-);
-
-CREATE POLICY "attachments_insert_own"
-ON storage.objects FOR INSERT
-TO authenticated
-WITH CHECK (
-  bucket_id = 'attachments'
-  AND (storage.foldername(name))[1] = auth.uid()::text
-);
-
-CREATE POLICY "attachments_update_own"
-ON storage.objects FOR UPDATE
-TO authenticated
-USING (
-  bucket_id = 'attachments'
-  AND (storage.foldername(name))[1] = auth.uid()::text
-)
-WITH CHECK (
-  bucket_id = 'attachments'
-  AND (storage.foldername(name))[1] = auth.uid()::text
-);
-
-CREATE POLICY "attachments_delete_own"
-ON storage.objects FOR DELETE
-TO authenticated
-USING (
-  bucket_id = 'attachments'
-  AND (storage.foldername(name))[1] = auth.uid()::text
-);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'storage' AND tablename = 'objects'
+      AND policyname = 'attachments_select_own'
+  ) THEN
+    CREATE POLICY "attachments_select_own" ON storage.objects FOR SELECT
+    TO authenticated
+    USING (
+      bucket_id = 'attachments'
+      AND (storage.foldername(name))[1] = auth.uid()::text
+    );
+  END IF;
+  -- insert / update / delete 策略同理，见 002_storage_rls.sql 全文
+END $$;
 ```
 
 若已在 Dashboard 手动创建了 `attachments` bucket，迁移中的 `INSERT` 会因 `ON CONFLICT DO NOTHING` 而跳过，不影响已有 bucket。
@@ -124,6 +102,12 @@ final url = await supabase.storage
 ```
 
 上传成功后，将返回的 URL 写入 task 的 `attachments[].remoteUrl`（见 [ARCHITECTURE.md](./ARCHITECTURE.md)）。
+
+## 常见错误
+
+若在 SQL Editor 执行时报 `ERROR: 42501: must be owner of table objects`，通常是因为脚本里含有 `ALTER TABLE storage.objects` 或 `DROP POLICY ... ON storage.objects`。`storage.objects` 归 `supabase_storage_admin` 所有，`postgres` 不能改表结构或删策略；请使用当前版 `002_storage_rls.sql`（仅 `INSERT` + 条件 `CREATE POLICY`）。
+
+若 `CREATE POLICY` 也失败，可改用 Dashboard → **Storage** → `attachments` → **Policies** 手动创建（见上文「Dashboard 手动配置」），或通过 **Connect** → Session pooler 的 `psql` 连接执行。
 
 ## 验证
 
