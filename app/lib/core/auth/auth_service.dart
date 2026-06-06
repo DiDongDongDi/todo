@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:todo_app/core/config/supabase_config.example.dart';
+import 'package:todo_app/core/config/supabase_config.dart';
 
 final supabaseClientProvider = Provider<SupabaseClient?>((ref) {
   return AuthService.instance.client;
