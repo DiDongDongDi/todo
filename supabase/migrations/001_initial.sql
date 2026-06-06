@@ -21,15 +21,19 @@ CREATE INDEX IF NOT EXISTS tasks_updated_at_idx ON public.tasks (user_id, update
 
 ALTER TABLE public.tasks ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS tasks_select_own ON public.tasks;
 CREATE POLICY tasks_select_own ON public.tasks
   FOR SELECT USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS tasks_insert_own ON public.tasks;
 CREATE POLICY tasks_insert_own ON public.tasks
   FOR INSERT WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS tasks_update_own ON public.tasks;
 CREATE POLICY tasks_update_own ON public.tasks
   FOR UPDATE USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS tasks_delete_own ON public.tasks;
 CREATE POLICY tasks_delete_own ON public.tasks
   FOR DELETE USING (auth.uid() = user_id);
 
@@ -50,9 +54,11 @@ CREATE INDEX IF NOT EXISTS operations_user_created_idx
 
 ALTER TABLE public.operations ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS operations_select_own ON public.operations;
 CREATE POLICY operations_select_own ON public.operations
   FOR SELECT USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS operations_insert_own ON public.operations;
 CREATE POLICY operations_insert_own ON public.operations
   FOR INSERT WITH CHECK (auth.uid() = user_id);
 

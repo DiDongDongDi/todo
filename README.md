@@ -263,6 +263,8 @@ flutter run -d ios
 
 在 Supabase Dashboard 中打开 **SQL Editor**，将 [`supabase/migrations/001_initial.sql`](supabase/migrations/001_initial.sql) 的全部内容粘贴并执行。
 
+> 若报错 `policy "tasks_select_own" already exists`，说明迁移已执行过，可忽略；或重新粘贴最新版 SQL（已支持重复执行）再跑一遍。
+
 迁移会创建：
 
 - `tasks` 表 — 任务数据
