@@ -14,7 +14,6 @@ import 'package:todo_app/shared/widgets/big_task_card.dart';
 import 'package:todo_app/shared/widgets/card_stage.dart';
 import 'package:todo_app/shared/widgets/progress_widgets.dart';
 import 'package:todo_app/shared/widgets/swipeable_card.dart';
-import 'package:todo_app/shared/widgets/task_action_bar.dart';
 
 class ProcessScreen extends ConsumerStatefulWidget {
   const ProcessScreen({super.key});
@@ -190,6 +189,20 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
                     controller: _editing ? _editController : null,
                     focusNode: _editing ? _editFocusNode : null,
                     onChanged: _editing ? (_) => setState(() {}) : null,
+                    onTrash: () => _trash(task, animated: true),
+                    onComplete: () => _archive(task, animated: true),
+                    onPrevious: () => _setIndex(
+                      clampedIndex - 1,
+                      tasks.length,
+                      animated: true,
+                    ),
+                    onNext: () => _setIndex(
+                      clampedIndex + 1,
+                      tasks.length,
+                      animated: true,
+                    ),
+                    canGoPrevious: clampedIndex > 0,
+                    canGoNext: clampedIndex < tasks.length - 1,
                   ),
                 ),
               ),
@@ -211,17 +224,6 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
                     ),
                   ],
                 ),
-              )
-            else if (!touchFirst)
-              TaskActionBar(
-                onTrash: () => _trash(task, animated: true),
-                onComplete: () => _archive(task, animated: true),
-                onPrevious: () =>
-                    _setIndex(clampedIndex - 1, tasks.length, animated: true),
-                onNext: () =>
-                    _setIndex(clampedIndex + 1, tasks.length, animated: true),
-                canGoPrevious: clampedIndex > 0,
-                canGoNext: clampedIndex < tasks.length - 1,
               ),
             if (progress >= 1 && tasks.isNotEmpty) const SizedBox(height: 4),
           ],

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:todo_app/core/models/task.dart';
+import 'package:todo_app/shared/theme/app_semantic_colors.dart';
 enum BigTaskCardMode { collect, process, readOnly }
 
 enum CollectCardFeedback { none, emptyHint }
@@ -18,6 +19,12 @@ class BigTaskCard extends StatelessWidget {
     this.onSave,
     this.onActivateInput,
     this.feedback = CollectCardFeedback.none,
+    this.onTrash,
+    this.onComplete,
+    this.onPrevious,
+    this.onNext,
+    this.canGoPrevious = true,
+    this.canGoNext = true,
   });
 
   final BigTaskCardMode mode;
@@ -31,6 +38,12 @@ class BigTaskCard extends StatelessWidget {
   final VoidCallback? onSave;
   final VoidCallback? onActivateInput;
   final CollectCardFeedback feedback;
+  final VoidCallback? onTrash;
+  final VoidCallback? onComplete;
+  final VoidCallback? onPrevious;
+  final VoidCallback? onNext;
+  final bool canGoPrevious;
+  final bool canGoNext;
 
   @override
   Widget build(BuildContext context) {
@@ -83,6 +96,42 @@ class BigTaskCard extends StatelessWidget {
                       ),
                     ],
                   ),
+                ),
+              ] else if (mode == BigTaskCardMode.readOnly && task != null) ...[
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    IconButton.filledTonal(
+                      onPressed: onTrash,
+                      icon: Icon(Icons.close, color: colorScheme.error),
+                      tooltip: '删除',
+                      style: IconButton.styleFrom(
+                        backgroundColor: colorScheme.errorContainer,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    FilledButton.icon(
+                      onPressed: onComplete,
+                      icon: const Icon(Icons.check, size: 20),
+                      label: const Text('完成'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: context.semanticColors.success,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                    const Spacer(),
+                    IconButton.filledTonal(
+                      onPressed: canGoPrevious ? onPrevious : null,
+                      icon: const Icon(Icons.keyboard_arrow_up),
+                      tooltip: '上一条',
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton.filledTonal(
+                      onPressed: canGoNext ? onNext : null,
+                      icon: const Icon(Icons.keyboard_arrow_down),
+                      tooltip: '下一条',
+                    ),
+                  ],
                 ),
               ],
             ],
