@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:todo_app/core/auth/auth_service.dart';
 import 'package:todo_app/core/models/task.dart';
@@ -15,7 +15,25 @@ final syncEngineProvider = Provider<SyncEngine>((ref) {
 
 final syncStatusProvider = StateProvider<SyncStatus>((ref) => SyncStatus.idle);
 
+final lastSyncAtProvider = StateProvider<DateTime?>((ref) => null);
+
 enum SyncStatus { idle, syncing, error, offline }
+
+extension SyncStatusDisplay on SyncStatus {
+  String get label => switch (this) {
+        SyncStatus.idle => '已同步',
+        SyncStatus.syncing => '正在同步…',
+        SyncStatus.error => '同步失败',
+        SyncStatus.offline => '离线',
+      };
+
+  IconData get icon => switch (this) {
+        SyncStatus.idle => Icons.cloud_done_outlined,
+        SyncStatus.syncing => Icons.cloud_sync_outlined,
+        SyncStatus.error => Icons.cloud_off_outlined,
+        SyncStatus.offline => Icons.cloud_off_outlined,
+      };
+}
 
 Future<void> triggerSyncIfSignedIn(WidgetRef ref) async {
   if (AuthService.instance.isSignedIn) {
@@ -69,6 +87,7 @@ class SyncEngine {
       await repo.pushTasks(local);
       final remote = await repo.pullTasks();
       await _mergeRemote(taskRepo, remote);
+      _ref.read(lastSyncAtProvider.notifier).state = DateTime.now();
       _ref.read(syncStatusProvider.notifier).state = SyncStatus.idle;
     } catch (e, st) {
       debugPrint('Sync error: $e\n$st');
