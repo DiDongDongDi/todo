@@ -264,10 +264,13 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                 controller: _otpController,
                 keyboardType: TextInputType.number,
                 maxLength: 10,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: '邮件验证码',
                   hintText: '以邮件中的位数为准（通常 6～10 位）',
-                  border: OutlineInputBorder(),
+                  hintStyle: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.35),
+                  ),
+                  border: const OutlineInputBorder(),
                   counterText: '',
                 ),
               ),
