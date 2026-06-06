@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:todo_app/core/auth/auth_error_messages.dart';
 import 'package:todo_app/core/auth/auth_service.dart';
 import 'package:todo_app/core/sync/sync_engine.dart';
 import 'package:todo_app/shared/widgets/app_snackbar.dart';
@@ -43,11 +44,14 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       await ref.read(syncEngineProvider).sync();
     } catch (e) {
       if (mounted) {
+        final snackType = authSignInErrorSnackType(e);
         showAppSnackBar(
           context,
-          message: '登录失败: $e',
-          icon: Icons.error_outline,
-          type: AppSnackType.error,
+          message: authSignInErrorMessage(e),
+          icon: snackType == AppSnackType.warning
+              ? Icons.schedule_outlined
+              : Icons.error_outline,
+          type: snackType,
         );
       }
     } finally {
