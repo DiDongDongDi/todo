@@ -1,9 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:todo_app/core/repositories/task_repository.dart';
+import 'package:todo_app/core/sync/sync_engine.dart';
+import 'package:todo_app/shared/widgets/app_snackbar.dart';
+import 'package:todo_app/shared/widgets/swipeable_restore_tile.dart';
 
 class TrashScreen extends ConsumerWidget {
   const TrashScreen({super.key});
+
+  void _showRestoredSnackBar(BuildContext context) {
+    showAppSnackBar(
+      context,
+      message: '已恢复',
+      icon: Icons.check_circle_outline,
+      type: AppSnackType.success,
+    );
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -24,20 +36,19 @@ class TrashScreen extends ConsumerWidget {
             separatorBuilder: (_, __) => const SizedBox(height: 8),
             itemBuilder: (context, index) {
               final task = tasks[index];
-              return Card(
-                child: ListTile(
-                  title: Text(task.title),
-                  subtitle: task.note != null ? Text(task.note!) : null,
-                  trailing: IconButton(
-                    icon: const Icon(Icons.restore),
-                    tooltip: '恢复',
-                    onPressed: () async {
-                      final repo =
-                          await ref.read(taskRepositoryProvider.future);
-                      await repo.restoreToInbox(task.id);
-                    },
-                  ),
-                ),
+              return SwipeableRestoreTile(
+                key: ValueKey(task.id),
+                task: task,
+                restoreIcon: Icons.restore,
+                restoreTooltip: '恢复',
+                onRestore: () async {
+                  final repo = await ref.read(taskRepositoryProvider.future);
+                  await repo.restoreToInbox(task.id);
+                  await triggerSyncIfSignedIn(ref);
+                  if (context.mounted) {
+                    _showRestoredSnackBar(context);
+                  }
+                },
               );
             },
           );
