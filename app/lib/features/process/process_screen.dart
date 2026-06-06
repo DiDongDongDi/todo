@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -324,15 +326,9 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
   }
 
   Future<void> _performArchive(Task task) async {
-    final settings = await ref.read(processSoundProvider.future);
     final repo = await ref.read(taskRepositoryProvider.future);
     await repo.archive(task.id);
-    await triggerSyncIfSignedIn(ref);
-    await ref.read(statsProvider.notifier).recordArchive();
-    await Future.wait([
-      AppHaptics.medium(),
-      AppSounds.play(settings.complete),
-    ]);
+
     _lastUndoTask = task;
     _lastUndoFrom = TaskStatus.archived;
     _showUndoSnackbar(
@@ -344,6 +340,18 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
       final remaining = (ref.read(inboxTasksProvider).value?.length ?? 1) - 1;
       if (remaining <= 0) showCelebrateOverlay(context);
     }
+
+    unawaited(triggerSyncIfSignedIn(ref));
+    unawaited(ref.read(statsProvider.notifier).recordArchive());
+    unawaited(_playCompleteFeedback());
+  }
+
+  Future<void> _playCompleteFeedback() async {
+    final settings = await ref.read(processSoundProvider.future);
+    await Future.wait([
+      AppHaptics.medium(),
+      AppSounds.play(settings.complete),
+    ]);
   }
 
   Future<void> _trash(Task task, {bool animated = false}) async {
@@ -358,14 +366,9 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
   }
 
   Future<void> _performTrash(Task task) async {
-    final settings = await ref.read(processSoundProvider.future);
     final repo = await ref.read(taskRepositoryProvider.future);
     await repo.trash(task.id);
-    await triggerSyncIfSignedIn(ref);
-    await Future.wait([
-      AppHaptics.medium(),
-      AppSounds.play(settings.trash),
-    ]);
+
     _lastUndoTask = task;
     _lastUndoFrom = TaskStatus.trashed;
     _showUndoSnackbar(
@@ -373,5 +376,16 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
       icon: Icons.delete_outline,
       type: AppSnackType.error,
     );
+
+    unawaited(triggerSyncIfSignedIn(ref));
+    unawaited(_playTrashFeedback());
+  }
+
+  Future<void> _playTrashFeedback() async {
+    final settings = await ref.read(processSoundProvider.future);
+    await Future.wait([
+      AppHaptics.medium(),
+      AppSounds.play(settings.trash),
+    ]);
   }
 }

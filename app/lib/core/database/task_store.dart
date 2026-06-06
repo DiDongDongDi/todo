@@ -25,6 +25,7 @@ class JsonTaskStore implements TaskStore {
 
   final List<Task> _tasks = [];
   final _changeController = StreamController<void>.broadcast();
+  Future<void>? _saveInFlight;
 
   @override
   Future<void> init() async {
@@ -79,15 +80,23 @@ class JsonTaskStore implements TaskStore {
     } else {
       _tasks.add(task);
     }
-    await _save();
-    _changeController.add(null);
+    _notifyChanged();
   }
 
   @override
   Future<void> delete(String id) async {
     _tasks.removeWhere((t) => t.id == id);
-    await _save();
+    _notifyChanged();
+  }
+
+  void _notifyChanged() {
     _changeController.add(null);
+    unawaited(_persistQueued());
+  }
+
+  Future<void> _persistQueued() {
+    _saveInFlight ??= _save().whenComplete(() => _saveInFlight = null);
+    return _saveInFlight!;
   }
 
   @override
