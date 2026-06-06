@@ -204,6 +204,8 @@ class SwipeableCardState extends State<SwipeableCard>
     bool animated = true,
     bool enterFromBottom = false,
     bool enterFromTop = false,
+    bool enterFromLeft = false,
+    bool enterFromRight = false,
   }) async {
     if (!mounted) return;
 
@@ -218,6 +220,28 @@ class SwipeableCardState extends State<SwipeableCard>
     if (enterFromTop && animated) {
       final height = _cardSize().height;
       setState(() => _drag = Offset(0, -height * 1.2));
+      await _animateDragTo(Offset.zero, _resetDuration, Curves.easeOut);
+      if (mounted) setState(() => _animating = false);
+      return;
+    }
+
+    if (enterFromLeft && animated) {
+      final width = _cardSize().width;
+      setState(() {
+        _animating = true;
+        _drag = Offset(-width * 1.5, 0);
+      });
+      await _animateDragTo(Offset.zero, _resetDuration, Curves.easeOut);
+      if (mounted) setState(() => _animating = false);
+      return;
+    }
+
+    if (enterFromRight && animated) {
+      final width = _cardSize().width;
+      setState(() {
+        _animating = true;
+        _drag = Offset(width * 1.5, 0);
+      });
       await _animateDragTo(Offset.zero, _resetDuration, Curves.easeOut);
       if (mounted) setState(() => _animating = false);
       return;

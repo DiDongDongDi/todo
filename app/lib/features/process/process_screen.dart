@@ -42,10 +42,38 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     final task = _lastUndoTask;
     final from = _lastUndoFrom;
     if (task == null || from == null) return;
+
+    final enterFromLeft = from == TaskStatus.trashed;
+    final enterFromRight = from == TaskStatus.archived;
+    if (!enterFromLeft && !enterFromRight) return;
+
     final repo = await ref.read(taskRepositoryProvider.future);
     await repo.restoreToInbox(task.id);
+    final tasks = await repo.watchInbox().first;
+
     _lastUndoTask = null;
     _lastUndoFrom = null;
+
+    if (!mounted) return;
+
+    final index = tasks.indexWhere((t) => t.id == task.id);
+    if (index < 0) return;
+
+    setState(() {
+      _index = index;
+      _editing = false;
+    });
+
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) return;
+
+    final state = _swipeKey.currentState;
+    if (state != null) {
+      await state.resetPosition(
+        enterFromLeft: enterFromLeft,
+        enterFromRight: enterFromRight,
+      );
+    }
   }
 
   void _showUndoSnackbar({
