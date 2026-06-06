@@ -283,6 +283,8 @@ flutter run -d ios
    - **Site URL** 可保持默认；App 发送魔法链接时会指定上述 Deep Link，**不要**仅依赖 `http://localhost`——在手机上 localhost 指向手机自身，无法完成登录
    - 若做 **Flutter Web** 本地开发，另加 `http://localhost:端口` 到 Redirect URLs
 
+> **开发时邮件发不出去 / 提示发送太频繁？** 免费项目默认邮件约 **2～4 封/小时**，很容易触发限流。请在 **Project Settings → Authentication → SMTP Settings** 配置自定义 SMTP（QQ 邮箱、SendGrid、Resend 等），限额更高。QQ 邮箱逐步配置见 **[docs/SUPABASE-SMTP.md](docs/SUPABASE-SMTP.md)**。
+
 ### 4. 填入 API 密钥
 
 1. 进入 **Project Settings → API**
@@ -347,6 +349,7 @@ Flutter · Riverpod · go_router · Supabase · SharedPreferences（本地存储
 | `flutter` 命令找不到 | 安装 Flutter SDK 并将其 `bin` 目录加入 PATH；已加仍找不到时见 [WINDOWS-DEV-ENV-NOTES.md](docs/WINDOWS-DEV-ENV-NOTES.md)（需重启 Cursor，非仅新开终端） |
 | `flutter run` 报缺少平台目录 | 执行 `scripts/init_platforms.ps1` 或 `flutter create .` |
 | App 显示「Supabase 未配置」 | 检查 `supabase_config.example.dart` 是否已填入 URL 和 anon key |
+| 魔法链接发送失败 / `over_email_send_rate_limit` | 默认邮件限额很低；等约 1 小时或查收已有邮件；长期见 [SUPABASE-SMTP.md](docs/SUPABASE-SMTP.md) 配置自定义 SMTP |
 | 登录后不同步 | 确认 SQL 迁移已执行，且邮箱已完成魔法链接验证 |
 | 离线能用、联网不同步 | 进入同步页点击「立即同步」，查看控制台是否有网络错误 |
 | Chrome 能跑、真机看不到设备 | 见 [Android 真机调试](#android-真机调试手势--动效) |

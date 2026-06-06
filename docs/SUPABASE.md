@@ -66,6 +66,11 @@ class SupabaseConfig {
 
 若做 Web 本地开发，除 Site URL 外还需在 **Redirect URLs** 中添加对应地址（如 `http://localhost:8080/**`）。
 
+### 魔法链接邮件与 SMTP
+
+开发调试时频繁发送魔法链接会触发 Supabase 默认邮件限流。解决方式：在 Dashboard 配置 **自定义 SMTP**。  
+QQ 邮箱逐步配置、其他服务商对照表见 **[SUPABASE-SMTP.md](./SUPABASE-SMTP.md)**。
+
 ## 典型使用流程
 
 1. 在 Supabase 官网注册并创建项目
