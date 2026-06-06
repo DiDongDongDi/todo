@@ -21,7 +21,7 @@ class SwipeableCard extends StatefulWidget {
     this.verticalEnterAnimation = false,
     this.shouldAnimateFlyout,
     this.onFlyoutFeedback,
-    this.leftLabel = '放弃',
+    this.leftLabel = '删除',
     this.rightLabel = '完成',
     this.upLabel,
     this.downLabel,

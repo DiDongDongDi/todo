@@ -33,7 +33,7 @@ class TaskActionBar extends StatelessWidget {
             onPressed: onTrash,
             icon: Icon(Icons.close, size: 18, color: colorScheme.error),
             label: Text(
-              '放弃',
+              '删除',
               style: TextStyle(color: colorScheme.error),
             ),
             style: OutlinedButton.styleFrom(

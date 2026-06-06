@@ -22,7 +22,7 @@ class CardStage extends StatelessWidget {
     this.onSwipeDown,
     this.onDragStart,
     this.onDragEnd,
-    this.leftLabel = '放弃',
+    this.leftLabel = '删除',
     this.rightLabel = '完成',
   });
 
