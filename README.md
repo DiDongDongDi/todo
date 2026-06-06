@@ -288,10 +288,11 @@ flutter run -d ios
    Supabase 规则：模板里有 `ConfirmationURL` 或 App 传了 `emailRedirectTo` 时，只发魔法链接且**不会**填充 `Token`，所以你加的验证码行不会出现在邮件里。示例：
    ```html
    <h2>登录验证码</h2>
-   <p>请在 App 中输入以下 6 位验证码（约 1 小时内有效）：</p>
+   <p>请在 App 中输入以下验证码（约 1 小时内有效）：</p>
    <p><strong>{{ .Token }}</strong></p>
    ```
-   QQ 邮箱等会预扫描魔法链接导致 `otp_expired`，验证码方式更可靠。
+   QQ 邮箱等会预扫描魔法链接导致 `otp_expired`，验证码方式更可靠。  
+   验证码位数在 **Authentication → Providers → Email** 中配置（默认 6 位，你的项目可能是 8 位，App 已支持 6～10 位）。
 
 > **开发时邮件发不出去 / 提示发送太频繁？** 免费项目默认邮件约 **2～4 封/小时**，很容易触发限流。请在 **Project Settings → Authentication → SMTP Settings** 配置自定义 SMTP（QQ 邮箱、SendGrid、Resend 等），限额更高。QQ 邮箱逐步配置见 **[docs/SUPABASE-SMTP.md](docs/SUPABASE-SMTP.md)**。
 
@@ -315,7 +316,7 @@ class SupabaseConfig {
 1. 运行应用：`flutter run`（修改 AndroidManifest 后需 **完全重启** App，热重载不够）
 2. 进入 **处理** Tab，点击右上角 **同步** 图标
 3. 输入邮箱，点击 **发送登录邮件**
-4. 查收邮件后，**推荐**在 App 内输入 6 位验证码并点击 **验证码登录**；也可点击邮件中的魔法链接（成功后会自动跳回 App）
+4. 查收邮件后，在 App 内输入邮件中的验证码并点击 **验证码登录**
 5. 确认账号与同步页显示 **云同步已开启**
 
 同步行为：

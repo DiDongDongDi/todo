@@ -49,7 +49,7 @@ class AuthService {
   Future<void> signInWithEmail(String email) async {
     final c = _client;
     if (c == null) throw StateError('Supabase 未配置');
-    // 不传 emailRedirectTo，配合邮件模板仅含 {{ .Token }} 时发送 6 位验证码。
+    // 不传 emailRedirectTo，配合邮件模板仅含 {{ .Token }} 时发送邮件验证码。
     // 若传 redirect 或模板含 {{ .ConfirmationURL }}，Supabase 只发魔法链接且不填充 Token。
     await c.auth.signInWithOtp(email: email);
   }

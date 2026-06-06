@@ -69,7 +69,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     if (email.isEmpty || token.isEmpty) {
       showAppSnackBar(
         context,
-        message: '请输入邮箱和邮件中的 6 位验证码',
+        message: '请输入邮箱和邮件中的验证码',
         icon: Icons.info_outline,
         type: AppSnackType.warning,
       );
@@ -249,7 +249,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                             const SizedBox(height: 4),
                             Text(
                               '请查收 ${_emailController.text.trim()} 的邮件，'
-                              '在下方输入邮件中的 6 位验证码并点击「验证码登录」。',
+                              '在下方输入邮件中的验证码并点击「验证码登录」。',
                               style: theme.textTheme.bodyMedium,
                             ),
                           ],
@@ -263,9 +263,10 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
               TextField(
                 controller: _otpController,
                 keyboardType: TextInputType.number,
-                maxLength: 6,
+                maxLength: 10,
                 decoration: const InputDecoration(
-                  labelText: '邮件验证码（6 位）',
+                  labelText: '邮件验证码',
+                  hintText: '以邮件中的位数为准（通常 6～10 位）',
                   border: OutlineInputBorder(),
                   counterText: '',
                 ),
