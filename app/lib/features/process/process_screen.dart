@@ -5,9 +5,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:todo_app/core/models/task.dart';
 import 'package:todo_app/core/repositories/task_repository.dart';
+import 'package:todo_app/core/settings/process_sound_settings.dart';
 import 'package:todo_app/core/stats/stats_provider.dart';
 import 'package:todo_app/core/sync/sync_engine.dart';
 import 'package:todo_app/shared/utils/haptics.dart';
+import 'package:todo_app/shared/utils/sounds.dart';
 import 'package:todo_app/shared/utils/platform_capabilities.dart';
 import 'package:todo_app/shared/widgets/app_snackbar.dart';
 import 'package:todo_app/shared/widgets/big_task_card.dart';
@@ -322,10 +324,15 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
   }
 
   Future<void> _performArchive(Task task) async {
+    final settings = await ref.read(processSoundProvider.future);
     final repo = await ref.read(taskRepositoryProvider.future);
     await repo.archive(task.id);
     await triggerSyncIfSignedIn(ref);
     await ref.read(statsProvider.notifier).recordArchive();
+    await Future.wait([
+      AppHaptics.medium(),
+      AppSounds.play(settings.complete),
+    ]);
     _lastUndoTask = task;
     _lastUndoFrom = TaskStatus.archived;
     _showUndoSnackbar(
@@ -351,9 +358,14 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
   }
 
   Future<void> _performTrash(Task task) async {
+    final settings = await ref.read(processSoundProvider.future);
     final repo = await ref.read(taskRepositoryProvider.future);
     await repo.trash(task.id);
     await triggerSyncIfSignedIn(ref);
+    await Future.wait([
+      AppHaptics.medium(),
+      AppSounds.play(settings.trash),
+    ]);
     _lastUndoTask = task;
     _lastUndoFrom = TaskStatus.trashed;
     _showUndoSnackbar(
