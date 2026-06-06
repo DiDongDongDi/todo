@@ -68,23 +68,47 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
   static const _switcherDuration = Duration(milliseconds: 200);
 
   void _ensureCaretVisible() {
-    final offset = _controller.text.length;
-    _controller.selection = TextSelection.collapsed(offset: offset);
+    final text = _controller.text;
+    final offset = text.length;
+    _controller.value = TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: offset),
+      composing: TextRange.empty,
+    );
   }
 
-  void _requestInputFocus({Duration delay = Duration.zero}) {
+  /// 单击卡片时也要刷新光标；仅 requestFocus 在已聚焦时不会触发 listener。
+  void _activateInput() {
+    _ensureCaretVisible();
+    if (!_focusNode.hasFocus) {
+      _focusNode.requestFocus();
+    }
+  }
+
+  Future<void> _requestInputFocus({
+    Duration delay = Duration.zero,
+    bool recycleFocus = false,
+  }) async {
     if (!mounted) return;
-    unawaited(
-      Future<void>.delayed(delay, () async {
-        if (!mounted) return;
-        await WidgetsBinding.instance.endOfFrame;
-        if (!mounted) return;
-        await WidgetsBinding.instance.endOfFrame;
-        if (!mounted) return;
-        _focusNode.requestFocus();
-        _ensureCaretVisible();
-      }),
-    );
+    if (delay > Duration.zero) {
+      await Future<void>.delayed(delay);
+      if (!mounted) return;
+    }
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) return;
+
+    if (recycleFocus && _focusNode.hasFocus) {
+      _focusNode.unfocus();
+      await WidgetsBinding.instance.endOfFrame;
+      if (!mounted) return;
+    }
+
+    _ensureCaretVisible();
+    _focusNode.requestFocus();
+
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) return;
+    _ensureCaretVisible();
   }
 
   @override
@@ -98,7 +122,7 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
 
     _initSpeech();
 
-    _requestInputFocus();
+    unawaited(_requestInputFocus());
 
   }
 
@@ -160,9 +184,10 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
     setState(() => _feedback = CollectCardFeedback.none);
 
     if (refocus) {
-
-      _requestInputFocus(delay: _switcherDuration);
-
+      await _requestInputFocus(
+        delay: _switcherDuration,
+        recycleFocus: true,
+      );
     }
 
   }
@@ -238,19 +263,18 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
     unawaited(triggerSyncIfSignedIn(ref));
 
     _controller.clear();
+    _ensureCaretVisible();
 
     _attachments.clear();
 
     _lastUndoTask = task;
 
     if (mounted) {
-
-      _showSaveSnackbar();
-
       await _swipeKey.currentState?.resetPosition(enterFromBottom: true);
 
-      _requestInputFocus();
+      await _requestInputFocus(recycleFocus: true);
 
+      _showSaveSnackbar();
     }
 
   }
@@ -412,6 +436,8 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
 
             onDragStart: () => _focusNode.unfocus(),
 
+            onDragEnd: () => unawaited(_requestInputFocus(recycleFocus: true)),
+
             onSwipeUp: _onSwipeUp,
 
             rightLabel: '',
@@ -424,6 +450,8 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
               controller: _controller,
 
               focusNode: _focusNode,
+
+              onActivateInput: _activateInput,
 
               feedback: _feedback,
 

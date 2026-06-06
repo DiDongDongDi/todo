@@ -16,6 +16,7 @@ class BigTaskCard extends StatelessWidget {
     this.onStartSpeech,
     this.isListening = false,
     this.onSave,
+    this.onActivateInput,
     this.feedback = CollectCardFeedback.none,
   });
 
@@ -28,6 +29,7 @@ class BigTaskCard extends StatelessWidget {
   final VoidCallback? onStartSpeech;
   final bool isListening;
   final VoidCallback? onSave;
+  final VoidCallback? onActivateInput;
   final CollectCardFeedback feedback;
 
   @override
@@ -92,9 +94,13 @@ class BigTaskCard extends StatelessWidget {
 
   Widget _buildContentArea(BuildContext context) {
     if (mode == BigTaskCardMode.collect) {
-      // TextField(expands: true) 已铺满点击区域；外层 GestureDetector 会与
-      // TextField 争用手势，Web 上常导致需双击才出现光标。
-      return _buildContent(context);
+      // expands 空态时 TextField 命中区常小于视觉区域；用 Listener（非
+      // GestureDetector）在首次 pointerDown 即聚焦，避免与 TextField 手势冲突。
+      return Listener(
+        behavior: HitTestBehavior.translucent,
+        onPointerDown: (_) => onActivateInput?.call(),
+        child: _buildContent(context),
+      );
     }
 
     if (mode == BigTaskCardMode.process) {
@@ -129,6 +135,8 @@ class BigTaskCard extends StatelessWidget {
                 controller: controller,
                 focusNode: focusNode,
                 autofocus: true,
+                showCursor: true,
+                onTap: onActivateInput,
                 onChanged: onChanged,
                 expands: true,
                 maxLines: null,

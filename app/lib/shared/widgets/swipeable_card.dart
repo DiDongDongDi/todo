@@ -15,6 +15,7 @@ class SwipeableCard extends StatefulWidget {
     this.onSwipeUp,
     this.onSwipeDown,
     this.onDragStart,
+    this.onDragEnd,
     this.enabled = true,
     this.resetAfterAction = true,
     this.shouldAnimateFlyout,
@@ -31,6 +32,7 @@ class SwipeableCard extends StatefulWidget {
   final SwipeCallback? onSwipeUp;
   final SwipeCallback? onSwipeDown;
   final VoidCallback? onDragStart;
+  final VoidCallback? onDragEnd;
   final bool enabled;
   final bool resetAfterAction;
   final FlyoutGate? shouldAnimateFlyout;
@@ -241,11 +243,13 @@ class SwipeableCardState extends State<SwipeableCard>
   }
 
   void _onPointerCancel(PointerCancelEvent event) {
+    final hadDrag = _dragStarted;
     _pointerActive = false;
     _pointerTravel = 0;
     _dragStarted = false;
     if (!widget.enabled || _animating) return;
     setState(() => _drag = Offset.zero);
+    if (hadDrag) widget.onDragEnd?.call();
   }
 
   Future<void> _onDragEnd() async {
@@ -276,6 +280,7 @@ class SwipeableCardState extends State<SwipeableCard>
 
     if (action == null) {
       setState(() => _drag = Offset.zero);
+      widget.onDragEnd?.call();
       return;
     }
 
