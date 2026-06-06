@@ -275,10 +275,13 @@ flutter run -d ios
 
 1. 进入 **Authentication → Providers**
 2. 确认 **Email** 已启用
-3. 在 **Authentication → URL Configuration** 中，将 **Site URL** 设为你的应用地址（本地开发可先用 `http://localhost`，**无需加端口**）
-   - Site URL 是用户点击邮件魔法链接后，浏览器验证完成时的默认跳转地址
-   - 本项目为原生 App 登录：点邮件链接后手动回到 App 即可，不要求 Site URL 精确对应 App 地址
-   - 仅在做 **Flutter Web** 本地开发时才需带端口（如 `http://localhost:8080`），并同步在 **Redirect URLs** 中添加
+3. 在 **Authentication → URL Configuration** 中配置回调地址：
+   - **Redirect URLs** 添加（须与代码中完全一致）：
+     ```
+     com.todo.app.todo_app://login-callback/
+     ```
+   - **Site URL** 可保持默认；App 发送魔法链接时会指定上述 Deep Link，**不要**仅依赖 `http://localhost`——在手机上 localhost 指向手机自身，无法完成登录
+   - 若做 **Flutter Web** 本地开发，另加 `http://localhost:端口` 到 Redirect URLs
 
 ### 4. 填入 API 密钥
 
@@ -300,8 +303,8 @@ class SupabaseConfig {
 1. 运行应用：`flutter run`
 2. 进入 **处理** Tab，点击右上角 **同步** 图标
 3. 输入邮箱，点击 **发送魔法链接登录**
-4. 查收邮件中的登录链接并点击确认
-5. 返回 App，点击 **立即同步**
+4. 查收邮件中的登录链接并点击——应自动跳回 App 并完成登录（修改 AndroidManifest 后需 **完全重启** App，热重载不够）
+5. 确认账号与同步页显示 **云同步已开启**
 
 同步行为：
 

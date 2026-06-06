@@ -1,8 +1,9 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:todo_app/core/config/auth_redirect_config.dart';
 import 'package:todo_app/core/config/supabase_config.dart';
 
 final supabaseClientProvider = Provider<SupabaseClient?>((ref) {
@@ -50,7 +51,10 @@ class AuthService {
   Future<void> signInWithEmail(String email) async {
     final c = _client;
     if (c == null) throw StateError('Supabase 未配置');
-    await c.auth.signInWithOtp(email: email);
+    await c.auth.signInWithOtp(
+      email: email,
+      emailRedirectTo: kIsWeb ? null : AuthRedirectConfig.url,
+    );
   }
 
   Future<void> signOut() async {

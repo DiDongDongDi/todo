@@ -203,7 +203,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                             const SizedBox(height: 4),
                             Text(
                               '请查收 ${_emailController.text.trim()} 的邮件并点击链接。'
-                              '登录成功后，本页将显示「云同步已开启」。',
+                              '点击后会自动打开本 App 并完成登录，本页将显示「云同步已开启」。',
                               style: theme.textTheme.bodyMedium,
                             ),
                           ],
