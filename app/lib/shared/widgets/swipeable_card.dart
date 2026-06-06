@@ -350,9 +350,9 @@ class SwipeableCardState extends State<SwipeableCard>
         if (offset.dx < -20)
           Positioned.fill(
             child: Align(
-              alignment: Alignment.centerLeft,
+              alignment: Alignment.centerRight,
               child: Padding(
-                padding: const EdgeInsets.only(left: 32),
+                padding: const EdgeInsets.only(right: 32),
                 child: Text(
                   widget.leftLabel,
                   style: TextStyle(
@@ -367,9 +367,9 @@ class SwipeableCardState extends State<SwipeableCard>
         if (offset.dx > 20)
           Positioned.fill(
             child: Align(
-              alignment: Alignment.centerRight,
+              alignment: Alignment.centerLeft,
               child: Padding(
-                padding: const EdgeInsets.only(right: 32),
+                padding: const EdgeInsets.only(left: 32),
                 child: Text(
                   widget.rightLabel,
                   style: TextStyle(
