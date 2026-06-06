@@ -62,9 +62,9 @@ class SupabaseConfig {
 | Flutter Web 本地开发 | `http://localhost:端口号`（如 `8080`） |
 | 正式 Web 站点 | `https://你的域名` |
 
-**Site URL** 是用户点击邮件魔法链接、Supabase 完成验证后，浏览器默认跳转的地址。当前流程为：App 发链接 → 用户在邮件中点击 → 浏览器完成验证 → **手动回到 App** 同步。会话已在 Supabase 侧建立，不依赖跳转页能否打开，因此原生 App 用 `http://localhost` 作占位即可。
+**Site URL** 仅在请求未指定 `redirect_to` 时作为回退地址。原生 App 发魔法链接时，代码会通过 `emailRedirectTo` 指定 Deep Link（`com.todo.app.todo_app://login-callback/`），**邮件里的链接应包含该地址，而不是 `http://localhost`**。若邮件链接仍是 `redirect_to=http://localhost`，说明发信时未带上 Deep Link，登录无法跳回 App。
 
-若做 Web 本地开发，除 Site URL 外还需在 **Redirect URLs** 中添加对应地址（如 `http://localhost:8080/**`）。
+若做 **Flutter Web** 本地开发，除 Site URL 外还需在 **Redirect URLs** 中添加对应地址（如 `http://localhost:8080/**`），并在 Web 端传入该 URL 作为 `emailRedirectTo`。
 
 ### 魔法链接邮件与 SMTP
 

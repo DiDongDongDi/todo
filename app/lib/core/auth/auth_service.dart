@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:todo_app/core/config/auth_redirect_config.dart';
@@ -53,7 +52,7 @@ class AuthService {
     if (c == null) throw StateError('Supabase 未配置');
     await c.auth.signInWithOtp(
       email: email,
-      emailRedirectTo: kIsWeb ? null : AuthRedirectConfig.url,
+      emailRedirectTo: AuthRedirectConfig.url,
     );
   }
 
