@@ -202,10 +202,7 @@ class SwipeableRestoreTileState extends State<SwipeableRestoreTile>
           ),
         Transform.translate(
           offset: offset,
-          child: Transform.rotate(
-            angle: offset.dx * 0.0008,
-            child: tileChild,
-          ),
+          child: tileChild,
         ),
       ],
     );
