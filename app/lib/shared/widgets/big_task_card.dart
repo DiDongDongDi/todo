@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:todo_app/core/models/task.dart';
-import 'package:todo_app/shared/utils/platform_capabilities.dart';
-
 enum BigTaskCardMode { collect, process, readOnly }
 
 enum CollectCardFeedback { none, emptyHint }
@@ -36,7 +34,6 @@ class BigTaskCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final touchFirst = isTouchFirstPlatform;
 
     return SizedBox(
       width: double.infinity,
@@ -77,12 +74,11 @@ class BigTaskCard extends StatelessWidget {
                         ),
                       ),
                       const Spacer(),
-                      if (!touchFirst)
-                        FilledButton.icon(
-                          onPressed: onSave,
-                          icon: const Icon(Icons.check, size: 20),
-                          label: const Text('保存'),
-                        ),
+                      FilledButton.icon(
+                        onPressed: onSave,
+                        icon: const Icon(Icons.check, size: 20),
+                        label: const Text('保存'),
+                      ),
                     ],
                   ),
                 ),
