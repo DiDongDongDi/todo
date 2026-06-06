@@ -12,7 +12,6 @@ import 'package:todo_app/shared/utils/platform_capabilities.dart';
 import 'package:todo_app/shared/widgets/app_snackbar.dart';
 import 'package:todo_app/shared/widgets/big_task_card.dart';
 import 'package:todo_app/shared/widgets/card_stage.dart';
-import 'package:todo_app/shared/widgets/hint_chip.dart';
 import 'package:todo_app/shared/widgets/progress_widgets.dart';
 import 'package:todo_app/shared/widgets/swipeable_card.dart';
 import 'package:todo_app/shared/widgets/task_action_bar.dart';
@@ -165,10 +164,6 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
                 ],
               ),
             ),
-            if (!_editing && touchFirst)
-              const HintChip(
-                text: '← 放弃   → 完成   ↑↓ 切换',
-              ),
             Expanded(
               child: CardStage(
                 swipeKey: _swipeKey,
