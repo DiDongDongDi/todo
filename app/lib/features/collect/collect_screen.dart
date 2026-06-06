@@ -14,6 +14,7 @@ import 'package:todo_app/core/repositories/task_repository.dart';
 
 import 'package:todo_app/core/sync/sync_engine.dart';
 
+import 'package:todo_app/shared/utils/attachment_storage.dart';
 import 'package:todo_app/shared/utils/haptics.dart';
 import 'package:todo_app/shared/utils/sounds.dart';
 
@@ -391,23 +392,27 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
 
 
   Future<void> _pickImage() async {
-
     final picker = ImagePicker();
-
     final file = await picker.pickImage(source: ImageSource.gallery);
-
     if (file == null) return;
 
-    setState(() {
-
-      _attachments.add(
-
-        TaskAttachment(type: AttachmentType.image, localPath: file.path),
-
+    final localPath = await persistImageAttachment(file);
+    if (localPath == null) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: '无法读取所选图片',
+        icon: Icons.error_outline,
+        type: AppSnackType.error,
       );
+      return;
+    }
 
+    setState(() {
+      _attachments.add(
+        TaskAttachment(type: AttachmentType.image, localPath: localPath),
+      );
     });
-
   }
 
   void _removeAttachment(int index) {

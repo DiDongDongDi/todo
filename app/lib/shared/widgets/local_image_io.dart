@@ -1,18 +1,18 @@
 import 'dart:io';
+import 'dart:typed_data';
 
-import 'package:flutter/material.dart';
+import 'package:cross_file/cross_file.dart';
 
-Widget buildLocalImage(
-  String path, {
-  BoxFit fit = BoxFit.cover,
-  double? width,
-  double? height,
-}) {
-  return Image.file(
-    File(path),
-    fit: fit,
-    width: width,
-    height: height,
-    errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined),
-  );
+Future<Uint8List?> loadLocalImageBytes(String path) async {
+  try {
+    if (!path.startsWith('content://')) {
+      final file = File(path);
+      if (await file.exists()) {
+        return file.readAsBytes();
+      }
+    }
+    return await XFile(path).readAsBytes();
+  } catch (_) {
+    return null;
+  }
 }

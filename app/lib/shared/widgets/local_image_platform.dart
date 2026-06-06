@@ -1,16 +1,11 @@
-import 'package:flutter/material.dart';
+import 'dart:typed_data';
 
-Widget buildLocalImage(
-  String path, {
-  BoxFit fit = BoxFit.cover,
-  double? width,
-  double? height,
-}) {
-  return Image.network(
-    path,
-    fit: fit,
-    width: width,
-    height: height,
-    errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined),
-  );
+import 'package:cross_file/cross_file.dart';
+
+Future<Uint8List?> loadLocalImageBytes(String path) async {
+  try {
+    return await XFile(path).readAsBytes();
+  } catch (_) {
+    return null;
+  }
 }

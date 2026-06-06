@@ -237,7 +237,7 @@ class BigTaskCard extends StatelessWidget {
                 itemCount: attachments.length,
                 separatorBuilder: (_, __) => const SizedBox(width: 8),
                 itemBuilder: (context, index) {
-                  return _CollectAttachmentTile(
+                  return _AttachmentThumbnail(
                     attachment: attachments[index],
                     onRemove: onRemoveAttachment == null
                         ? null
@@ -294,17 +294,9 @@ class BigTaskCard extends StatelessWidget {
           const SizedBox(height: 20),
           Wrap(
             spacing: 8,
+            runSpacing: 8,
             children: displayTask.attachments.map((a) {
-              return Chip(
-                avatar: Icon(
-                  a.type == AttachmentType.image
-                      ? Icons.image_outlined
-                      : Icons.audiotrack_outlined,
-                ),
-                label: Text(
-                  a.type == AttachmentType.image ? '图片' : '录音',
-                ),
-              );
+              return _AttachmentThumbnail(attachment: a);
             }).toList(),
           ),
         ],
@@ -338,8 +330,8 @@ class BigTaskCard extends StatelessWidget {
   }
 }
 
-class _CollectAttachmentTile extends StatelessWidget {
-  const _CollectAttachmentTile({
+class _AttachmentThumbnail extends StatelessWidget {
+  const _AttachmentThumbnail({
     required this.attachment,
     this.onRemove,
   });
