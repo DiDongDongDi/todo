@@ -126,11 +126,13 @@ class BigTaskCard extends StatelessWidget {
                           ),
                         ),
                         const Spacer(),
-                        TextButton(
-                          onPressed: onCancelEdit,
-                          child: const Text('取消'),
-                        ),
-                        const SizedBox(width: 8),
+                        if (editing) ...[
+                          TextButton(
+                            onPressed: onCancelEdit,
+                            child: const Text('取消'),
+                          ),
+                          const SizedBox(width: 8),
+                        ],
                         Focus(
                           canRequestFocus: false,
                           child: FilledButton.icon(

@@ -116,7 +116,9 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
   }
 
   void _onInputFocusChange() {
-    if (_focusNode.hasFocus && mounted) {
+    if (!mounted) return;
+    setState(() {});
+    if (_focusNode.hasFocus) {
       _ensureCaretVisible();
     }
   }
@@ -468,6 +470,7 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
               isListening: _recording,
               onSave: () => _save(animated: true),
               onCancelEdit: _cancelInput,
+              editing: _focusNode.hasFocus,
               scheduleEditor: TaskScheduleEditor(
                 isDaily: _isDaily,
                 dailyUntil: _dailyUntil,
