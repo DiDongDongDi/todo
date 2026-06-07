@@ -6,7 +6,8 @@ import 'package:todo_app/shared/utils/audio_storage.dart';
 import 'package:todo_app/shared/widgets/attachment_image.dart';
 import 'package:todo_app/shared/widgets/audio_preview.dart';
 import 'package:todo_app/shared/widgets/image_preview.dart';
-enum BigTaskCardMode { collect, process, readOnly }
+import 'package:todo_app/shared/widgets/keyboard_lift.dart';
+enum BigTaskCardMode { collect, process }
 
 enum CollectCardFeedback { none, emptyHint, listening }
 
@@ -38,6 +39,8 @@ class BigTaskCard extends StatelessWidget {
     this.completeLabel = '完成',
     this.scheduleEditor,
     this.onCancelEdit,
+    this.editing = false,
+    this.onEnterEdit,
   });
 
   final BigTaskCardMode mode;
@@ -66,6 +69,12 @@ class BigTaskCard extends StatelessWidget {
   final Widget? scheduleEditor;
   final VoidCallback? onCancelEdit;
 
+  /// 处理 tab：false 时标题为只读 [TextField]，true 时可编辑。
+  final bool editing;
+
+  /// 只读标题被点击时进入编辑（处理 tab）。
+  final VoidCallback? onEnterEdit;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -78,7 +87,7 @@ class BigTaskCard extends StatelessWidget {
         color: colorScheme.surfaceContainerHighest,
         elevation: 0,
         borderRadius: BorderRadius.circular(20),
-        clipBehavior: Clip.antiAlias,
+        clipBehavior: Clip.none,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
           child: Column(
@@ -87,133 +96,152 @@ class BigTaskCard extends StatelessWidget {
               Expanded(
                 child: _buildContentArea(context),
               ),
-              if (mode == BigTaskCardMode.collect) ...[
-                if (scheduleEditor != null) ...[
-                  const SizedBox(height: 8),
-                  scheduleEditor!,
-                ],
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    IconButton.filledTonal(
-                      onPressed: onPickImage,
-                      icon: const Icon(Icons.image_outlined),
-                      tooltip: '添加图片',
-                    ),
-                    const SizedBox(width: 8),
-                    IconButton.filledTonal(
-                      onPressed: onStartSpeech,
-                      icon: Icon(isListening ? Icons.stop : Icons.mic_none_outlined),
-                      tooltip: isListening ? '停止录音' : '录音',
-                      style: IconButton.styleFrom(
-                        backgroundColor: isListening
-                            ? colorScheme.errorContainer
-                            : null,
-                      ),
-                    ),
-                    const Spacer(),
-                    Focus(
-                      canRequestFocus: false,
-                      child: FilledButton.icon(
-                        onPressed: () {
-                          final keepKeyboard = focusNode?.hasFocus ?? false;
-                          onSave?.call();
-                          if (keepKeyboard &&
-                              focusNode != null &&
-                              !focusNode!.hasFocus) {
-                            focusNode!.requestFocus();
-                          }
-                        },
-                        icon: const Icon(Icons.check, size: 20),
-                        label: const Text('保存'),
-                      ),
-                    ),
-                  ],
-                ),
-              ] else if (mode == BigTaskCardMode.process) ...[
-                const SizedBox(height: 12),
-                if (scheduleEditor != null) scheduleEditor!,
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    IconButton.filledTonal(
-                      onPressed: onPickImage,
-                      icon: const Icon(Icons.image_outlined),
-                      tooltip: '添加图片',
-                      visualDensity: VisualDensity.compact,
-                    ),
-                    const SizedBox(width: 8),
-                    IconButton.filledTonal(
-                      onPressed: onStartSpeech,
-                      icon: Icon(
-                        isListening ? Icons.stop : Icons.mic_none_outlined,
-                      ),
-                      tooltip: isListening ? '停止录音' : '录音',
-                      visualDensity: VisualDensity.compact,
-                      style: IconButton.styleFrom(
-                        backgroundColor: isListening
-                            ? colorScheme.errorContainer
-                            : null,
-                      ),
-                    ),
-                    const Spacer(),
-                    TextButton(
-                      onPressed: onCancelEdit,
-                      child: const Text('取消'),
-                    ),
-                    const SizedBox(width: 8),
-                    FilledButton(
-                      onPressed: onSave,
-                      child: const Text('保存'),
-                    ),
-                  ],
-                ),
-              ] else if (mode == BigTaskCardMode.readOnly && task != null) ...[
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    IconButton.filledTonal(
-                      onPressed: onTrash,
-                      icon: Icon(Icons.close, color: colorScheme.error),
-                      tooltip: '删除',
-                      style: IconButton.styleFrom(
-                        backgroundColor: colorScheme.errorContainer,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    FilledButton.icon(
-                      onPressed: onComplete,
-                      icon: const Icon(Icons.check, size: 20),
-                      label: Text(completeLabel),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: context.semanticColors.success,
-                        foregroundColor: Colors.white,
-                      ),
-                    ),
-                    if (task!.canRetryTranscription &&
-                        onRetryTranscription != null) ...[
-                      const SizedBox(width: 8),
-                      IconButton.filledTonal(
-                        onPressed: onRetryTranscription,
-                        icon: const Icon(Icons.refresh),
-                        tooltip: '重试转写',
-                      ),
+              if (mode == BigTaskCardMode.collect)
+                _keyboardLiftedFooter(
+                  context,
+                  [
+                    if (scheduleEditor != null) ...[
+                      const SizedBox(height: 8),
+                      scheduleEditor!,
                     ],
-                    const Spacer(),
-                    IconButton.filledTonal(
-                      onPressed: canGoPrevious ? onPrevious : null,
-                      icon: const Icon(Icons.keyboard_arrow_up),
-                      tooltip: '上一条',
-                    ),
-                    const SizedBox(width: 8),
-                    IconButton.filledTonal(
-                      onPressed: canGoNext ? onNext : null,
-                      icon: const Icon(Icons.keyboard_arrow_down),
-                      tooltip: '下一条',
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        IconButton.filledTonal(
+                          onPressed: onPickImage,
+                          icon: const Icon(Icons.image_outlined),
+                          tooltip: '添加图片',
+                        ),
+                        const SizedBox(width: 8),
+                        IconButton.filledTonal(
+                          onPressed: onStartSpeech,
+                          icon: Icon(
+                            isListening ? Icons.stop : Icons.mic_none_outlined,
+                          ),
+                          tooltip: isListening ? '停止录音' : '录音',
+                          style: IconButton.styleFrom(
+                            backgroundColor: isListening
+                                ? colorScheme.errorContainer
+                                : null,
+                          ),
+                        ),
+                        const Spacer(),
+                        Focus(
+                          canRequestFocus: false,
+                          child: FilledButton.icon(
+                            onPressed: () {
+                              final keepKeyboard = focusNode?.hasFocus ?? false;
+                              onSave?.call();
+                              if (keepKeyboard &&
+                                  focusNode != null &&
+                                  !focusNode!.hasFocus) {
+                                focusNode!.requestFocus();
+                              }
+                            },
+                            icon: const Icon(Icons.check, size: 20),
+                            label: const Text('保存'),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
-                ),
-              ],
+                )
+              else if (mode == BigTaskCardMode.process && task != null)
+                editing
+                    ? _keyboardLiftedFooter(
+                        context,
+                        [
+                          const SizedBox(height: 12),
+                          if (scheduleEditor != null) scheduleEditor!,
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              IconButton.filledTonal(
+                                onPressed: onPickImage,
+                                icon: const Icon(Icons.image_outlined),
+                                tooltip: '添加图片',
+                                visualDensity: VisualDensity.compact,
+                              ),
+                              const SizedBox(width: 8),
+                              IconButton.filledTonal(
+                                onPressed: onStartSpeech,
+                                icon: Icon(
+                                  isListening
+                                      ? Icons.stop
+                                      : Icons.mic_none_outlined,
+                                ),
+                                tooltip: isListening ? '停止录音' : '录音',
+                                visualDensity: VisualDensity.compact,
+                                style: IconButton.styleFrom(
+                                  backgroundColor: isListening
+                                      ? colorScheme.errorContainer
+                                      : null,
+                                ),
+                              ),
+                              const Spacer(),
+                              TextButton(
+                                onPressed: onCancelEdit,
+                                child: const Text('取消'),
+                              ),
+                              const SizedBox(width: 8),
+                              FilledButton(
+                                onPressed: onSave,
+                                child: const Text('保存'),
+                              ),
+                            ],
+                          ),
+                        ],
+                      )
+                    : Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              IconButton.filledTonal(
+                                onPressed: onTrash,
+                                icon: Icon(Icons.close, color: colorScheme.error),
+                                tooltip: '删除',
+                                style: IconButton.styleFrom(
+                                  backgroundColor: colorScheme.errorContainer,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              FilledButton.icon(
+                                onPressed: onComplete,
+                                icon: const Icon(Icons.check, size: 20),
+                                label: Text(completeLabel),
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: context.semanticColors.success,
+                                  foregroundColor: Colors.white,
+                                ),
+                              ),
+                              if (task!.canRetryTranscription &&
+                                  onRetryTranscription != null) ...[
+                                const SizedBox(width: 8),
+                                IconButton.filledTonal(
+                                  onPressed: onRetryTranscription,
+                                  icon: const Icon(Icons.refresh),
+                                  tooltip: '重试转写',
+                                ),
+                              ],
+                              const Spacer(),
+                              IconButton.filledTonal(
+                                onPressed: canGoPrevious ? onPrevious : null,
+                                icon: const Icon(Icons.keyboard_arrow_up),
+                                tooltip: '上一条',
+                              ),
+                              const SizedBox(width: 8),
+                              IconButton.filledTonal(
+                                onPressed: canGoNext ? onNext : null,
+                                icon: const Icon(Icons.keyboard_arrow_down),
+                                tooltip: '下一条',
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
             ],
           ),
         ),
@@ -221,21 +249,60 @@ class BigTaskCard extends StatelessWidget {
     );
   }
 
+  Widget _keyboardLiftedFooter(BuildContext context, List<Widget> children) {
+    return KeyboardLift(
+      bottomObstruction: shellBottomObstruction(context),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: children,
+      ),
+    );
+  }
+
   Widget _buildContentArea(BuildContext context) {
-    if (mode == BigTaskCardMode.collect) {
-      return _buildContent(context);
-    }
+    return _buildContent(context);
+  }
 
-    if (mode == BigTaskCardMode.process) {
-      return GestureDetector(
-        behavior: HitTestBehavior.translucent,
-        onTap: () => focusNode?.requestFocus(),
-        child: _buildContent(context),
-      );
-    }
+  /// 不撑满父级高度，避免键盘动画期间逐帧重排；空白区由 [Listener] 负责聚焦。
+  Widget _buildFlexibleTitleField(
+    BuildContext context, {
+    required TextEditingController fieldController,
+    required bool readOnly,
+    String? hintText,
+    InputDecoration? decoration,
+    VoidCallback? onTap,
+    bool autofocus = false,
+    Color? textColor,
+  }) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
-    return SingleChildScrollView(
-      child: _buildContent(context),
+    return SizedBox(
+      width: double.infinity,
+      child: TextField(
+        controller: fieldController,
+        focusNode: focusNode,
+        readOnly: readOnly,
+        autofocus: autofocus,
+        showCursor: !readOnly,
+        cursorColor: colorScheme.primary,
+        onTap: readOnly ? onTap : null,
+        onChanged: onChanged,
+        minLines: 1,
+        maxLines: null,
+        keyboardType: TextInputType.multiline,
+        textInputAction: TextInputAction.newline,
+        textAlignVertical: TextAlignVertical.top,
+        style: theme.textTheme.headlineMedium?.copyWith(
+          color: textColor ?? colorScheme.onSurface,
+          height: 1.35,
+        ),
+        decoration: decoration ??
+            (hintText != null
+                ? InputDecoration(hintText: hintText)
+                : const InputDecoration(border: InputBorder.none)),
+      ),
     );
   }
 
@@ -248,9 +315,7 @@ class BigTaskCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Expanded(
-            // expands 空态时 TextField 命中区常小于视觉区域；用 Listener（非
-            // GestureDetector）在首次 pointerDown 即聚焦，避免与 TextField 手势冲突。
-            // 仅包裹文本区，附件缩略图不在其内，避免点图预览时唤起键盘。
+            // Listener 在 pointerDown 即聚焦，空白区也可点；附件区不在其内。
             child: Listener(
               behavior: HitTestBehavior.translucent,
               onPointerDown: (_) => onActivateInput?.call(),
@@ -262,23 +327,14 @@ class BigTaskCard extends StatelessWidget {
                             feedback == CollectCardFeedback.listening
                         ? 0
                         : 1,
-                    child: TextField(
-                      controller: controller,
-                      focusNode: focusNode,
-                      autofocus: true,
-                      showCursor: true,
-                      cursorColor: colorScheme.primary,
-                      onChanged: onChanged,
-                      expands: true,
-                      maxLines: null,
-                      scrollPhysics: const NeverScrollableScrollPhysics(),
-                      textAlignVertical: TextAlignVertical.top,
-                      style: theme.textTheme.headlineMedium?.copyWith(
-                        color: colorScheme.onSurface,
-                        height: 1.35,
-                      ),
-                      decoration: const InputDecoration(
+                    child: Align(
+                      alignment: Alignment.topLeft,
+                      child: _buildFlexibleTitleField(
+                        context,
+                        fieldController: controller!,
+                        readOnly: false,
                         hintText: '记下一件事…',
+                        autofocus: true,
                       ),
                     ),
                   ),
@@ -345,29 +401,75 @@ class BigTaskCard extends StatelessWidget {
     }
 
     if (mode == BigTaskCardMode.process && controller != null) {
+      final pendingTitle = displayTask.title.trim().isEmpty &&
+          displayTask.transcriptionStatus == TranscriptionStatus.pending;
+
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Expanded(
-            child: GestureDetector(
+            child: Listener(
               behavior: HitTestBehavior.translucent,
-              onTap: () => focusNode?.requestFocus(),
-              child: TextField(
-                controller: controller,
-                focusNode: focusNode,
-                onChanged: onChanged,
-                expands: true,
-                maxLines: null,
-                textAlignVertical: TextAlignVertical.top,
-                style: theme.textTheme.headlineMedium?.copyWith(
-                  color: colorScheme.onSurface,
-                  height: 1.35,
+              onPointerDown: (_) {
+                if (editing) {
+                  focusNode?.requestFocus();
+                } else {
+                  onEnterEdit?.call();
+                }
+              },
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildFlexibleTitleField(
+                      context,
+                      fieldController: controller!,
+                      readOnly: !editing,
+                      onTap: editing ? null : onEnterEdit,
+                      textColor: pendingTitle && !editing
+                          ? colorScheme.onSurface.withValues(alpha: 0.45)
+                          : null,
+                    ),
+                    if (!editing) ...[
+                      if (scheduleLabel != null) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          scheduleLabel!,
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            color: scheduleLabel!.startsWith('已逾期')
+                                ? colorScheme.error
+                                : colorScheme.primary,
+                          ),
+                        ),
+                      ],
+                      if (displayTask.note != null &&
+                          displayTask.note!.isNotEmpty) ...[
+                        const SizedBox(height: 16),
+                        Text(displayTask.note!, style: theme.textTheme.bodyLarge),
+                      ],
+                      if (displayTask.attachments.isNotEmpty) ...[
+                        const SizedBox(height: 20),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: displayTask.attachments.map((a) {
+                            return _AttachmentThumbnail(
+                              attachment: a,
+                              imageAttachments:
+                                  _imageAttachments(displayTask.attachments),
+                              audioAttachments:
+                                  _audioAttachments(displayTask.attachments),
+                            );
+                          }).toList(),
+                        ),
+                      ],
+                    ],
+                  ],
                 ),
-                decoration: const InputDecoration(border: InputBorder.none),
               ),
             ),
           ),
-          if (attachments.isNotEmpty) ...[
+          if (editing && attachments.isNotEmpty) ...[
             const SizedBox(height: 12),
             SizedBox(
               height: 80,
@@ -395,58 +497,7 @@ class BigTaskCard extends StatelessWidget {
       );
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          displayTask.displayTitle,
-          style: theme.textTheme.headlineMedium?.copyWith(
-            color: displayTask.title.trim().isEmpty &&
-                    displayTask.transcriptionStatus ==
-                        TranscriptionStatus.pending
-                ? colorScheme.onSurface.withValues(alpha: 0.45)
-                : null,
-          ),
-        ),
-        if (scheduleLabel != null) ...[
-          const SizedBox(height: 8),
-          Text(
-            scheduleLabel!,
-            style: theme.textTheme.labelLarge?.copyWith(
-              color: scheduleLabel!.startsWith('已逾期')
-                  ? colorScheme.error
-                  : colorScheme.primary,
-            ),
-          ),
-        ],
-        if (displayTask.note != null && displayTask.note!.isNotEmpty) ...[
-          const SizedBox(height: 16),
-          Text(displayTask.note!, style: theme.textTheme.bodyLarge),
-        ],
-        if (displayTask.attachments.isNotEmpty) ...[
-          const SizedBox(height: 20),
-          Builder(
-            builder: (context) {
-              final imageAttachments =
-                  _imageAttachments(displayTask.attachments);
-              final audioAttachments =
-                  _audioAttachments(displayTask.attachments);
-              return Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: displayTask.attachments.map((a) {
-                  return _AttachmentThumbnail(
-                    attachment: a,
-                    imageAttachments: imageAttachments,
-                    audioAttachments: audioAttachments,
-                  );
-                }).toList(),
-              );
-            },
-          ),
-        ],
-      ],
-    );
+    return const SizedBox.shrink();
   }
 
   String _feedbackMessage(CollectCardFeedback value) {

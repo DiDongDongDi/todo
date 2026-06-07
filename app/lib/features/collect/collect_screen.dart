@@ -109,7 +109,6 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
     super.initState();
     _focusNode = FocusNode();
     _focusNode.addListener(_onInputFocusChange);
-    unawaited(_requestInputFocus());
   }
 
   void _onInputFocusChange() {
@@ -457,7 +456,7 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
               onActivateInput: _activateInput,
               feedback: _recording ? CollectCardFeedback.listening : _feedback,
               onDismissFeedback: _dismissCardFeedback,
-              onChanged: (_) => setState(() {}),
+              onChanged: null,
               attachments: _attachments,
               onRemoveAttachment: _removeAttachment,
               onPickImage: _pickImage,

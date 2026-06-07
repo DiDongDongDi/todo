@@ -180,6 +180,9 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
           });
         }
         final task = tasks[clampedIndex];
+        if (!_editing) {
+          _syncDisplayFromTask(task);
+        }
         final archivedToday = statsAsync.value?.archivedToday ?? 0;
         final progress = inboxProgress(archivedToday, tasks.length);
 
@@ -187,7 +190,8 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
             ? {
                 const SingleActivator(LogicalKeyboardKey.enter): () =>
                     _saveEdit(task),
-                const SingleActivator(LogicalKeyboardKey.escape): _exitEditMode,
+                const SingleActivator(LogicalKeyboardKey.escape): () =>
+                    _exitEditMode(task),
               }
             : {
                 const SingleActivator(LogicalKeyboardKey.arrowLeft): () =>
@@ -266,58 +270,55 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
                     _setIndex(clampedIndex + 1, tasks.length),
                 onSwipeDown: () =>
                     _setIndex(clampedIndex - 1, tasks.length),
-                child: GestureDetector(
-                  onTap: _editing ? null : () => _startEdit(task),
-                  child: BigTaskCard(
-                    mode: _editing
-                        ? BigTaskCardMode.process
-                        : BigTaskCardMode.readOnly,
-                    task: task,
-                    controller: _editing ? _editController : null,
-                    focusNode: _editing ? _editFocusNode : null,
-                    onChanged: _editing ? (_) => setState(() {}) : null,
-                    attachments: _editing ? _editAttachments : const [],
-                    onRemoveAttachment:
-                        _editing ? _removeEditAttachment : null,
-                    onPickImage: _editing ? _pickEditImage : null,
-                    onStartSpeech:
-                        _editing && !kIsWeb ? _toggleEditRecording : null,
-                    isListening: _editRecording,
-                    onSave: _editing ? () => _saveEdit(task) : null,
-                    onCancelEdit: _editing ? _exitEditMode : null,
-                    scheduleEditor: _editing
-                        ? TaskScheduleEditor(
-                            isDaily: _editIsDaily,
-                            dailyUntil: _editDailyUntil,
-                            dueDate: _editDueDate,
-                            onDailyChanged: (value) =>
-                                setState(() => _editIsDaily = value),
-                            onDailyUntilChanged: (value) =>
-                                setState(() => _editDailyUntil = value),
-                            onDueDateChanged: (value) =>
-                                setState(() => _editDueDate = value),
-                          )
-                        : null,
-                    onTrash: () => _trash(task, animated: true),
-                    onComplete: () => _archive(task, animated: true),
-                    onPrevious: () => _setIndex(
-                      clampedIndex - 1,
-                      tasks.length,
-                      animated: true,
-                    ),
-                    onNext: () => _setIndex(
-                      clampedIndex + 1,
-                      tasks.length,
-                      animated: true,
-                    ),
-                    canGoPrevious: clampedIndex > 0,
-                    canGoNext: clampedIndex < tasks.length - 1,
-                    onRetryTranscription: task.canRetryTranscription
-                        ? () => _retryTranscription(task)
-                        : null,
-                    scheduleLabel: scheduleLabel(task),
-                    completeLabel: task.isDaily ? '今日完成' : '完成',
+                child: BigTaskCard(
+                  mode: BigTaskCardMode.process,
+                  editing: _editing,
+                  task: task,
+                  controller: _editController,
+                  focusNode: _editFocusNode,
+                  onEnterEdit: () => _startEdit(task),
+                  attachments:
+                      _editing ? _editAttachments : task.attachments,
+                  onRemoveAttachment:
+                      _editing ? _removeEditAttachment : null,
+                  onPickImage: _editing ? _pickEditImage : null,
+                  onStartSpeech:
+                      _editing && !kIsWeb ? _toggleEditRecording : null,
+                  isListening: _editRecording,
+                  onSave: _editing ? () => _saveEdit(task) : null,
+                  onCancelEdit: _editing ? () => _exitEditMode(task) : null,
+                  scheduleEditor: _editing
+                      ? TaskScheduleEditor(
+                          isDaily: _editIsDaily,
+                          dailyUntil: _editDailyUntil,
+                          dueDate: _editDueDate,
+                          onDailyChanged: (value) =>
+                              setState(() => _editIsDaily = value),
+                          onDailyUntilChanged: (value) =>
+                              setState(() => _editDailyUntil = value),
+                          onDueDateChanged: (value) =>
+                              setState(() => _editDueDate = value),
+                        )
+                      : null,
+                  onTrash: () => _trash(task, animated: true),
+                  onComplete: () => _archive(task, animated: true),
+                  onPrevious: () => _setIndex(
+                    clampedIndex - 1,
+                    tasks.length,
+                    animated: true,
                   ),
+                  onNext: () => _setIndex(
+                    clampedIndex + 1,
+                    tasks.length,
+                    animated: true,
+                  ),
+                  canGoPrevious: clampedIndex > 0,
+                  canGoNext: clampedIndex < tasks.length - 1,
+                  onRetryTranscription: task.canRetryTranscription
+                      ? () => _retryTranscription(task)
+                      : null,
+                  scheduleLabel: scheduleLabel(task),
+                  completeLabel: task.isDaily ? '今日完成' : '完成',
                 ),
               ),
             ),
@@ -365,7 +366,16 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     }
   }
 
+  void _syncDisplayFromTask(Task task) {
+    if (_editing) return;
+    final display = task.displayTitle;
+    if (_editController.text != display) {
+      _editController.text = display;
+    }
+  }
+
   void _startEdit(Task task) {
+    if (_editing) return;
     _editController.text = task.title;
     _editIsDaily = task.isDaily;
     _editDailyUntil = task.dailyUntil;
@@ -375,15 +385,16 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
       ..addAll(task.attachments);
     _editRecording = false;
     setState(() => _editing = true);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _editFocusNode.requestFocus();
-    });
+    _editFocusNode.requestFocus();
   }
 
-  void _exitEditMode() {
+  void _exitEditMode([Task? task]) {
     if (!_editing) return;
     _editFocusNode.unfocus();
     setState(() => _editing = false);
+    if (task != null) {
+      _syncDisplayFromTask(task);
+    }
   }
 
   Future<void> _saveEdit(Task task) async {
@@ -422,7 +433,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     }
     unawaited(triggerSyncIfSignedIn(ref));
 
-    _exitEditMode();
+    _exitEditMode(task);
   }
 
   void _removeEditAttachment(int index) {
