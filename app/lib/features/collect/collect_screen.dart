@@ -46,6 +46,9 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
   /// 手势/保存开始前输入法是否打开；用于保存后保持相同状态。
   bool? _keyboardWasOpenBeforeGesture;
 
+  /// 保存后递增以重建 TextField，重连 IME 且无需 unfocus。
+  int _collectInputEpoch = 0;
+
   static const _switcherDuration = Duration(milliseconds: 200);
 
   void _ensureCaretVisible() {
@@ -62,7 +65,14 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
     _ensureCaretVisible();
     if (!_focusNode.hasFocus) {
       _focusNode.requestFocus();
+    } else if (_controller.text.isEmpty) {
+      // 空卡片假焦点：重建 TextField 重连 IME，不收起键盘。
+      setState(() => _collectInputEpoch++);
     }
+  }
+
+  void _rebuildInputField() {
+    setState(() => _collectInputEpoch++);
   }
 
   void _rememberKeyboardState() {
@@ -114,6 +124,11 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
       _focusNode.unfocus();
       return;
     }
+
+    // 重建 TextField 重连 IME，无需 unfocus，键盘保持打开。
+    _rebuildInputField();
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) return;
 
     _ensureCaretVisible();
     if (!_focusNode.hasFocus && mounted) {
@@ -303,7 +318,8 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
       delay: _switcherDuration,
     );
     if (keepKeyboard && mounted && !_focusNode.hasFocus) {
-      await _restoreInputAfterSave(keepKeyboard: true);
+      _ensureCaretVisible();
+      FocusScope.of(context).requestFocus(_focusNode);
     }
   }
 
@@ -465,6 +481,7 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
               mode: BigTaskCardMode.collect,
               controller: _controller,
               focusNode: _focusNode,
+              inputFieldKey: ValueKey('collect-input-$_collectInputEpoch'),
               onActivateInput: _activateInput,
               feedback: _recording ? CollectCardFeedback.listening : _feedback,
               onDismissFeedback: _dismissCardFeedback,
