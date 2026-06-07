@@ -43,14 +43,8 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
   DateTime? _dailyUntil;
   DateTime? _dueDate;
 
-  /// 手势/保存开始前输入法是否打开；用于保存后保持相同状态。
+  /// 拖拽/保存开始前输入法是否打开。
   bool? _keyboardWasOpenBeforeGesture;
-
-  /// 保存后重建 TextField 的世代号（配合新 FocusNode 重连 IME）。
-  int _collectInputGeneration = 0;
-
-  /// 保存后自动恢复失败时，允许点击再重置一次。
-  bool _caretRefreshPending = false;
 
   static const _switcherDuration = Duration(milliseconds: 200);
 
@@ -64,65 +58,29 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
     );
   }
 
+  /// 单击卡片：空卡片假聚焦时强制 recycle，保证第一次点击就有光标。
   void _activateInput() {
-    if (_caretRefreshPending) {
-      _caretRefreshPending = false;
-      if (_focusNode.hasFocus) {
-        unawaited(_resetCollectInput(requestFocus: true));
-        return;
-      }
-    }
     _ensureCaretVisible();
     if (!_focusNode.hasFocus) {
       _focusNode.requestFocus();
+    } else if (_controller.text.isEmpty) {
+      unawaited(_requestInputFocus(recycleFocus: true));
     }
   }
 
-  void _rememberKeyboardState() {
+  void _onDragStart() {
     _keyboardWasOpenBeforeGesture ??= _focusNode.hasFocus;
+    _focusNode.unfocus();
   }
 
-  /// 换新 FocusNode + 新 TextField，完整重连 IME。
-  Future<void> _resetCollectInput({required bool requestFocus}) async {
-    if (!mounted || _recording) return;
-
-    final oldNode = _focusNode;
-    oldNode.removeListener(_onInputFocusChange);
-
-    _focusNode = FocusNode();
-    _focusNode.addListener(_onInputFocusChange);
-    _collectInputGeneration++;
-    setState(() {});
-
-    await WidgetsBinding.instance.endOfFrame;
-    await WidgetsBinding.instance.endOfFrame;
-    if (!mounted) {
-      oldNode.dispose();
-      return;
+  void _onDragEnd() {
+    if (_keyboardWasOpenBeforeGesture == true) {
+      unawaited(_requestInputFocus(recycleFocus: true));
     }
-
-    _ensureCaretVisible();
-    if (requestFocus) {
-      FocusScope.of(context).requestFocus(_focusNode);
-    }
-
-    await WidgetsBinding.instance.endOfFrame;
-    oldNode.dispose();
-    if (!mounted) return;
-    _ensureCaretVisible();
+    _keyboardWasOpenBeforeGesture = null;
   }
 
-  Future<void> _finalizeInputFocus() async {
-    if (!mounted || _recording) return;
-    await WidgetsBinding.instance.endOfFrame;
-    if (!mounted) return;
-    _ensureCaretVisible();
-    FocusScope.of(context).requestFocus(_focusNode);
-    await WidgetsBinding.instance.endOfFrame;
-    if (!mounted) return;
-    _ensureCaretVisible();
-  }
-
+  /// [recycleFocus] 为 true 时始终先 unfocus 再 requestFocus，重连 IME。
   Future<void> _requestInputFocus({
     Duration delay = Duration.zero,
     bool recycleFocus = false,
@@ -135,45 +93,18 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
     await WidgetsBinding.instance.endOfFrame;
     if (!mounted) return;
 
-    if (recycleFocus && _focusNode.hasFocus) {
+    if (recycleFocus) {
       _focusNode.unfocus();
       await WidgetsBinding.instance.endOfFrame;
       if (!mounted) return;
     }
 
     _ensureCaretVisible();
-    if (mounted) {
-      FocusScope.of(context).requestFocus(_focusNode);
-    }
+    FocusScope.of(context).requestFocus(_focusNode);
 
     await WidgetsBinding.instance.endOfFrame;
     if (!mounted) return;
     _ensureCaretVisible();
-  }
-
-  /// 保存/动画结束后恢复输入状态，不主动收起再弹起键盘。
-  Future<void> _restoreInputAfterSave({
-    required bool keepKeyboard,
-    Duration delay = Duration.zero,
-  }) async {
-    if (!mounted || _recording) return;
-    if (delay > Duration.zero) {
-      await Future<void>.delayed(delay);
-      if (!mounted) return;
-    }
-    await WidgetsBinding.instance.endOfFrame;
-    if (!mounted) return;
-
-    if (!keepKeyboard) {
-      _caretRefreshPending = false;
-      _focusNode.unfocus();
-      return;
-    }
-
-    await _resetCollectInput(requestFocus: true);
-    if (mounted) {
-      _caretRefreshPending = true;
-    }
   }
 
   @override
@@ -294,7 +225,7 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
 
   Future<void> _onSwipeUp() async {
     if (!_hasContent) {
-      final keepKeyboard = _focusNode.hasFocus;
+      final keepKeyboard = _keyboardWasOpenBeforeGesture ?? _focusNode.hasFocus;
       await AppHaptics.light();
       if (mounted) {
         await _showCardFeedback(
@@ -302,8 +233,8 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
           const Duration(seconds: 1),
         );
       }
-      if (keepKeyboard && mounted && !_focusNode.hasFocus) {
-        _focusNode.requestFocus();
+      if (keepKeyboard && mounted) {
+        await _requestInputFocus(recycleFocus: true);
       }
       return;
     }
@@ -311,7 +242,7 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
   }
 
   Future<void> _performSave() async {
-    final keepKeyboard = _keyboardWasOpenBeforeGesture ?? _focusNode.hasFocus;
+    final keepKeyboard = _keyboardWasOpenBeforeGesture ?? false;
     _keyboardWasOpenBeforeGesture = null;
 
     final repo = await ref.read(taskRepositoryProvider.future);
@@ -348,19 +279,20 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
     await _swipeKey.currentState?.resetPosition(enterFromBottom: true);
     if (!mounted) return;
 
-    await _restoreInputAfterSave(
-      keepKeyboard: keepKeyboard,
-      delay: _switcherDuration,
-    );
-    if (!mounted) return;
+    if (keepKeyboard) {
+      await _requestInputFocus(
+        delay: _switcherDuration,
+        recycleFocus: true,
+      );
+    } else {
+      _focusNode.unfocus();
+    }
 
+    if (!mounted) return;
     _showSaveSnackbar();
 
     if (keepKeyboard) {
-      await _finalizeInputFocus();
-      if (mounted) {
-        _caretRefreshPending = true;
-      }
+      await _requestInputFocus(recycleFocus: true);
     }
   }
 
@@ -376,8 +308,8 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
           const Duration(seconds: 1),
         );
       }
-      if (keepKeyboard && mounted && !_focusNode.hasFocus) {
-        _focusNode.requestFocus();
+      if (keepKeyboard && mounted) {
+        await _requestInputFocus(recycleFocus: true);
       }
       return;
     }
@@ -385,7 +317,8 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
     _saving = true;
     try {
       if (animated) {
-        _rememberKeyboardState();
+        _keyboardWasOpenBeforeGesture ??= _focusNode.hasFocus;
+        _focusNode.unfocus();
         final state = _swipeKey.currentState;
         if (state != null) {
           await state.animateFlyout(
@@ -397,6 +330,7 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
           await _performSave();
         }
       } else {
+        _keyboardWasOpenBeforeGesture ??= _focusNode.hasFocus;
         await _performSave();
       }
     } finally {
@@ -514,7 +448,8 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
             resetAfterAction: false,
             shouldAnimateFlyout: (_) async => _hasContent,
             onFlyoutFeedback: _collectFlyoutFeedback,
-            onDragStart: _rememberKeyboardState,
+            onDragStart: _onDragStart,
+            onDragEnd: _onDragEnd,
             onSwipeUp: _onSwipeUp,
             rightLabel: '',
             leftLabel: '',
@@ -522,14 +457,10 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
               mode: BigTaskCardMode.collect,
               controller: _controller,
               focusNode: _focusNode,
-              inputFieldKey: ValueKey('collect-input-$_collectInputGeneration'),
               onActivateInput: _activateInput,
               feedback: _recording ? CollectCardFeedback.listening : _feedback,
               onDismissFeedback: _dismissCardFeedback,
-              onChanged: (_) {
-                _caretRefreshPending = false;
-                setState(() {});
-              },
+              onChanged: (_) => setState(() {}),
               attachments: _attachments,
               onRemoveAttachment: _removeAttachment,
               onPickImage: _pickImage,
