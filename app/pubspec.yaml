@@ -24,6 +24,7 @@ dependencies:
   cross_file: ^0.3.4+2
   shared_preferences: ^2.5.3
   record: ^6.2.1
+  audioplayers: ^6.6.0
 
 dev_dependencies:
   flutter_test:

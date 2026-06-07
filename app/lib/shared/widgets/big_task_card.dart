@@ -4,6 +4,7 @@ import 'package:todo_app/core/models/task_display.dart';
 import 'package:todo_app/shared/theme/app_semantic_colors.dart';
 import 'package:todo_app/shared/utils/audio_storage.dart';
 import 'package:todo_app/shared/widgets/attachment_image.dart';
+import 'package:todo_app/shared/widgets/audio_preview.dart';
 import 'package:todo_app/shared/widgets/image_preview.dart';
 enum BigTaskCardMode { collect, process, readOnly }
 
@@ -263,10 +264,12 @@ class BigTaskCard extends StatelessWidget {
                 separatorBuilder: (_, __) => const SizedBox(width: 8),
                 itemBuilder: (context, index) {
                   final imageAttachments = _imageAttachments(attachments);
+                  final audioAttachments = _audioAttachments(attachments);
                   final attachment = attachments[index];
                   return _AttachmentThumbnail(
                     attachment: attachment,
                     imageAttachments: imageAttachments,
+                    audioAttachments: audioAttachments,
                     onRemove: onRemoveAttachment == null
                         ? null
                         : () => onRemoveAttachment!(index),
@@ -328,7 +331,10 @@ class BigTaskCard extends StatelessWidget {
           const SizedBox(height: 20),
           Builder(
             builder: (context) {
-              final imageAttachments = _imageAttachments(displayTask.attachments);
+              final imageAttachments =
+                  _imageAttachments(displayTask.attachments);
+              final audioAttachments =
+                  _audioAttachments(displayTask.attachments);
               return Wrap(
                 spacing: 8,
                 runSpacing: 8,
@@ -336,6 +342,7 @@ class BigTaskCard extends StatelessWidget {
                   return _AttachmentThumbnail(
                     attachment: a,
                     imageAttachments: imageAttachments,
+                    audioAttachments: audioAttachments,
                   );
                 }).toList(),
               );
@@ -357,6 +364,12 @@ class BigTaskCard extends StatelessWidget {
   static List<TaskAttachment> _imageAttachments(List<TaskAttachment> attachments) {
     return attachments
         .where((a) => a.type == AttachmentType.image)
+        .toList();
+  }
+
+  static List<TaskAttachment> _audioAttachments(List<TaskAttachment> attachments) {
+    return attachments
+        .where((a) => a.type == AttachmentType.audio)
         .toList();
   }
 
@@ -383,30 +396,52 @@ class _AttachmentThumbnail extends StatelessWidget {
   const _AttachmentThumbnail({
     required this.attachment,
     this.imageAttachments = const [],
+    this.audioAttachments = const [],
     this.onRemove,
   });
 
   final TaskAttachment attachment;
   final List<TaskAttachment> imageAttachments;
+  final List<TaskAttachment> audioAttachments;
   final VoidCallback? onRemove;
 
+  bool get _isPreviewable =>
+      attachment.type == AttachmentType.image ||
+      attachment.type == AttachmentType.audio;
+
   void _openPreview(BuildContext context) {
-    if (attachment.type != AttachmentType.image) return;
+    if (!_isPreviewable) return;
 
     FocusManager.instance.primaryFocus?.unfocus();
 
-    final images = imageAttachments.isNotEmpty
-        ? imageAttachments
-        : [attachment];
-    final index = images.indexWhere(
+    if (attachment.type == AttachmentType.image) {
+      final images =
+          imageAttachments.isNotEmpty ? imageAttachments : [attachment];
+      final index = images.indexWhere(
+        (a) =>
+            a.localPath == attachment.localPath &&
+            a.remoteUrl == attachment.remoteUrl,
+      );
+
+      showAttachmentImagePreview(
+        context,
+        attachments: images,
+        initialIndex: index >= 0 ? index : 0,
+      );
+      return;
+    }
+
+    final audios =
+        audioAttachments.isNotEmpty ? audioAttachments : [attachment];
+    final index = audios.indexWhere(
       (a) =>
           a.localPath == attachment.localPath &&
           a.remoteUrl == attachment.remoteUrl,
     );
 
-    showAttachmentImagePreview(
+    showAttachmentAudioPreview(
       context,
-      attachments: images,
+      attachments: audios,
       initialIndex: index >= 0 ? index : 0,
     );
   }
@@ -421,7 +456,7 @@ class _AttachmentThumbnail extends StatelessWidget {
       clipBehavior: Clip.none,
       children: [
         GestureDetector(
-          onTap: isImage ? () => _openPreview(context) : null,
+          onTap: _isPreviewable ? () => _openPreview(context) : null,
           child: ClipRRect(
             borderRadius: BorderRadius.circular(12),
             child: SizedBox(
