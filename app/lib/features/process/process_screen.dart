@@ -28,7 +28,10 @@ import 'package:todo_app/shared/widgets/swipeable_card.dart';
 import 'package:todo_app/shared/widgets/task_schedule_editor.dart';
 
 class ProcessScreen extends ConsumerStatefulWidget {
-  const ProcessScreen({super.key});
+  const ProcessScreen({super.key, this.isActive = true});
+
+  /// 当前是否为 Shell 中选中的 tab；失活时强制退出编辑 UI。
+  final bool isActive;
 
   @override
   ConsumerState<ProcessScreen> createState() => _ProcessScreenState();
@@ -50,13 +53,100 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
   final List<TaskAttachment> _editAttachments = [];
   bool _editRecording = false;
   final _editAudioRecorder = AppAudioRecorder();
+  bool _editPendingFocus = false;
+  int _transientUiDepth = 0;
+
+  /// 与收集页一致：底部按钮组由焦点驱动；tab 不可见时一律视为非编辑 UI。
+  bool get _editUiVisible =>
+      widget.isActive &&
+      (_editFocusNode.hasFocus ||
+          _editRecording ||
+          _editPendingFocus ||
+          _transientUiDepth > 0);
+
+  @override
+  void initState() {
+    super.initState();
+    _editFocusNode.addListener(_onEditFocusChange);
+  }
+
+  @override
+  void didUpdateWidget(ProcessScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isActive && !widget.isActive) {
+      _handleTabHidden();
+    }
+  }
+
+  void _handleTabHidden() {
+    _editPendingFocus = false;
+    _transientUiDepth = 0;
+    _editFocusNode.unfocus();
+    if (_editRecording) {
+      _editRecording = false;
+      unawaited(_editAudioRecorder.stop());
+    }
+    final task = _taskForBlurExit();
+    setState(() => _editing = false);
+    if (task != null) {
+      _syncDisplayFromTask(task);
+    }
+  }
 
   @override
   void dispose() {
+    _editFocusNode.removeListener(_onEditFocusChange);
     _editController.dispose();
     _editFocusNode.dispose();
     unawaited(_editAudioRecorder.dispose());
     super.dispose();
+  }
+
+  Task? _taskForBlurExit() {
+    final tasks = ref.read(processTasksProvider).value;
+    if (tasks == null || tasks.isEmpty) return null;
+    return tasks[_index.clamp(0, tasks.length - 1)];
+  }
+
+  void _onEditFocusChange() {
+    if (!mounted) return;
+    if (_editFocusNode.hasFocus) {
+      _editPendingFocus = false;
+      _ensureEditCaretVisible();
+      setState(() {});
+      return;
+    }
+    if (_editRecording || _transientUiDepth > 0) {
+      setState(() {});
+      return;
+    }
+    // 延迟一帧再切换按钮，避免失焦后「保存/取消」被换掉导致 onPressed 丢失。
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (_editFocusNode.hasFocus ||
+          _editRecording ||
+          _transientUiDepth > 0) {
+        return;
+      }
+      setState(() {});
+      _scheduleEditSessionCleanup();
+    });
+  }
+
+  void _scheduleEditSessionCleanup() {
+    if (_editUiVisible || !_editing) return;
+    _exitEditMode(_taskForBlurExit());
+  }
+
+  void _beginTransientEditUi() {
+    _transientUiDepth++;
+  }
+
+  void _endTransientEditUi() {
+    if (_transientUiDepth > 0) _transientUiDepth--;
+    if (!mounted) return;
+    setState(() {});
+    _scheduleEditSessionCleanup();
   }
 
   Future<List<Task>> _waitForProcessTask(String taskId) async {
@@ -213,7 +303,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
         final archivedToday = statsAsync.value?.archivedToday ?? 0;
         final progress = inboxProgress(archivedToday, tasks.length);
 
-        final shortcuts = _editing
+        final shortcuts = _editUiVisible
             ? {
                 const SingleActivator(LogicalKeyboardKey.enter): () =>
                     _saveEdit(task),
@@ -284,7 +374,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
             Expanded(
               child: CardStage(
                 swipeKey: _swipeKey,
-                enabled: touchFirst && !_editing,
+                enabled: touchFirst && !_editUiVisible,
                 verticalEnterAnimation: true,
                 shouldAnimateFlyout: (flyout) async {
                   if (flyout.dy != 0) return tasks.length > 1;
@@ -298,22 +388,22 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
                     _setIndex(clampedIndex - 1, tasks.length),
                 child: BigTaskCard(
                   mode: BigTaskCardMode.process,
-                  editing: _editing,
+                  editing: _editUiVisible,
                   task: task,
                   controller: _editController,
                   focusNode: _editFocusNode,
                   onEnterEdit: () => _startEdit(task),
                   attachments:
-                      _editing ? _editAttachments : task.attachments,
+                      _editUiVisible ? _editAttachments : task.attachments,
                   onRemoveAttachment:
-                      _editing ? _removeEditAttachment : null,
-                  onPickImage: _editing ? _pickEditImage : null,
+                      _editUiVisible ? _removeEditAttachment : null,
+                  onPickImage: _editUiVisible ? _pickEditImage : null,
                   onStartSpeech:
-                      _editing && !kIsWeb ? _toggleEditRecording : null,
+                      _editUiVisible && !kIsWeb ? _toggleEditRecording : null,
                   isListening: _editRecording,
-                  onSave: _editing ? () => _saveEdit(task) : null,
-                  onCancelEdit: _editing ? () => _exitEditMode(task) : null,
-                  scheduleEditor: _editing
+                  onSave: _editUiVisible ? () => _saveEdit(task) : null,
+                  onCancelEdit: _editUiVisible ? () => _exitEditMode(task) : null,
+                  scheduleEditor: _editUiVisible
                       ? TaskScheduleEditor(
                           isDaily: _editIsDaily,
                           dailyUntil: _editDailyUntil,
@@ -324,6 +414,8 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
                               setState(() => _editDailyUntil = value),
                           onDueDateChanged: (value) =>
                               setState(() => _editDueDate = value),
+                          onTransientUiOpening: _beginTransientEditUi,
+                          onTransientUiClosed: _endTransientEditUi,
                         )
                       : null,
                   onTrash: () => _trash(task, animated: true),
@@ -357,7 +449,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
         return CallbackShortcuts(
           bindings: shortcuts,
           child: Focus(
-            autofocus: !_editing,
+            autofocus: !_editUiVisible,
             child: content,
           ),
         );
@@ -441,7 +533,11 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
   }
 
   void _startEdit(Task task) {
-    if (_editing) return;
+    if (_editUiVisible) return;
+    if (_editing) {
+      _syncDisplayFromTask(task);
+      _editing = false;
+    }
     _editController.text = task.title;
     _editIsDaily = task.isDaily;
     _editDailyUntil = task.dailyUntil;
@@ -450,14 +546,16 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
       ..clear()
       ..addAll(task.attachments);
     _editRecording = false;
+    _editPendingFocus = true;
     setState(() => _editing = true);
     unawaited(_requestEditFocus());
   }
 
   void _exitEditMode([Task? task]) {
-    if (!_editing) return;
-    _editFocusNode.unfocus();
+    if (!_editing && !_editUiVisible) return;
+    _editPendingFocus = false;
     setState(() => _editing = false);
+    _editFocusNode.unfocus();
     if (task != null) {
       _syncDisplayFromTask(task);
     }
@@ -507,27 +605,32 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
   }
 
   Future<void> _pickEditImage() async {
+    _beginTransientEditUi();
     final picker = ImagePicker();
-    final file = await picker.pickImage(source: ImageSource.gallery);
-    if (file == null) return;
+    try {
+      final file = await picker.pickImage(source: ImageSource.gallery);
+      if (file == null) return;
 
-    final localPath = await persistImageAttachment(file);
-    if (localPath == null) {
-      if (!mounted) return;
-      showAppSnackBar(
-        context,
-        message: '无法读取所选图片',
-        icon: Icons.error_outline,
-        type: AppSnackType.error,
-      );
-      return;
+      final localPath = await persistImageAttachment(file);
+      if (localPath == null) {
+        if (!mounted) return;
+        showAppSnackBar(
+          context,
+          message: '无法读取所选图片',
+          icon: Icons.error_outline,
+          type: AppSnackType.error,
+        );
+        return;
+      }
+
+      setState(() {
+        _editAttachments.add(
+          TaskAttachment(type: AttachmentType.image, localPath: localPath),
+        );
+      });
+    } finally {
+      if (mounted) _endTransientEditUi();
     }
-
-    setState(() {
-      _editAttachments.add(
-        TaskAttachment(type: AttachmentType.image, localPath: localPath),
-      );
-    });
   }
 
   Future<void> _toggleEditRecording() async {
@@ -570,6 +673,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
       return;
     }
 
+    _beginTransientEditUi();
     _editFocusNode.unfocus();
     try {
       await _editAudioRecorder.start();
@@ -584,6 +688,8 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
         icon: Icons.mic_off_outlined,
         type: AppSnackType.error,
       );
+    } finally {
+      if (mounted) _endTransientEditUi();
     }
   }
 

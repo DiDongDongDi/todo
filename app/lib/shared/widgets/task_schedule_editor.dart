@@ -11,6 +11,8 @@ class TaskScheduleEditor extends StatelessWidget {
     required this.onDailyChanged,
     required this.onDailyUntilChanged,
     required this.onDueDateChanged,
+    this.onTransientUiOpening,
+    this.onTransientUiClosed,
   });
 
   final bool isDaily;
@@ -19,6 +21,8 @@ class TaskScheduleEditor extends StatelessWidget {
   final ValueChanged<bool> onDailyChanged;
   final ValueChanged<DateTime?> onDailyUntilChanged;
   final ValueChanged<DateTime?> onDueDateChanged;
+  final VoidCallback? onTransientUiOpening;
+  final VoidCallback? onTransientUiClosed;
 
   static String _formatShortDate(DateTime d) => '${d.month}/${d.day}';
 
@@ -27,15 +31,20 @@ class TaskScheduleEditor extends StatelessWidget {
     required DateTime? initial,
     required ValueChanged<DateTime?> onPicked,
   }) async {
-    final today = localDate(DateTime.now());
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: initial ?? today,
-      firstDate: today,
-      lastDate: today.add(const Duration(days: 3650)),
-    );
-    if (picked != null) {
-      onPicked(localDate(picked));
+    onTransientUiOpening?.call();
+    try {
+      final today = localDate(DateTime.now());
+      final picked = await showDatePicker(
+        context: context,
+        initialDate: initial ?? today,
+        firstDate: today,
+        lastDate: today.add(const Duration(days: 3650)),
+      );
+      if (picked != null) {
+        onPicked(localDate(picked));
+      }
+    } finally {
+      onTransientUiClosed?.call();
     }
   }
 

@@ -36,14 +36,24 @@ class _ShellScreenState extends State<ShellScreen> {
           fit: StackFit.expand,
           children: [
             _tabPage(0, const CollectScreen(key: ValueKey('collect'))),
-            _tabPage(1, const ProcessScreen(key: ValueKey('process'))),
+            _tabPage(
+              1,
+              ProcessScreen(
+                key: const ValueKey('process'),
+                isActive: _index == 1,
+              ),
+            ),
             _tabPage(2, const SettingsScreen(key: ValueKey('settings'))),
           ],
         ),
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
-        onDestinationSelected: (i) => setState(() => _index = i),
+        onDestinationSelected: (i) {
+          if (i == _index) return;
+          FocusManager.instance.primaryFocus?.unfocus();
+          setState(() => _index = i);
+        },
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.add_circle_outline),
