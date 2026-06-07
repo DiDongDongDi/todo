@@ -62,6 +62,7 @@ class SwipeableCardState extends State<SwipeableCard>
 
   static const _threshold = 80.0;
   static const _dragDeadZone = 8.0;
+  static const _cardBorderRadius = 20.0;
   static const _flyoutDuration = Duration(milliseconds: 180);
   static const _resetDuration = Duration(milliseconds: 220);
 
@@ -77,8 +78,11 @@ class SwipeableCardState extends State<SwipeableCard>
     super.dispose();
   }
 
-  double _bandOpacity(double drag, double threshold) {
-    return ((drag.abs() - 20) / threshold).clamp(0.0, 0.55);
+  bool _showsActionBand(double drag) => drag.abs() >= _threshold;
+
+  double _bandOpacity(double drag) {
+    if (!_showsActionBand(drag)) return 0;
+    return ((drag.abs() - _threshold) / _threshold).clamp(0.0, 1.0) * 0.2 + 0.35;
   }
 
   /// Locks drag to directions that have registered swipe callbacks.
@@ -357,27 +361,29 @@ class SwipeableCardState extends State<SwipeableCard>
       clipBehavior: Clip.none,
       fit: StackFit.expand,
       children: [
-        if (offset.dx < -20)
+        if (offset.dx <= -_threshold)
           Positioned.fill(
             child: DecoratedBox(
               decoration: BoxDecoration(
                 color: colorScheme.error.withValues(
-                  alpha: _bandOpacity(offset.dx, _threshold),
+                  alpha: _bandOpacity(offset.dx),
                 ),
+                borderRadius: BorderRadius.circular(_cardBorderRadius),
               ),
             ),
           ),
-        if (offset.dx > 20)
+        if (offset.dx >= _threshold)
           Positioned.fill(
             child: DecoratedBox(
               decoration: BoxDecoration(
                 color: successColor.withValues(
-                  alpha: _bandOpacity(offset.dx, _threshold),
+                  alpha: _bandOpacity(offset.dx),
                 ),
+                borderRadius: BorderRadius.circular(_cardBorderRadius),
               ),
             ),
           ),
-        if (offset.dx < -20)
+        if (offset.dx <= -_threshold)
           Positioned.fill(
             child: Align(
               alignment: Alignment.centerRight,
@@ -394,7 +400,7 @@ class SwipeableCardState extends State<SwipeableCard>
               ),
             ),
           ),
-        if (offset.dx > 20)
+        if (offset.dx >= _threshold)
           Positioned.fill(
             child: Align(
               alignment: Alignment.centerLeft,
