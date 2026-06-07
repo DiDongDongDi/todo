@@ -46,8 +46,7 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
   /// 手势/保存开始前输入法是否打开；用于保存后保持相同状态。
   bool? _keyboardWasOpenBeforeGesture;
 
-  /// 保存后递增以重建 TextField，重连 IME 且无需 unfocus。
-  int _collectInputEpoch = 0;
+  bool _inputReconnecting = false;
 
   static const _switcherDuration = Duration(milliseconds: 200);
 
@@ -68,12 +67,46 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
     }
   }
 
-  void _rebuildInputField() {
-    setState(() => _collectInputEpoch++);
-  }
-
   void _rememberKeyboardState() {
     _keyboardWasOpenBeforeGesture ??= _focusNode.hasFocus;
+  }
+
+  /// 切换 readOnly 一帧，重连 IME 且通常不收起键盘。
+  Future<void> _reconnectInputSoft() async {
+    if (!mounted || _recording) return;
+    setState(() => _inputReconnecting = true);
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) return;
+    setState(() => _inputReconnecting = false);
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) return;
+    _ensureCaretVisible();
+  }
+
+  /// 换新 FocusNode，让 TextField 重新挂载并绑定 IME。
+  Future<void> _swapInputFocusNode() async {
+    if (!mounted || _recording) return;
+
+    final oldNode = _focusNode;
+    oldNode.removeListener(_onInputFocusChange);
+
+    _focusNode = FocusNode();
+    _focusNode.addListener(_onInputFocusChange);
+    setState(() {});
+
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) {
+      oldNode.dispose();
+      return;
+    }
+
+    _ensureCaretVisible();
+    FocusScope.of(context).requestFocus(_focusNode);
+
+    await WidgetsBinding.instance.endOfFrame;
+    oldNode.dispose();
+    if (!mounted) return;
+    _ensureCaretVisible();
   }
 
   Future<void> _requestInputFocus({
@@ -122,19 +155,18 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
       return;
     }
 
-    // 动画结束后重建 TextField，重连 IME 且不收起键盘。
-    _rebuildInputField();
-    await WidgetsBinding.instance.endOfFrame;
+    await _reconnectInputSoft();
     if (!mounted) return;
 
-    _ensureCaretVisible();
-    if (!_focusNode.hasFocus && mounted) {
+    if (!_focusNode.hasFocus) {
       FocusScope.of(context).requestFocus(_focusNode);
+      await WidgetsBinding.instance.endOfFrame;
+      if (!mounted) return;
+      _ensureCaretVisible();
+    } else {
+      // 假聚焦：FocusNode 显示已聚焦但 IME 未连接，换新节点重挂 TextField。
+      await _swapInputFocusNode();
     }
-
-    await WidgetsBinding.instance.endOfFrame;
-    if (!mounted) return;
-    _ensureCaretVisible();
   }
 
   @override
@@ -478,7 +510,7 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
               mode: BigTaskCardMode.collect,
               controller: _controller,
               focusNode: _focusNode,
-              inputFieldKey: ValueKey('collect-input-$_collectInputEpoch'),
+              inputReadOnly: _inputReconnecting,
               onActivateInput: _activateInput,
               feedback: _recording ? CollectCardFeedback.listening : _feedback,
               onDismissFeedback: _dismissCardFeedback,

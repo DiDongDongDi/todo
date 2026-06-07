@@ -25,7 +25,7 @@ class BigTaskCard extends StatelessWidget {
     this.isListening = false,
     this.onSave,
     this.onActivateInput,
-    this.inputFieldKey,
+    this.inputReadOnly = false,
     this.feedback = CollectCardFeedback.none,
     this.onDismissFeedback,
     this.onTrash,
@@ -53,7 +53,7 @@ class BigTaskCard extends StatelessWidget {
   final bool isListening;
   final VoidCallback? onSave;
   final VoidCallback? onActivateInput;
-  final Key? inputFieldKey;
+  final bool inputReadOnly;
   final CollectCardFeedback feedback;
   final VoidCallback? onDismissFeedback;
   final VoidCallback? onTrash;
@@ -255,7 +255,11 @@ class BigTaskCard extends StatelessWidget {
             // 仅包裹文本区，附件缩略图不在其内，避免点图预览时唤起键盘。
             child: Listener(
               behavior: HitTestBehavior.translucent,
-              onPointerDown: (_) => onActivateInput?.call(),
+              onPointerDown: (_) {
+                if (!(focusNode?.hasFocus ?? false)) {
+                  onActivateInput?.call();
+                }
+              },
               child: Stack(
                 fit: StackFit.expand,
                 children: [
@@ -265,9 +269,9 @@ class BigTaskCard extends StatelessWidget {
                         ? 0
                         : 1,
                     child: TextField(
-                      key: inputFieldKey,
                       controller: controller,
                       focusNode: focusNode,
+                      readOnly: inputReadOnly,
                       autofocus: true,
                       showCursor: true,
                       onTap: onActivateInput,
