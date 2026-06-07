@@ -31,6 +31,10 @@ void main() {
       status: TaskStatus.inbox,
       createdAt: _t,
       updatedAt: _t,
+      isDaily: true,
+      dailyUntil: DateTime(2026, 6, 30),
+      lastDailyCompletedAt: DateTime.utc(2026, 6, 7, 12),
+      dueDate: DateTime(2026, 6, 15),
       attachments: [
         TaskAttachment(type: AttachmentType.image, localPath: '/tmp/a.png'),
       ],
@@ -38,5 +42,9 @@ void main() {
     final restored = Task.fromJson(task.toJson());
     expect(restored.title, '测试');
     expect(restored.attachments.length, 1);
+    expect(restored.isDaily, isTrue);
+    expect(restored.dailyUntil, DateTime(2026, 6, 30));
+    expect(restored.lastDailyCompletedAt, DateTime.utc(2026, 6, 7, 12));
+    expect(restored.dueDate, DateTime(2026, 6, 15));
   });
 }

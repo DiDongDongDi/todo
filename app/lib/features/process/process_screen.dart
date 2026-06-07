@@ -7,8 +7,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:todo_app/core/models/task.dart';
 import 'package:todo_app/core/models/task_display.dart';
+import 'package:todo_app/core/models/task_schedule.dart';
 import 'package:todo_app/core/repositories/task_repository.dart';
 import 'package:todo_app/core/settings/process_sound_settings.dart';
+import 'package:todo_app/core/settings/process_today_only_settings.dart';
 import 'package:todo_app/core/stats/stats_provider.dart';
 import 'package:todo_app/core/sync/sync_engine.dart';
 import 'package:todo_app/core/transcription/transcription_service.dart';
@@ -36,6 +38,11 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
   final _swipeKey = GlobalKey<SwipeableCardState>();
   Task? _lastUndoTask;
   TaskStatus? _lastUndoFrom;
+  bool _lastUndoWasDailyCompletion = false;
+
+  bool _editIsDaily = false;
+  DateTime? _editDailyUntil;
+  DateTime? _editDueDate;
 
   @override
   void dispose() {
@@ -50,15 +57,21 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     if (task == null || from == null) return;
 
     final enterFromLeft = from == TaskStatus.trashed;
-    final enterFromRight = from == TaskStatus.archived;
+    final enterFromRight =
+        from == TaskStatus.archived || _lastUndoWasDailyCompletion;
     if (!enterFromLeft && !enterFromRight) return;
 
     final repo = await ref.read(taskRepositoryProvider.future);
-    await repo.restoreToInbox(task.id);
-    final tasks = await repo.watchInbox().first;
+    if (_lastUndoWasDailyCompletion) {
+      await repo.undoDailyCompletion(task.id);
+    } else {
+      await repo.restoreToInbox(task.id);
+    }
+    final tasks = ref.read(processTasksProvider).value ?? [];
 
     _lastUndoTask = null;
     _lastUndoFrom = null;
+    _lastUndoWasDailyCompletion = false;
 
     if (!mounted) return;
 
@@ -113,22 +126,39 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final inboxAsync = ref.watch(inboxTasksProvider);
+    final tasksAsync = ref.watch(processTasksProvider);
+    final todayOnlyAsync = ref.watch(processTodayOnlyProvider);
     final statsAsync = ref.watch(statsProvider);
     final touchFirst = isTouchFirstPlatform;
+    final todayOnly = todayOnlyAsync.value ?? false;
 
-    return inboxAsync.when(
+    return tasksAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Center(child: Text('加载失败: $e')),
       data: (tasks) {
         if (tasks.isEmpty) {
-          return const Center(
+          return Center(
             child: Padding(
-              padding: EdgeInsets.all(32),
-              child: Text(
-                '收集箱是空的，去收集页记一条吧',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 18),
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    todayOnly
+                        ? '今天没有计划任务'
+                        : '收集箱是空的，去收集页记一条吧',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 18),
+                  ),
+                  const SizedBox(height: 24),
+                  FilterChip(
+                    label: const Text('只看今日'),
+                    selected: todayOnly,
+                    onSelected: (value) => ref
+                        .read(processTodayOnlyProvider.notifier)
+                        .setEnabled(value),
+                  ),
+                ],
               ),
             ),
           );
@@ -167,32 +197,47 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  ProcessProgressRing(
-                    completed: archivedToday,
-                    total: archivedToday + tasks.length,
+                  Row(
+                    children: [
+                      ProcessProgressRing(
+                        completed: archivedToday,
+                        total: archivedToday + tasks.length,
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        '${tasks.length} 待处理',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      const Spacer(),
+                      IconButton(
+                        icon: const Icon(Icons.task_alt_outlined),
+                        tooltip: '已完成',
+                        onPressed: () => context.push('/archive'),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline),
+                        tooltip: '回收站',
+                        onPressed: () => context.push('/trash'),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.sync_outlined),
+                        tooltip: '同步',
+                        onPressed: () => context.push('/auth'),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 12),
-                  Text(
-                    '${tasks.length} 待处理',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    icon: const Icon(Icons.task_alt_outlined),
-                    tooltip: '已完成',
-                    onPressed: () => context.push('/archive'),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.delete_outline),
-                    tooltip: '回收站',
-                    onPressed: () => context.push('/trash'),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.sync_outlined),
-                    tooltip: '同步',
-                    onPressed: () => context.push('/auth'),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: FilterChip(
+                      label: const Text('只看今日'),
+                      selected: todayOnly,
+                      onSelected: (value) => ref
+                          .read(processTodayOnlyProvider.notifier)
+                          .setEnabled(value),
+                    ),
                   ),
                 ],
               ),
@@ -240,11 +285,17 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
                     onRetryTranscription: task.canRetryTranscription
                         ? () => _retryTranscription(task)
                         : null,
+                    scheduleLabel: scheduleLabel(task),
+                    completeLabel: task.isDaily ? '今日完成' : '完成',
                   ),
                 ),
               ),
             ),
-            if (_editing)
+            if (_editing) ...[
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+                child: _buildScheduleEditor(context),
+              ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
                 child: Row(
@@ -262,6 +313,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
                   ],
                 ),
               ),
+            ],
             if (progress >= 1 && tasks.isNotEmpty) const SizedBox(height: 4),
           ],
         );
@@ -307,6 +359,9 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
 
   void _startEdit(Task task) {
     _editController.text = task.title;
+    _editIsDaily = task.isDaily;
+    _editDailyUntil = task.dailyUntil;
+    _editDueDate = task.dueDate;
     setState(() => _editing = true);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _editFocusNode.requestFocus();
@@ -315,8 +370,111 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
 
   Future<void> _saveEdit(Task task) async {
     final repo = await ref.read(taskRepositoryProvider.future);
-    await repo.update(task.copyWith(title: _editController.text.trim()));
+    await repo.update(
+      task.copyWith(
+        title: _editController.text.trim(),
+        isDaily: _editIsDaily,
+        dailyUntil: _editDailyUntil,
+        dueDate: _editIsDaily ? null : _editDueDate,
+        clearDailyUntil: _editIsDaily && _editDailyUntil == null,
+        clearDueDate: _editIsDaily || _editDueDate == null,
+      ),
+    );
     setState(() => _editing = false);
+  }
+
+  Widget _buildScheduleEditor(BuildContext context) {
+    final theme = Theme.of(context);
+    final today = localDate(DateTime.now());
+
+    String formatDate(DateTime? d) {
+      if (d == null) return '未设置';
+      return '${d.year}/${d.month}/${d.day}';
+    }
+
+    Future<void> pickDailyUntil() async {
+      final picked = await showDatePicker(
+        context: context,
+        initialDate: _editDailyUntil ?? today,
+        firstDate: today,
+        lastDate: today.add(const Duration(days: 3650)),
+      );
+      if (picked != null && mounted) {
+        setState(() => _editDailyUntil = localDate(picked));
+      }
+    }
+
+    Future<void> pickDueDate() async {
+      final picked = await showDatePicker(
+        context: context,
+        initialDate: _editDueDate ?? today,
+        firstDate: today,
+        lastDate: today.add(const Duration(days: 3650)),
+      );
+      if (picked != null && mounted) {
+        setState(() => _editDueDate = localDate(picked));
+      }
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('每日重复'),
+          value: _editIsDaily,
+          onChanged: (value) {
+            setState(() {
+              _editIsDaily = value;
+              if (value) _editDueDate = null;
+            });
+          },
+        ),
+        if (_editIsDaily) ...[
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text('重复至', style: theme.textTheme.bodyMedium),
+            subtitle: Text(formatDate(_editDailyUntil)),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (_editDailyUntil != null)
+                  IconButton(
+                    icon: const Icon(Icons.clear),
+                    tooltip: '清除',
+                    onPressed: () => setState(() => _editDailyUntil = null),
+                  ),
+                IconButton(
+                  icon: const Icon(Icons.calendar_today_outlined),
+                  onPressed: pickDailyUntil,
+                ),
+              ],
+            ),
+          ),
+        ] else ...[
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text('计划日期', style: theme.textTheme.bodyMedium),
+            subtitle: Text(formatDate(_editDueDate)),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (_editDueDate != null)
+                  IconButton(
+                    icon: const Icon(Icons.clear),
+                    tooltip: '清除',
+                    onPressed: () => setState(() => _editDueDate = null),
+                  ),
+                IconButton(
+                  icon: const Icon(Icons.calendar_today_outlined),
+                  onPressed: pickDueDate,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
   }
 
   Future<void> _archive(Task task, {bool animated = false}) async {
@@ -332,17 +490,24 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
 
   Future<void> _performArchive(Task task) async {
     final repo = await ref.read(taskRepositoryProvider.future);
-    await repo.archive(task.id);
+    final isDaily = task.isDaily;
+
+    if (isDaily) {
+      await repo.completeDailyToday(task.id);
+    } else {
+      await repo.archive(task.id);
+    }
 
     _lastUndoTask = task;
-    _lastUndoFrom = TaskStatus.archived;
+    _lastUndoFrom = isDaily ? TaskStatus.inbox : TaskStatus.archived;
+    _lastUndoWasDailyCompletion = isDaily;
     _showUndoSnackbar(
-      message: '已完成',
+      message: isDaily ? '今日已完成' : '已完成',
       icon: Icons.check_circle_outline,
       type: AppSnackType.success,
     );
     if (mounted) {
-      final remaining = (ref.read(inboxTasksProvider).value?.length ?? 1) - 1;
+      final remaining = (ref.read(processTasksProvider).value?.length ?? 1) - 1;
       if (remaining <= 0) showCelebrateOverlay(context);
     }
 

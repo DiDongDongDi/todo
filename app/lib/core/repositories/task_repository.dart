@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:todo_app/core/database/task_store.dart';
 import 'package:todo_app/core/models/task.dart';
+import 'package:todo_app/core/models/task_schedule.dart';
+import 'package:todo_app/core/settings/process_today_only_settings.dart';
 import 'package:uuid/uuid.dart';
 
 const _storageKey = 'todo_tasks_v1';
@@ -21,6 +23,19 @@ final taskStoreInitProvider = FutureProvider<TaskStore>((ref) async {
 final inboxTasksProvider = StreamProvider<List<Task>>((ref) async* {
   final store = await ref.watch(taskStoreInitProvider.future);
   yield* store.watchByStatus(TaskStatus.inbox);
+});
+
+final processTasksProvider = StreamProvider<List<Task>>((ref) async* {
+  final store = await ref.watch(taskStoreInitProvider.future);
+  final todayOnlyAsync = ref.watch(processTodayOnlyProvider);
+  final todayOnly = todayOnlyAsync.value ?? false;
+
+  yield* store.watchByStatus(TaskStatus.inbox).map((tasks) {
+    final now = DateTime.now();
+    return tasks
+        .where((t) => shouldShowInProcess(t, todayOnly: todayOnly, now: now))
+        .toList();
+  });
 });
 
 final archivedTasksProvider = StreamProvider<List<Task>>((ref) async* {
@@ -86,6 +101,30 @@ class TaskRepository {
       updatedAt: now,
       syncVersion: task.syncVersion + 1,
       clearTrashedAt: true,
+    );
+    await _store.upsert(updated);
+    return updated;
+  }
+
+  Future<Task> completeDailyToday(String id) async {
+    final task = await _require(id);
+    final now = DateTime.now().toUtc();
+    final updated = task.copyWith(
+      lastDailyCompletedAt: now,
+      updatedAt: now,
+      syncVersion: task.syncVersion + 1,
+    );
+    await _store.upsert(updated);
+    return updated;
+  }
+
+  Future<Task> undoDailyCompletion(String id) async {
+    final task = await _require(id);
+    final now = DateTime.now().toUtc();
+    final updated = task.copyWith(
+      updatedAt: now,
+      syncVersion: task.syncVersion + 1,
+      clearLastDailyCompletedAt: true,
     );
     await _store.upsert(updated);
     return updated;

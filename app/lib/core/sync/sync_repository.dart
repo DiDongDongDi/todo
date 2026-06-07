@@ -54,6 +54,10 @@ class SyncRepository {
       'updated_at': row['updated_at'],
       'deleted_at': row['deleted_at'],
       'sync_version': row['sync_version'] ?? 0,
+      'is_daily': row['is_daily'] ?? false,
+      'daily_until': row['daily_until'],
+      'last_daily_completed_at': row['last_daily_completed_at'],
+      'due_date': row['due_date'],
     };
   }
 

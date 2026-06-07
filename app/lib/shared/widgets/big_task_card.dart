@@ -34,6 +34,8 @@ class BigTaskCard extends StatelessWidget {
     this.canGoPrevious = true,
     this.canGoNext = true,
     this.onRetryTranscription,
+    this.scheduleLabel,
+    this.completeLabel = '完成',
   });
 
   final BigTaskCardMode mode;
@@ -57,6 +59,8 @@ class BigTaskCard extends StatelessWidget {
   final bool canGoPrevious;
   final bool canGoNext;
   final VoidCallback? onRetryTranscription;
+  final String? scheduleLabel;
+  final String completeLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -134,7 +138,7 @@ class BigTaskCard extends StatelessWidget {
                     FilledButton.icon(
                       onPressed: onComplete,
                       icon: const Icon(Icons.check, size: 20),
-                      label: const Text('完成'),
+                      label: Text(completeLabel),
                       style: FilledButton.styleFrom(
                         backgroundColor: context.semanticColors.success,
                         foregroundColor: Colors.white,
@@ -323,6 +327,17 @@ class BigTaskCard extends StatelessWidget {
                 : null,
           ),
         ),
+        if (scheduleLabel != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            scheduleLabel!,
+            style: theme.textTheme.labelLarge?.copyWith(
+              color: scheduleLabel!.startsWith('已逾期')
+                  ? colorScheme.error
+                  : colorScheme.primary,
+            ),
+          ),
+        ],
         if (displayTask.note != null && displayTask.note!.isNotEmpty) ...[
           const SizedBox(height: 16),
           Text(displayTask.note!, style: theme.textTheme.bodyLarge),

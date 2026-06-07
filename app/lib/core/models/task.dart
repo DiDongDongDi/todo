@@ -50,6 +50,10 @@ class Task {
     this.trashedAt,
     this.deletedAt,
     this.syncVersion = 0,
+    this.isDaily = false,
+    this.dailyUntil,
+    this.lastDailyCompletedAt,
+    this.dueDate,
   });
 
   final String id;
@@ -66,6 +70,10 @@ class Task {
   final DateTime updatedAt;
   final DateTime? deletedAt;
   final int syncVersion;
+  final bool isDaily;
+  final DateTime? dailyUntil;
+  final DateTime? lastDailyCompletedAt;
+  final DateTime? dueDate;
 
   bool get hasContent =>
       title.trim().isNotEmpty || note?.trim().isNotEmpty == true || attachments.isNotEmpty;
@@ -85,9 +93,16 @@ class Task {
     DateTime? updatedAt,
     DateTime? deletedAt,
     int? syncVersion,
+    bool? isDaily,
+    DateTime? dailyUntil,
+    DateTime? lastDailyCompletedAt,
+    DateTime? dueDate,
     bool clearNote = false,
     bool clearArchivedAt = false,
     bool clearTrashedAt = false,
+    bool clearDailyUntil = false,
+    bool clearLastDailyCompletedAt = false,
+    bool clearDueDate = false,
   }) {
     return Task(
       id: id ?? this.id,
@@ -104,6 +119,12 @@ class Task {
       updatedAt: updatedAt ?? this.updatedAt,
       deletedAt: deletedAt ?? this.deletedAt,
       syncVersion: syncVersion ?? this.syncVersion,
+      isDaily: isDaily ?? this.isDaily,
+      dailyUntil: clearDailyUntil ? null : (dailyUntil ?? this.dailyUntil),
+      lastDailyCompletedAt: clearLastDailyCompletedAt
+          ? null
+          : (lastDailyCompletedAt ?? this.lastDailyCompletedAt),
+      dueDate: clearDueDate ? null : (dueDate ?? this.dueDate),
     );
   }
 
@@ -122,7 +143,15 @@ class Task {
         'updated_at': updatedAt.toIso8601String(),
         'deleted_at': deletedAt?.toIso8601String(),
         'sync_version': syncVersion,
+        'is_daily': isDaily,
+        if (dailyUntil != null) 'daily_until': _dateOnlyString(dailyUntil!),
+        if (lastDailyCompletedAt != null)
+          'last_daily_completed_at': lastDailyCompletedAt!.toIso8601String(),
+        if (dueDate != null) 'due_date': _dateOnlyString(dueDate!),
       };
+
+  static String _dateOnlyString(DateTime d) =>
+      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
   factory Task.fromJson(Map<String, dynamic> json) {
     final attachmentsRaw = json['attachments'];
@@ -155,6 +184,28 @@ class Task {
           ? DateTime.parse(json['deleted_at'] as String)
           : null,
       syncVersion: json['sync_version'] as int? ?? 0,
+      isDaily: json['is_daily'] as bool? ?? false,
+      dailyUntil: _parseDateOnly(json['daily_until']),
+      lastDailyCompletedAt: json['last_daily_completed_at'] != null
+          ? DateTime.parse(json['last_daily_completed_at'] as String)
+          : null,
+      dueDate: _parseDateOnly(json['due_date']),
     );
+  }
+
+  static DateTime? _parseDateOnly(dynamic value) {
+    if (value == null) return null;
+    if (value is String) {
+      final parts = value.split('-');
+      if (parts.length >= 3) {
+        return DateTime(
+          int.parse(parts[0]),
+          int.parse(parts[1]),
+          int.parse(parts[2]),
+        );
+      }
+      return DateTime.parse(value);
+    }
+    return null;
   }
 }
