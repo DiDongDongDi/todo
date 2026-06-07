@@ -12,7 +12,6 @@ import 'package:todo_app/core/transcription/transcription_service.dart';
 import 'package:todo_app/shared/utils/app_audio_recorder.dart';
 import 'package:todo_app/shared/utils/attachment_storage.dart';
 import 'package:todo_app/shared/utils/haptics.dart';
-import 'package:todo_app/shared/utils/platform_capabilities.dart';
 import 'package:todo_app/shared/utils/sounds.dart';
 import 'package:todo_app/shared/widgets/app_snackbar.dart';
 import 'package:todo_app/shared/widgets/big_task_card.dart';
@@ -44,6 +43,9 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
   DateTime? _dailyUntil;
   DateTime? _dueDate;
 
+  /// 手势/保存开始前输入法是否打开；用于保存后保持相同状态。
+  bool? _keyboardWasOpenBeforeGesture;
+
   static const _switcherDuration = Duration(milliseconds: 200);
 
   void _ensureCaretVisible() {
@@ -57,7 +59,14 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
   }
 
   void _activateInput() {
-    unawaited(_requestInputFocus(recycleFocus: _focusNode.hasFocus));
+    _ensureCaretVisible();
+    if (!_focusNode.hasFocus) {
+      _focusNode.requestFocus();
+    }
+  }
+
+  void _rememberKeyboardState() {
+    _keyboardWasOpenBeforeGesture ??= _focusNode.hasFocus;
   }
 
   Future<void> _requestInputFocus({
@@ -72,8 +81,7 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
     await WidgetsBinding.instance.endOfFrame;
     if (!mounted) return;
 
-    // 拖拽/动画后 IME 可能处于半连接状态；始终先 unfocus 再 requestFocus。
-    if (recycleFocus) {
+    if (recycleFocus && _focusNode.hasFocus) {
       _focusNode.unfocus();
       await WidgetsBinding.instance.endOfFrame;
       if (!mounted) return;
@@ -81,6 +89,34 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
 
     _ensureCaretVisible();
     if (mounted) {
+      FocusScope.of(context).requestFocus(_focusNode);
+    }
+
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) return;
+    _ensureCaretVisible();
+  }
+
+  /// 保存/动画结束后恢复输入状态，不主动收起再弹起键盘。
+  Future<void> _restoreInputAfterSave({
+    required bool keepKeyboard,
+    Duration delay = Duration.zero,
+  }) async {
+    if (!mounted || _recording) return;
+    if (delay > Duration.zero) {
+      await Future<void>.delayed(delay);
+      if (!mounted) return;
+    }
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) return;
+
+    if (!keepKeyboard) {
+      _focusNode.unfocus();
+      return;
+    }
+
+    _ensureCaretVisible();
+    if (!_focusNode.hasFocus && mounted) {
       FocusScope.of(context).requestFocus(_focusNode);
     }
 
@@ -224,6 +260,9 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
   }
 
   Future<void> _performSave() async {
+    final keepKeyboard = _keyboardWasOpenBeforeGesture ?? _focusNode.hasFocus;
+    _keyboardWasOpenBeforeGesture = null;
+
     final repo = await ref.read(taskRepositoryProvider.future);
 
     final hasAudio = _attachments.any((a) => a.type == AttachmentType.audio);
@@ -259,13 +298,13 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
     if (!mounted) return;
 
     _showSaveSnackbar();
-    await _requestInputFocus(
+    await _restoreInputAfterSave(
+      keepKeyboard: keepKeyboard,
       delay: _switcherDuration,
-      recycleFocus: true,
     );
-    if (!mounted) return;
-    // SnackBar 插入常会抢走焦点，补一次聚焦。
-    await _requestInputFocus(recycleFocus: true);
+    if (keepKeyboard && mounted && !_focusNode.hasFocus) {
+      await _restoreInputAfterSave(keepKeyboard: true);
+    }
   }
 
   Future<void> _save({bool animated = false}) async {
@@ -289,9 +328,7 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
     _saving = true;
     try {
       if (animated) {
-        if (isTouchFirstPlatform) {
-          _focusNode.unfocus();
-        }
+        _rememberKeyboardState();
         final state = _swipeKey.currentState;
         if (state != null) {
           await state.animateFlyout(
@@ -420,8 +457,7 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
             resetAfterAction: false,
             shouldAnimateFlyout: (_) async => _hasContent,
             onFlyoutFeedback: _collectFlyoutFeedback,
-            onDragStart: () => _focusNode.unfocus(),
-            onDragEnd: () => unawaited(_requestInputFocus(recycleFocus: true)),
+            onDragStart: _rememberKeyboardState,
             onSwipeUp: _onSwipeUp,
             rightLabel: '',
             leftLabel: '',
