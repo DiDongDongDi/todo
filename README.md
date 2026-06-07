@@ -8,7 +8,7 @@ Android · iOS · macOS · Windows · Web
 
 ## 功能概览
 
-- **收集** — 空白大卡片快速录入（文字 / 语音 / 图片 / 录音），上划保存
+- **收集** — 空白大卡片快速录入（文字 / 录音 / 图片），上划保存；录音后台云端转写
 - **处理** — 大卡片逐条分拣：左滑放弃、右滑归档、上下切换
 - **同步** — 离线优先，Supabase 多设备同步
 
@@ -330,6 +330,8 @@ class SupabaseConfig {
 若需同步图片 / 录音附件，在 SQL Editor 中执行 [`supabase/migrations/002_storage_rls.sql`](supabase/migrations/002_storage_rls.sql)（会创建 Private bucket `attachments` 并配置 RLS）。
 
 详细步骤、Dashboard 手动配置与 App 上传示例见 **[docs/SUPABASE-STORAGE-RLS.md](docs/SUPABASE-STORAGE-RLS.md)**。
+
+录音转写需部署 Edge Function 并配置 Groq API Key，见 **[docs/STT-SETUP.md](docs/STT-SETUP.md)**。
 
 ---
 

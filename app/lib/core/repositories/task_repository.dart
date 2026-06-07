@@ -126,6 +126,8 @@ class TaskRepository {
   }
 
   Future<List<Task>> getAll() => _store.getAll();
+
+  Future<Task?> getById(String id) => _store.getById(id);
 }
 
 final taskRepositoryProvider = FutureProvider<TaskRepository>((ref) async {

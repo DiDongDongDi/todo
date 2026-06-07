@@ -8,6 +8,7 @@ import 'package:todo_app/core/models/task.dart';
 import 'package:todo_app/core/repositories/task_repository.dart';
 import 'package:todo_app/core/sync/attachment_upload_service.dart';
 import 'package:todo_app/core/sync/sync_repository.dart';
+import 'package:todo_app/core/transcription/transcription_service.dart';
 
 final syncEngineProvider = Provider<SyncEngine>((ref) {
   return SyncEngine(ref);
@@ -87,6 +88,7 @@ class SyncEngine {
       await repo.pushTasks(local);
       final remote = await repo.pullTasks();
       await _mergeRemote(taskRepo, remote);
+      await _ref.read(transcriptionServiceProvider).processPendingTasks();
       _ref.read(lastSyncAtProvider.notifier).state = DateTime.now();
       _ref.read(syncStatusProvider.notifier).state = SyncStatus.idle;
     } catch (e, st) {

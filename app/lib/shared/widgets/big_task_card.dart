@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:todo_app/core/models/task.dart';
+import 'package:todo_app/core/models/task_display.dart';
 import 'package:todo_app/shared/theme/app_semantic_colors.dart';
+import 'package:todo_app/shared/utils/audio_storage.dart';
 import 'package:todo_app/shared/widgets/attachment_image.dart';
 import 'package:todo_app/shared/widgets/image_preview.dart';
 enum BigTaskCardMode { collect, process, readOnly }
@@ -30,6 +32,7 @@ class BigTaskCard extends StatelessWidget {
     this.onNext,
     this.canGoPrevious = true,
     this.canGoNext = true,
+    this.onRetryTranscription,
   });
 
   final BigTaskCardMode mode;
@@ -52,6 +55,7 @@ class BigTaskCard extends StatelessWidget {
   final VoidCallback? onNext;
   final bool canGoPrevious;
   final bool canGoNext;
+  final VoidCallback? onRetryTranscription;
 
   @override
   Widget build(BuildContext context) {
@@ -86,8 +90,8 @@ class BigTaskCard extends StatelessWidget {
                     const SizedBox(width: 8),
                     IconButton.filledTonal(
                       onPressed: onStartSpeech,
-                      icon: Icon(isListening ? Icons.mic : Icons.mic_none_outlined),
-                      tooltip: '语音输入',
+                      icon: Icon(isListening ? Icons.stop : Icons.mic_none_outlined),
+                      tooltip: isListening ? '停止录音' : '录音',
                       style: IconButton.styleFrom(
                         backgroundColor: isListening
                             ? colorScheme.errorContainer
@@ -135,6 +139,15 @@ class BigTaskCard extends StatelessWidget {
                         foregroundColor: Colors.white,
                       ),
                     ),
+                    if (task!.canRetryTranscription &&
+                        onRetryTranscription != null) ...[
+                      const SizedBox(width: 8),
+                      IconButton.filledTonal(
+                        onPressed: onRetryTranscription,
+                        icon: const Icon(Icons.refresh),
+                        tooltip: '重试转写',
+                      ),
+                    ],
                     const Spacer(),
                     IconButton.filledTonal(
                       onPressed: canGoPrevious ? onPrevious : null,
@@ -298,8 +311,14 @@ class BigTaskCard extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          displayTask.title.isEmpty ? '（无标题）' : displayTask.title,
-          style: theme.textTheme.headlineMedium,
+          displayTask.displayTitle,
+          style: theme.textTheme.headlineMedium?.copyWith(
+            color: displayTask.title.trim().isEmpty &&
+                    displayTask.transcriptionStatus ==
+                        TranscriptionStatus.pending
+                ? colorScheme.onSurface.withValues(alpha: 0.45)
+                : null,
+          ),
         ),
         if (displayTask.note != null && displayTask.note!.isNotEmpty) ...[
           const SizedBox(height: 16),
@@ -330,7 +349,7 @@ class BigTaskCard extends StatelessWidget {
   String _feedbackMessage(CollectCardFeedback value) {
     return switch (value) {
       CollectCardFeedback.emptyHint => '先记下点什么',
-      CollectCardFeedback.listening => '正在听，请说话…',
+      CollectCardFeedback.listening => '录音中…',
       CollectCardFeedback.none => '',
     };
   }
@@ -394,7 +413,8 @@ class _AttachmentThumbnail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final isImage = attachment.type == AttachmentType.image;
 
     return Stack(
@@ -414,9 +434,24 @@ class _AttachmentThumbnail extends StatelessWidget {
                     )
                   : ColoredBox(
                       color: colorScheme.secondaryContainer,
-                      child: Icon(
-                        Icons.mic_none_outlined,
-                        color: colorScheme.onSecondaryContainer,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.mic_none_outlined,
+                            color: colorScheme.onSecondaryContainer,
+                          ),
+                          if (attachment.duration != null &&
+                              attachment.duration! > 0) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              formatAudioDuration(attachment.duration),
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: colorScheme.onSecondaryContainer,
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ),
             ),

@@ -14,11 +14,10 @@ Flutter Web 将应用编译为 **HTML + Canvas/WebGL + JS**，多数业务逻辑
 
 ---
 
-## speech_to_text
+## record（收集 Tab 录音）
 
-- **Web：** 依赖浏览器 **Web Speech API** 与麦克风权限
-- **现状：** 部分浏览器/环境支持不完整；Chrome 桌面版通常可用，但不如 Android 稳定
-- **建议：** Web 上优先测文字录入；语音以 Android 真机为准
+- **Web：** 第一版暂不支持；收集页隐藏麦克风按钮
+- **移动端：** 完整录音 + 云端转写，见 [STT-SETUP.md](STT-SETUP.md)
 
 ---
 

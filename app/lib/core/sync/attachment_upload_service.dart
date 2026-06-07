@@ -50,7 +50,12 @@ class AttachmentUploadService {
     await client.storage.from(bucket).upload(
           objectPath,
           file,
-          fileOptions: const FileOptions(upsert: true),
+          fileOptions: FileOptions(
+            upsert: true,
+            contentType: attachment.type == AttachmentType.audio
+                ? 'audio/mp4'
+                : null,
+          ),
         );
 
     return TaskAttachment(

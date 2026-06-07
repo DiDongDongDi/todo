@@ -33,7 +33,7 @@
 - **处理 Tab：** inbox 卡片栈、上下切卡、左滑回收站、右滑归档、内联编辑
 - 归档 / 回收站查看与恢复（设置入口）
 - 处理清零环 + streak 本地统计
-- 多模态占位：贴图、录音 UI（系统 STT 可选）
+- 多模态：贴图、录音（`record` + 云端转写，见 [STT-SETUP.md](STT-SETUP.md)）
 
 ### 验收标准
 
@@ -56,7 +56,7 @@
 - tasks 表 RLS + operations 同步表
 - Storage 上传图片/音频
 - SyncEngine：push/pull + LWW 合并
-- 录音异步转写管线（pending → done）
+- Edge Function `transcribe` + 客户端转写队列（pending → done）
 
 ### 验收标准
 

@@ -1,11 +1,10 @@
 # Android 插件配置说明（A2）
 
-## speech_to_text
+## record（收集 Tab 录音）
 
 - **权限：** `RECORD_AUDIO`（已在 `app/android/app/src/main/AndroidManifest.xml` 声明）
-- **queries：** `android.speech.RecognitionService`（Android 11+ 可见性，已声明）
-- **运行时：** 插件会在首次使用时请求麦克风权限；需在代码中处理 `SpeechToText.initialize()` 返回 false 的情况（`collect_screen.dart` 已调用）
-- **依赖：** 设备需安装 Google 语音服务或厂商自带语音识别（国内部分机型可用系统语音）
+- **格式：** m4a / AAC，保存到应用文档目录 `attachments/`
+- **运行时：** 首次录音时请求麦克风权限；Web 端暂不支持（收集页隐藏麦克风）
 
 ## image_picker
 
@@ -27,3 +26,7 @@
 - **Android：** 通过 `MainActivity` 的 MethodChannel（`com.todo.app/notification_sound`）调用 `RingtoneManager.ACTION_RINGTONE_PICKER` 打开系统通知音选择器，并用 `RingtoneManager.getRingtone()` 播放
 - **权限：** 无需额外 manifest 权限（读取/播放系统铃声 URI）
 - **其他平台：** 暂不支持系统通知音库，设置页会提示仅保留震动
+
+## 语音转写
+
+- 不使用系统 STT；云端转写见 [STT-SETUP.md](STT-SETUP.md)

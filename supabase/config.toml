@@ -1,0 +1,5 @@
+# Supabase Edge Functions local config
+# https://supabase.com/docs/guides/functions/function-configuration
+
+[functions.transcribe]
+verify_jwt = true

@@ -147,8 +147,11 @@ sequenceDiagram
 
 ## 语音与附件
 
-| 能力 | MVP | Phase 2 |
-|------|-----|---------|
-| 语音转文字 | 系统 STT | — |
-| 纯录音转写 | 本地 pending 状态 | Whisper API |
-| 图片 | 本地路径 | Supabase Storage 上传 |
+| 能力 | 实现 |
+|------|------|
+| 录音 | 客户端 `record` 包，本地 m4a |
+| 云端转写 | Supabase Edge Function `transcribe` → Groq Whisper（默认） |
+| 转写状态 | `transcription_status`: `pending` → `done` / `failed` |
+| 图片 | 本地路径 + Supabase Storage 上传 |
+
+详见 [STT-SETUP.md](STT-SETUP.md)。

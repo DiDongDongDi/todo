@@ -6,10 +6,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:todo_app/core/models/task.dart';
+import 'package:todo_app/core/models/task_display.dart';
 import 'package:todo_app/core/repositories/task_repository.dart';
 import 'package:todo_app/core/settings/process_sound_settings.dart';
 import 'package:todo_app/core/stats/stats_provider.dart';
 import 'package:todo_app/core/sync/sync_engine.dart';
+import 'package:todo_app/core/transcription/transcription_service.dart';
 import 'package:todo_app/shared/utils/haptics.dart';
 import 'package:todo_app/shared/utils/sounds.dart';
 import 'package:todo_app/shared/utils/platform_capabilities.dart';
@@ -235,6 +237,9 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
                     ),
                     canGoPrevious: clampedIndex > 0,
                     canGoNext: clampedIndex < tasks.length - 1,
+                    onRetryTranscription: task.canRetryTranscription
+                        ? () => _retryTranscription(task)
+                        : null,
                   ),
                 ),
               ),
@@ -352,6 +357,17 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
       AppHaptics.medium(),
       AppSounds.play(settings.complete),
     ]);
+  }
+
+  Future<void> _retryTranscription(Task task) async {
+    await ref.read(transcriptionServiceProvider).retryTask(task);
+    if (!mounted) return;
+    showAppSnackBar(
+      context,
+      message: '正在重新转写…',
+      icon: Icons.mic_none_outlined,
+      type: AppSnackType.info,
+    );
   }
 
   Future<void> _trash(Task task, {bool animated = false}) async {
