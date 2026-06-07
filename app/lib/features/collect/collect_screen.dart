@@ -58,6 +58,10 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
     );
   }
 
+  void _cancelInput() {
+    _focusNode.unfocus();
+  }
+
   /// 单击卡片空白区：仅在未聚焦时请求焦点；已聚焦时不做任何事，避免键盘回弹。
   void _activateInput() {
     if (_focusNode.hasFocus) return;
@@ -463,6 +467,7 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
               onStartSpeech: kIsWeb ? null : _toggleRecording,
               isListening: _recording,
               onSave: () => _save(animated: true),
+              onCancelEdit: _cancelInput,
               scheduleEditor: TaskScheduleEditor(
                 isDaily: _isDaily,
                 dailyUntil: _dailyUntil,
