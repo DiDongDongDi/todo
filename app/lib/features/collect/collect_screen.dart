@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -17,6 +18,7 @@ import 'package:todo_app/core/sync/sync_engine.dart';
 import 'package:todo_app/shared/utils/attachment_storage.dart';
 import 'package:todo_app/shared/utils/haptics.dart';
 import 'package:todo_app/shared/utils/sounds.dart';
+import 'package:todo_app/shared/utils/speech_intent_platform.dart';
 
 import 'package:todo_app/shared/utils/platform_capabilities.dart';
 
@@ -90,7 +92,7 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
     Duration delay = Duration.zero,
     bool recycleFocus = false,
   }) async {
-    if (!mounted) return;
+    if (!mounted || _listening) return;
     if (delay > Duration.zero) {
       await Future<void>.delayed(delay);
       if (!mounted) return;
@@ -121,8 +123,6 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
     _focusNode = FocusNode();
     _focusNode.addListener(_onInputFocusChange);
 
-    _initSpeech();
-
     unawaited(_requestInputFocus());
 
   }
@@ -135,13 +135,166 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
 
 
 
-  Future<void> _initSpeech() async {
-
-    await _speech.initialize();
-
+  void _showSpeechUnavailable() {
+    showAppSnackBar(
+      context,
+      message: '无法使用语音输入，请检查麦克风权限或系统语音识别设置',
+      icon: Icons.mic_off_outlined,
+      type: AppSnackType.error,
+    );
   }
 
+  Future<bool> _ensureSpeechReady() async {
+    if (_speech.isAvailable) return true;
 
+    final ready = await _speech.initialize(
+      onError: (error) {
+        if (!mounted) return;
+        setState(() => _listening = false);
+        showAppSnackBar(
+          context,
+          message: _speechErrorMessage(error.errorMsg),
+          icon: Icons.mic_off_outlined,
+          type: AppSnackType.error,
+        );
+      },
+      onStatus: (status) {
+        if (!mounted) return;
+        if (status == SpeechToText.listeningStatus) {
+          setState(() => _listening = true);
+        } else if (status == SpeechToText.doneStatus ||
+            status == SpeechToText.notListeningStatus) {
+          if (_listening) setState(() => _listening = false);
+        }
+      },
+      debugLogging: kDebugMode,
+    );
+
+    if (!ready && mounted) _showSpeechUnavailable();
+    return ready;
+  }
+
+  String _speechErrorMessage(String code) {
+    return switch (code) {
+      'error_speech_timeout' => '没有听到说话，请再试一次',
+      'error_no_match' => '未识别到语音，请再试一次',
+      'error_permission' || 'error_audio_error' => '无法使用麦克风，请检查权限',
+      'error_network' || 'error_network_timeout' => '语音识别需要网络连接',
+      _ => '语音识别出错：$code',
+    };
+  }
+
+  void _showMiuiSpeechEngineHint() {
+    showAppSnackBar(
+      context,
+      message: '系统语音引擎未就绪。可在「设置 → 小爱同学」授权语音，或安装 Google 应用后重试',
+      icon: Icons.info_outline,
+      type: AppSnackType.warning,
+      duration: const Duration(seconds: 5),
+    );
+  }
+
+  Future<void> _toggleSpeechViaIntent() async {
+    _focusNode.unfocus();
+    setState(() => _listening = true);
+
+    final result = await SpeechIntentPlatform.recognize();
+    if (!mounted) return;
+
+    if (result.text?.trim().isNotEmpty == true) {
+      setState(() => _listening = false);
+      _controller.text = result.text!.trim();
+      _ensureCaretVisible();
+      setState(() {});
+      await AppHaptics.light();
+      return;
+    }
+
+    if (result.permissionDenied) {
+      setState(() => _listening = false);
+      _showSpeechUnavailable();
+      return;
+    }
+
+    if (result.cancelled) {
+      setState(() => _listening = false);
+      return;
+    }
+
+    if (result.engineFailed) {
+      _showMiuiSpeechEngineHint();
+    }
+
+    // 系统面板失败时，回退到应用内实时识别
+    setState(() => _listening = false);
+    await _toggleSpeechInline();
+  }
+
+  Future<void> _toggleSpeechInline() async {
+    if (_listening) {
+      await _speech.stop();
+      if (mounted) setState(() => _listening = false);
+      return;
+    }
+
+    _focusNode.unfocus();
+
+    if (!await _ensureSpeechReady()) return;
+    if (!mounted) return;
+
+    final hasPermission = await _speech.hasPermission;
+    if (!hasPermission) {
+      _showSpeechUnavailable();
+      return;
+    }
+
+    setState(() => _listening = true);
+
+    try {
+      String? localeId;
+      final locales = await _speech.locales();
+      for (final locale in locales) {
+        if (locale.localeId.startsWith('zh')) {
+          localeId = locale.localeId;
+          break;
+        }
+      }
+      localeId ??= locales.isNotEmpty ? locales.first.localeId : null;
+
+      await _speech.listen(
+        onResult: (result) {
+          if (!mounted) return;
+          _controller.text = result.recognizedWords;
+          _controller.selection = TextSelection.collapsed(
+            offset: _controller.text.length,
+          );
+          setState(() {});
+        },
+        listenOptions: SpeechListenOptions(
+          listenMode: ListenMode.dictation,
+          partialResults: true,
+          cancelOnError: true,
+          localeId: localeId,
+          listenFor: const Duration(seconds: 30),
+          pauseFor: const Duration(seconds: 4),
+        ),
+      );
+
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+      if (!mounted) return;
+      if (!_speech.isListening) {
+        setState(() => _listening = false);
+        _showSpeechUnavailable();
+        return;
+      }
+
+      await AppHaptics.light();
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _listening = false);
+      _showSpeechUnavailable();
+    }
+  }
 
   @override
 
@@ -422,43 +575,11 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
 
 
   Future<void> _toggleSpeech() async {
-
-    if (_listening) {
-
-      await _speech.stop();
-
-      setState(() => _listening = false);
-
+    if (await SpeechIntentPlatform.isSupported) {
+      await _toggleSpeechViaIntent();
       return;
-
     }
-
-
-
-    if (!await _speech.initialize()) return;
-
-
-
-    setState(() => _listening = true);
-
-    await _speech.listen(
-
-      onResult: (result) {
-
-        _controller.text = result.recognizedWords;
-
-        _controller.selection = TextSelection.collapsed(
-
-          offset: _controller.text.length,
-
-        );
-
-        setState(() {});
-
-      },
-
-    );
-
+    await _toggleSpeechInline();
   }
 
 
@@ -505,7 +626,8 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
 
               onActivateInput: _activateInput,
 
-              feedback: _feedback,
+              feedback:
+                  _listening ? CollectCardFeedback.listening : _feedback,
 
               onDismissFeedback: _dismissCardFeedback,
 

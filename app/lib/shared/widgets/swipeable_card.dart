@@ -284,12 +284,13 @@ class SwipeableCardState extends State<SwipeableCard>
 
   Future<void> _onPointerUp(PointerUpEvent event) async {
     if (!_pointerActive) return;
+    final hadDrag = _dragStarted;
     _pointerActive = false;
     _pointerTravel = 0;
     _dragStarted = false;
 
     if (!widget.enabled || _animating) return;
-    await _onDragEnd();
+    await _onDragEnd(notifyDragEnd: hadDrag);
   }
 
   void _onPointerCancel(PointerCancelEvent event) {
@@ -302,7 +303,7 @@ class SwipeableCardState extends State<SwipeableCard>
     if (hadDrag) widget.onDragEnd?.call();
   }
 
-  Future<void> _onDragEnd() async {
+  Future<void> _onDragEnd({bool notifyDragEnd = true}) async {
     if (!widget.enabled || _animating) return;
 
     final dx = _drag.dx;
@@ -330,7 +331,7 @@ class SwipeableCardState extends State<SwipeableCard>
 
     if (action == null) {
       setState(() => _drag = Offset.zero);
-      widget.onDragEnd?.call();
+      if (notifyDragEnd) widget.onDragEnd?.call();
       return;
     }
 

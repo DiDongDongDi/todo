@@ -5,7 +5,7 @@ import 'package:todo_app/shared/widgets/attachment_image.dart';
 import 'package:todo_app/shared/widgets/image_preview.dart';
 enum BigTaskCardMode { collect, process, readOnly }
 
-enum CollectCardFeedback { none, emptyHint }
+enum CollectCardFeedback { none, emptyHint, listening }
 
 class BigTaskCard extends StatelessWidget {
   const BigTaskCard({
@@ -194,7 +194,10 @@ class BigTaskCard extends StatelessWidget {
                 fit: StackFit.expand,
                 children: [
                   Opacity(
-                    opacity: feedback == CollectCardFeedback.emptyHint ? 0 : 1,
+                    opacity: feedback == CollectCardFeedback.emptyHint ||
+                            feedback == CollectCardFeedback.listening
+                        ? 0
+                        : 1,
                     child: TextField(
                       controller: controller,
                       focusNode: focusNode,
@@ -224,6 +227,13 @@ class BigTaskCard extends StatelessWidget {
                           context,
                           _feedbackMessage(feedback),
                         ),
+                      ),
+                    ),
+                  if (feedback == CollectCardFeedback.listening)
+                    Positioned.fill(
+                      child: _buildCollectCenterHint(
+                        context,
+                        _feedbackMessage(feedback),
                       ),
                     ),
                 ],
@@ -320,6 +330,7 @@ class BigTaskCard extends StatelessWidget {
   String _feedbackMessage(CollectCardFeedback value) {
     return switch (value) {
       CollectCardFeedback.emptyHint => '先记下点什么',
+      CollectCardFeedback.listening => '正在听，请说话…',
       CollectCardFeedback.none => '',
     };
   }
