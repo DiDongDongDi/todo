@@ -65,9 +65,6 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
     _ensureCaretVisible();
     if (!_focusNode.hasFocus) {
       _focusNode.requestFocus();
-    } else if (_controller.text.isEmpty) {
-      // 空卡片假焦点：重建 TextField 重连 IME，不收起键盘。
-      setState(() => _collectInputEpoch++);
     }
   }
 
@@ -125,7 +122,7 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
       return;
     }
 
-    // 重建 TextField 重连 IME，无需 unfocus，键盘保持打开。
+    // 动画结束后重建 TextField，重连 IME 且不收起键盘。
     _rebuildInputField();
     await WidgetsBinding.instance.endOfFrame;
     if (!mounted) return;
