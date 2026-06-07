@@ -1,8 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:todo_app/core/models/task.dart';
 import 'package:todo_app/core/repositories/task_repository.dart';
+import 'package:todo_app/core/settings/restore_sound_settings.dart';
 import 'package:todo_app/core/sync/sync_engine.dart';
+import 'package:todo_app/shared/utils/sounds.dart';
 import 'package:todo_app/shared/widgets/app_snackbar.dart';
 import 'package:todo_app/shared/widgets/swipeable_restore_tile.dart';
 
@@ -78,7 +82,8 @@ class _RestoreTaskListViewState extends ConsumerState<RestoreTaskListView> {
 
     final repo = await ref.read(taskRepositoryProvider.future);
     await repo.restoreToInbox(task.id);
-    await triggerSyncIfSignedIn(ref);
+    unawaited(triggerSyncIfSignedIn(ref));
+    unawaited(_playRestoreFeedback());
 
     if (!mounted) return;
     showAppSnackBar(
@@ -87,6 +92,11 @@ class _RestoreTaskListViewState extends ConsumerState<RestoreTaskListView> {
       icon: Icons.check_circle_outline,
       type: AppSnackType.success,
     );
+  }
+
+  Future<void> _playRestoreFeedback() async {
+    final preference = await ref.read(restoreSoundProvider.future);
+    await AppSounds.play(preference);
   }
 
   Widget _buildCollapseSlot(double height, Animation<double> animation) {

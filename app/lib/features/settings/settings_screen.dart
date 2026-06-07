@@ -4,6 +4,7 @@ import 'package:todo_app/core/settings/collect_sound_settings.dart';
 import 'package:todo_app/core/settings/notification_sound_platform.dart';
 import 'package:todo_app/core/settings/notification_sound_preference.dart';
 import 'package:todo_app/core/settings/process_sound_settings.dart';
+import 'package:todo_app/core/settings/restore_sound_settings.dart';
 import 'package:todo_app/shared/layout/app_layout.dart';
 import 'package:todo_app/shared/utils/sounds.dart';
 import 'package:todo_app/shared/widgets/app_snackbar.dart';
@@ -31,9 +32,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Widget build(BuildContext context) {
     final collectAsync = ref.watch(collectSoundProvider);
     final processAsync = ref.watch(processSoundProvider);
+    final restoreAsync = ref.watch(restoreSoundProvider);
     final theme = Theme.of(context);
 
-    if (collectAsync.isLoading || processAsync.isLoading) {
+    if (collectAsync.isLoading ||
+        processAsync.isLoading ||
+        restoreAsync.isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
     if (collectAsync.hasError) {
@@ -42,9 +46,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (processAsync.hasError) {
       return Center(child: Text('加载失败: ${processAsync.error}'));
     }
+    if (restoreAsync.hasError) {
+      return Center(child: Text('加载失败: ${restoreAsync.error}'));
+    }
 
     final collect = collectAsync.requireValue;
     final process = processAsync.requireValue;
+    final restore = restoreAsync.requireValue;
     final supported = _soundSupported ?? false;
     final unsupportedHint = supported
         ? null
@@ -98,6 +106,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             process.trash,
           ),
         ),
+        NotificationSoundSection(
+          title: '恢复音效',
+          description: unsupportedHint ??
+              '在已完成或回收站恢复任务到收集箱时播放所选系统通知音。',
+          preference: restore,
+          supported: supported,
+          onEnabledChanged: (value) =>
+              ref.read(restoreSoundProvider.notifier).setEnabled(value),
+          onPick: () => _pickRestoreSound(restore),
+        ),
       ],
     );
   }
@@ -108,6 +126,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (!mounted || !changed) return;
 
     final updated = ref.read(collectSoundProvider).value;
+    if (updated != null && updated.canPlay) {
+      await AppSounds.play(updated);
+    }
+
+    if (!mounted) return;
+    _showPickResult(updated);
+  }
+
+  Future<void> _pickRestoreSound(NotificationSoundPreference current) async {
+    final changed =
+        await ref.read(restoreSoundProvider.notifier).pickFromSystem();
+    if (!mounted || !changed) return;
+
+    final updated = ref.read(restoreSoundProvider).value;
     if (updated != null && updated.canPlay) {
       await AppSounds.play(updated);
     }
