@@ -260,8 +260,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
                 enabled: touchFirst && !_editing,
                 verticalEnterAnimation: true,
                 shouldAnimateFlyout: (flyout) async {
-                  if (flyout.dy < 0) return clampedIndex < tasks.length - 1;
-                  if (flyout.dy > 0) return clampedIndex > 0;
+                  if (flyout.dy != 0) return tasks.length > 1;
                   return true;
                 },
                 onSwipeLeft: () => _trash(task),
@@ -312,8 +311,8 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
                     tasks.length,
                     animated: true,
                   ),
-                  canGoPrevious: clampedIndex > 0,
-                  canGoNext: clampedIndex < tasks.length - 1,
+                  canGoPrevious: tasks.length > 1,
+                  canGoNext: tasks.length > 1,
                   onRetryTranscription: task.canRetryTranscription
                       ? () => _retryTranscription(task)
                       : null,
@@ -339,27 +338,46 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     );
   }
 
+  int _wrapIndex(int index, int length) {
+    if (length <= 0) return 0;
+    return ((index % length) + length) % length;
+  }
+
   Future<void> _setIndex(
     int newIndex,
     int length, {
     bool animated = false,
   }) async {
-    final clamped = newIndex.clamp(0, length - 1);
-    if (clamped == _index) return;
+    if (length <= 0) return;
+    if (length == 1) {
+      if (_index != 0) {
+        _editFocusNode.unfocus();
+        setState(() {
+          _index = 0;
+          _editing = false;
+        });
+      }
+      return;
+    }
+
+    final target = _wrapIndex(newIndex, length);
+    if (target == _index) return;
+
+    // Use raw newIndex so wrap-around keeps the swipe direction (up = next, down = prev).
+    final forward = newIndex > _index;
 
     Future<void> apply() async {
       _editFocusNode.unfocus();
       setState(() {
-        _index = clamped;
+        _index = target;
         _editing = false;
       });
       AppHaptics.selection();
     }
 
     if (animated) {
-      final delta = clamped - _index;
       final flyout =
-          delta > 0 ? const Offset(0, -1.5) : const Offset(0, 1.5);
+          forward ? const Offset(0, -1.5) : const Offset(0, 1.5);
       await _animateFlyout(flyout, apply);
     } else {
       await apply();
