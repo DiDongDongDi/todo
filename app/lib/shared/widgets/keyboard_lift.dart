@@ -69,7 +69,8 @@ class _KeyboardLiftState extends State<KeyboardLift>
     final inset = MediaQuery.viewInsetsOf(context).bottom;
     final target =
         (inset - widget.bottomObstruction).clamp(0.0, double.infinity);
-    if ((target - _toLift).abs() < 0.5 && !_controller.isAnimating) {
+    // 目标未变时不重启动画，避免父级 setState 在键盘过渡期间造成底部栏弹跳。
+    if ((target - _toLift).abs() < 0.5) {
       return;
     }
     _fromLift = _lift;

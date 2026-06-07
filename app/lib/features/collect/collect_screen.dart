@@ -48,6 +48,9 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
 
   static const _switcherDuration = Duration(milliseconds: 200);
 
+  /// 底部「取消」按钮：仅在有焦点或保存动画期间显示。
+  bool get _inputUiVisible => _focusNode.hasFocus || _saving;
+
   void _ensureCaretVisible() {
     final text = _controller.text;
     final offset = text.length;
@@ -75,17 +78,15 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
   }
 
   void _onDragEnd() {
-    if (_keyboardWasOpenBeforeGesture == true) {
-      unawaited(_requestInputFocus(recycleFocus: true));
-    }
+    if (_saving) return;
+    final shouldRefocus = _keyboardWasOpenBeforeGesture == true;
     _keyboardWasOpenBeforeGesture = null;
+    if (shouldRefocus) {
+      unawaited(_requestInputFocus());
+    }
   }
 
-  /// [recycleFocus] 为 true 时始终先 unfocus 再 requestFocus，重连 IME。
-  Future<void> _requestInputFocus({
-    Duration delay = Duration.zero,
-    bool recycleFocus = false,
-  }) async {
+  Future<void> _requestInputFocus({Duration delay = Duration.zero}) async {
     if (!mounted || _recording) return;
     if (delay > Duration.zero) {
       await Future<void>.delayed(delay);
@@ -93,12 +94,6 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
     }
     await WidgetsBinding.instance.endOfFrame;
     if (!mounted) return;
-
-    if (recycleFocus) {
-      _focusNode.unfocus();
-      await WidgetsBinding.instance.endOfFrame;
-      if (!mounted) return;
-    }
 
     _ensureCaretVisible();
     FocusScope.of(context).requestFocus(_focusNode);
@@ -113,14 +108,30 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
     super.initState();
     _focusNode = FocusNode();
     _focusNode.addListener(_onInputFocusChange);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && !_recording) {
+        _focusNode.requestFocus();
+      }
+    });
   }
 
   void _onInputFocusChange() {
     if (!mounted) return;
-    setState(() {});
     if (_focusNode.hasFocus) {
       _ensureCaretVisible();
+      setState(() {});
+      return;
     }
+    if (_saving) {
+      setState(() {});
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _focusNode.hasFocus || _saving) {
+        return;
+      }
+      setState(() {});
+    });
   }
 
   @override
@@ -152,10 +163,7 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
     if (!mounted || epoch != _feedbackEpoch) return;
     setState(() => _feedback = CollectCardFeedback.none);
     if (refocus) {
-      await _requestInputFocus(
-        delay: _switcherDuration,
-        recycleFocus: true,
-      );
+      await _requestInputFocus(delay: _switcherDuration);
     }
   }
 
@@ -201,7 +209,7 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
     }
 
     if (!mounted) return;
-    await _requestInputFocus(recycleFocus: true);
+    await _requestInputFocus();
   }
 
   void _showSaveSnackbar() {
@@ -236,7 +244,7 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
         );
       }
       if (keepKeyboard && mounted) {
-        await _requestInputFocus(recycleFocus: true);
+        await _requestInputFocus();
       }
       return;
     }
@@ -244,57 +252,50 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
   }
 
   Future<void> _performSave() async {
-    final keepKeyboard = _keyboardWasOpenBeforeGesture ?? false;
+    if (_saving) return;
+    _saving = true;
     _keyboardWasOpenBeforeGesture = null;
 
-    final repo = await ref.read(taskRepositoryProvider.future);
+    try {
+      final repo = await ref.read(taskRepositoryProvider.future);
 
-    final hasAudio = _attachments.any((a) => a.type == AttachmentType.audio);
-    final task = await repo.createInbox(
-      title: _controller.text.trim(),
-      attachments: List.from(_attachments),
-      transcriptionStatus:
-          hasAudio ? TranscriptionStatus.pending : TranscriptionStatus.none,
-      isDaily: _isDaily,
-      dailyUntil: _isDaily ? _dailyUntil : null,
-      dueDate: _isDaily ? null : _dueDate,
-    );
-
-    unawaited(triggerSyncIfSignedIn(ref));
-
-    if (hasAudio) {
-      unawaited(ref.read(transcriptionServiceProvider).processTask(task));
-    }
-
-    if (!mounted) return;
-
-    setState(() {
-      _controller.clear();
-      _attachments.clear();
-      _isDaily = false;
-      _dailyUntil = null;
-      _dueDate = null;
-      _lastUndoTask = task;
-    });
-    _ensureCaretVisible();
-
-    await _swipeKey.currentState?.resetPosition(enterFromBottom: true);
-    if (!mounted) return;
-
-    if (keepKeyboard) {
-      await _requestInputFocus(
-        delay: _switcherDuration,
-        recycleFocus: true,
+      final hasAudio = _attachments.any((a) => a.type == AttachmentType.audio);
+      final task = await repo.createInbox(
+        title: _controller.text.trim(),
+        attachments: List.from(_attachments),
+        transcriptionStatus:
+            hasAudio ? TranscriptionStatus.pending : TranscriptionStatus.none,
+        isDaily: _isDaily,
+        dailyUntil: _isDaily ? _dailyUntil : null,
+        dueDate: _isDaily ? null : _dueDate,
       );
-    } else {
+
+      unawaited(triggerSyncIfSignedIn(ref));
+
+      if (hasAudio) {
+        unawaited(ref.read(transcriptionServiceProvider).processTask(task));
+      }
+
+      if (!mounted) return;
+
+      setState(() {
+        _controller.clear();
+        _attachments.clear();
+        _isDaily = false;
+        _dailyUntil = null;
+        _dueDate = null;
+        _lastUndoTask = task;
+      });
+      _ensureCaretVisible();
+
+      await _swipeKey.currentState?.resetPosition(enterFromBottom: true);
+      if (!mounted) return;
+
+      _showSaveSnackbar();
+    } finally {
       _focusNode.unfocus();
-    }
-
-    if (!mounted) return;
-    _showSaveSnackbar();
-
-    if (keepKeyboard) {
-      await _requestInputFocus(recycleFocus: true);
+      _saving = false;
+      if (mounted) setState(() {});
     }
   }
 
@@ -311,32 +312,25 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
         );
       }
       if (keepKeyboard && mounted) {
-        await _requestInputFocus(recycleFocus: true);
+        await _requestInputFocus();
       }
       return;
     }
 
-    _saving = true;
-    try {
-      if (animated) {
-        _keyboardWasOpenBeforeGesture ??= _focusNode.hasFocus;
-        _focusNode.unfocus();
-        final state = _swipeKey.currentState;
-        if (state != null) {
-          await state.animateFlyout(
-            const Offset(0, -1.2),
-            _performSave,
-            resetAfter: false,
-          );
-        } else {
-          await _performSave();
-        }
+    if (animated) {
+      _focusNode.unfocus();
+      final state = _swipeKey.currentState;
+      if (state != null) {
+        await state.animateFlyout(
+          const Offset(0, -1.2),
+          _performSave,
+          resetAfter: false,
+        );
       } else {
-        _keyboardWasOpenBeforeGesture ??= _focusNode.hasFocus;
         await _performSave();
       }
-    } finally {
-      _saving = false;
+    } else {
+      await _performSave();
     }
   }
 
@@ -468,7 +462,7 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
               isListening: _recording,
               onSave: () => _save(animated: true),
               onCancelEdit: _cancelInput,
-              editing: _focusNode.hasFocus,
+              editing: _inputUiVisible,
               scheduleEditor: TaskScheduleEditor(
                 isDaily: _isDaily,
                 dailyUntil: _dailyUntil,

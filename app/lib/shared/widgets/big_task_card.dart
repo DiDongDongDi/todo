@@ -136,15 +136,7 @@ class BigTaskCard extends StatelessWidget {
                         Focus(
                           canRequestFocus: false,
                           child: FilledButton.icon(
-                            onPressed: () {
-                              final keepKeyboard = focusNode?.hasFocus ?? false;
-                              onSave?.call();
-                              if (keepKeyboard &&
-                                  focusNode != null &&
-                                  !focusNode!.hasFocus) {
-                                focusNode!.requestFocus();
-                              }
-                            },
+                            onPressed: onSave,
                             icon: const Icon(Icons.check, size: 20),
                             label: const Text('保存'),
                           ),
@@ -416,7 +408,6 @@ class BigTaskCard extends StatelessWidget {
                         fieldController: controller!,
                         readOnly: false,
                         hintText: '记下一件事…',
-                        autofocus: true,
                       ),
                     ),
                   ),
