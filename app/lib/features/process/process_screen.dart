@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:todo_app/core/models/task.dart';
 import 'package:todo_app/core/models/task_display.dart';
 import 'package:todo_app/core/models/task_schedule.dart';
@@ -14,6 +15,8 @@ import 'package:todo_app/core/settings/process_today_only_settings.dart';
 import 'package:todo_app/core/stats/stats_provider.dart';
 import 'package:todo_app/core/sync/sync_engine.dart';
 import 'package:todo_app/core/transcription/transcription_service.dart';
+import 'package:todo_app/shared/utils/app_audio_recorder.dart';
+import 'package:todo_app/shared/utils/attachment_storage.dart';
 import 'package:todo_app/shared/utils/haptics.dart';
 import 'package:todo_app/shared/utils/sounds.dart';
 import 'package:todo_app/shared/utils/platform_capabilities.dart';
@@ -22,6 +25,7 @@ import 'package:todo_app/shared/widgets/big_task_card.dart';
 import 'package:todo_app/shared/widgets/card_stage.dart';
 import 'package:todo_app/shared/widgets/progress_widgets.dart';
 import 'package:todo_app/shared/widgets/swipeable_card.dart';
+import 'package:todo_app/shared/widgets/task_schedule_editor.dart';
 
 class ProcessScreen extends ConsumerStatefulWidget {
   const ProcessScreen({super.key});
@@ -43,11 +47,15 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
   bool _editIsDaily = false;
   DateTime? _editDailyUntil;
   DateTime? _editDueDate;
+  final List<TaskAttachment> _editAttachments = [];
+  bool _editRecording = false;
+  final _editAudioRecorder = AppAudioRecorder();
 
   @override
   void dispose() {
     _editController.dispose();
     _editFocusNode.dispose();
+    unawaited(_editAudioRecorder.dispose());
     super.dispose();
   }
 
@@ -268,6 +276,29 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
                     controller: _editing ? _editController : null,
                     focusNode: _editing ? _editFocusNode : null,
                     onChanged: _editing ? (_) => setState(() {}) : null,
+                    attachments: _editing ? _editAttachments : const [],
+                    onRemoveAttachment:
+                        _editing ? _removeEditAttachment : null,
+                    onPickImage: _editing ? _pickEditImage : null,
+                    onStartSpeech:
+                        _editing && !kIsWeb ? _toggleEditRecording : null,
+                    isListening: _editRecording,
+                    onSave: _editing ? () => _saveEdit(task) : null,
+                    onCancelEdit:
+                        _editing ? () => setState(() => _editing = false) : null,
+                    scheduleEditor: _editing
+                        ? TaskScheduleEditor(
+                            isDaily: _editIsDaily,
+                            dailyUntil: _editDailyUntil,
+                            dueDate: _editDueDate,
+                            onDailyChanged: (value) =>
+                                setState(() => _editIsDaily = value),
+                            onDailyUntilChanged: (value) =>
+                                setState(() => _editDailyUntil = value),
+                            onDueDateChanged: (value) =>
+                                setState(() => _editDueDate = value),
+                          )
+                        : null,
                     onTrash: () => _trash(task, animated: true),
                     onComplete: () => _archive(task, animated: true),
                     onPrevious: () => _setIndex(
@@ -291,29 +322,6 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
                 ),
               ),
             ),
-            if (_editing) ...[
-              Padding(
-                padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
-                child: _buildScheduleEditor(context),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    TextButton(
-                      onPressed: () => setState(() => _editing = false),
-                      child: const Text('取消'),
-                    ),
-                    const SizedBox(width: 16),
-                    FilledButton(
-                      onPressed: () => _saveEdit(task),
-                      child: const Text('保存'),
-                    ),
-                  ],
-                ),
-              ),
-            ],
             if (progress >= 1 && tasks.isNotEmpty) const SizedBox(height: 4),
           ],
         );
@@ -362,6 +370,10 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     _editIsDaily = task.isDaily;
     _editDailyUntil = task.dailyUntil;
     _editDueDate = task.dueDate;
+    _editAttachments
+      ..clear()
+      ..addAll(task.attachments);
+    _editRecording = false;
     setState(() => _editing = true);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _editFocusNode.requestFocus();
@@ -370,9 +382,27 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
 
   Future<void> _saveEdit(Task task) async {
     final repo = await ref.read(taskRepositoryProvider.future);
-    await repo.update(
+    final hasAudio =
+        _editAttachments.any((a) => a.type == AttachmentType.audio);
+    final audioChanged = hasAudio &&
+        _editAttachments.any(
+          (a) =>
+              a.type == AttachmentType.audio &&
+              !task.attachments.any((o) => o.localPath == a.localPath),
+        );
+
+    var transcriptionStatus = task.transcriptionStatus;
+    if (!hasAudio) {
+      transcriptionStatus = TranscriptionStatus.none;
+    } else if (audioChanged) {
+      transcriptionStatus = TranscriptionStatus.pending;
+    }
+
+    final updated = await repo.update(
       task.copyWith(
         title: _editController.text.trim(),
+        attachments: List.from(_editAttachments),
+        transcriptionStatus: transcriptionStatus,
         isDaily: _editIsDaily,
         dailyUntil: _editDailyUntil,
         dueDate: _editIsDaily ? null : _editDueDate,
@@ -380,101 +410,100 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
         clearDueDate: _editIsDaily || _editDueDate == null,
       ),
     );
+
+    if (hasAudio && transcriptionStatus == TranscriptionStatus.pending) {
+      unawaited(ref.read(transcriptionServiceProvider).processTask(updated));
+    }
+    unawaited(triggerSyncIfSignedIn(ref));
+
     setState(() => _editing = false);
   }
 
-  Widget _buildScheduleEditor(BuildContext context) {
-    final theme = Theme.of(context);
-    final today = localDate(DateTime.now());
+  void _removeEditAttachment(int index) {
+    setState(() => _editAttachments.removeAt(index));
+  }
 
-    String formatDate(DateTime? d) {
-      if (d == null) return '未设置';
-      return '${d.year}/${d.month}/${d.day}';
-    }
+  Future<void> _pickEditImage() async {
+    final picker = ImagePicker();
+    final file = await picker.pickImage(source: ImageSource.gallery);
+    if (file == null) return;
 
-    Future<void> pickDailyUntil() async {
-      final picked = await showDatePicker(
-        context: context,
-        initialDate: _editDailyUntil ?? today,
-        firstDate: today,
-        lastDate: today.add(const Duration(days: 3650)),
+    final localPath = await persistImageAttachment(file);
+    if (localPath == null) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: '无法读取所选图片',
+        icon: Icons.error_outline,
+        type: AppSnackType.error,
       );
-      if (picked != null && mounted) {
-        setState(() => _editDailyUntil = localDate(picked));
-      }
+      return;
     }
 
-    Future<void> pickDueDate() async {
-      final picked = await showDatePicker(
-        context: context,
-        initialDate: _editDueDate ?? today,
-        firstDate: today,
-        lastDate: today.add(const Duration(days: 3650)),
+    setState(() {
+      _editAttachments.add(
+        TaskAttachment(type: AttachmentType.image, localPath: localPath),
       );
-      if (picked != null && mounted) {
-        setState(() => _editDueDate = localDate(picked));
+    });
+  }
+
+  Future<void> _toggleEditRecording() async {
+    if (_editRecording) {
+      final result = await _editAudioRecorder.stop();
+      if (!mounted) return;
+      setState(() => _editRecording = false);
+
+      if (result == null) {
+        showAppSnackBar(
+          context,
+          message: '录音失败，请检查麦克风权限',
+          icon: Icons.mic_off_outlined,
+          type: AppSnackType.error,
+        );
+        return;
       }
+
+      setState(() {
+        _editAttachments.add(
+          TaskAttachment(
+            type: AttachmentType.audio,
+            localPath: result.path,
+            duration: result.durationSeconds,
+          ),
+        );
+      });
+      await AppHaptics.light();
+      return;
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          title: const Text('每日重复'),
-          value: _editIsDaily,
-          onChanged: (value) {
-            setState(() {
-              _editIsDaily = value;
-              if (value) _editDueDate = null;
-            });
-          },
-        ),
-        if (_editIsDaily) ...[
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text('重复至', style: theme.textTheme.bodyMedium),
-            subtitle: Text(formatDate(_editDailyUntil)),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (_editDailyUntil != null)
-                  IconButton(
-                    icon: const Icon(Icons.clear),
-                    tooltip: '清除',
-                    onPressed: () => setState(() => _editDailyUntil = null),
-                  ),
-                IconButton(
-                  icon: const Icon(Icons.calendar_today_outlined),
-                  onPressed: pickDailyUntil,
-                ),
-              ],
-            ),
-          ),
-        ] else ...[
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text('计划日期', style: theme.textTheme.bodyMedium),
-            subtitle: Text(formatDate(_editDueDate)),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (_editDueDate != null)
-                  IconButton(
-                    icon: const Icon(Icons.clear),
-                    tooltip: '清除',
-                    onPressed: () => setState(() => _editDueDate = null),
-                  ),
-                IconButton(
-                  icon: const Icon(Icons.calendar_today_outlined),
-                  onPressed: pickDueDate,
-                ),
-              ],
-            ),
-          ),
-        ],
-      ],
-    );
+    final permitted = await _editAudioRecorder.hasPermission();
+    if (!permitted) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: '需要麦克风权限才能录音',
+        icon: Icons.mic_off_outlined,
+        type: AppSnackType.error,
+      );
+      return;
+    }
+
+    _editFocusNode.unfocus();
+    try {
+      await _editAudioRecorder.start();
+      if (!mounted) return;
+      setState(() => _editRecording = true);
+      await AppHaptics.light();
+    } catch (e) {
+      debugPrint('Recording start failed: $e');
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: '无法开始录音',
+        icon: Icons.mic_off_outlined,
+        type: AppSnackType.error,
+      );
+    }
   }
 
   Future<void> _archive(Task task, {bool animated = false}) async {

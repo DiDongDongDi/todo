@@ -36,6 +36,8 @@ class BigTaskCard extends StatelessWidget {
     this.onRetryTranscription,
     this.scheduleLabel,
     this.completeLabel = '完成',
+    this.scheduleEditor,
+    this.onCancelEdit,
   });
 
   final BigTaskCardMode mode;
@@ -61,6 +63,8 @@ class BigTaskCard extends StatelessWidget {
   final VoidCallback? onRetryTranscription;
   final String? scheduleLabel;
   final String completeLabel;
+  final Widget? scheduleEditor;
+  final VoidCallback? onCancelEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -84,6 +88,10 @@ class BigTaskCard extends StatelessWidget {
                 child: _buildContentArea(context),
               ),
               if (mode == BigTaskCardMode.collect) ...[
+                if (scheduleEditor != null) ...[
+                  const SizedBox(height: 8),
+                  scheduleEditor!,
+                ],
                 const SizedBox(height: 16),
                 Row(
                   children: [
@@ -119,6 +127,44 @@ class BigTaskCard extends StatelessWidget {
                         icon: const Icon(Icons.check, size: 20),
                         label: const Text('保存'),
                       ),
+                    ),
+                  ],
+                ),
+              ] else if (mode == BigTaskCardMode.process) ...[
+                const SizedBox(height: 12),
+                if (scheduleEditor != null) scheduleEditor!,
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    IconButton.filledTonal(
+                      onPressed: onPickImage,
+                      icon: const Icon(Icons.image_outlined),
+                      tooltip: '添加图片',
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton.filledTonal(
+                      onPressed: onStartSpeech,
+                      icon: Icon(
+                        isListening ? Icons.stop : Icons.mic_none_outlined,
+                      ),
+                      tooltip: isListening ? '停止录音' : '录音',
+                      visualDensity: VisualDensity.compact,
+                      style: IconButton.styleFrom(
+                        backgroundColor: isListening
+                            ? colorScheme.errorContainer
+                            : null,
+                      ),
+                    ),
+                    const Spacer(),
+                    TextButton(
+                      onPressed: onCancelEdit,
+                      child: const Text('取消'),
+                    ),
+                    const SizedBox(width: 8),
+                    FilledButton(
+                      onPressed: onSave,
+                      child: const Text('保存'),
                     ),
                   ],
                 ),
@@ -299,18 +345,53 @@ class BigTaskCard extends StatelessWidget {
     }
 
     if (mode == BigTaskCardMode.process && controller != null) {
-      return TextField(
-        controller: controller,
-        focusNode: focusNode,
-        onChanged: onChanged,
-        expands: true,
-        maxLines: null,
-        textAlignVertical: TextAlignVertical.top,
-        style: theme.textTheme.headlineMedium?.copyWith(
-          color: colorScheme.onSurface,
-          height: 1.35,
-        ),
-        decoration: const InputDecoration(border: InputBorder.none),
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTap: () => focusNode?.requestFocus(),
+              child: TextField(
+                controller: controller,
+                focusNode: focusNode,
+                onChanged: onChanged,
+                expands: true,
+                maxLines: null,
+                textAlignVertical: TextAlignVertical.top,
+                style: theme.textTheme.headlineMedium?.copyWith(
+                  color: colorScheme.onSurface,
+                  height: 1.35,
+                ),
+                decoration: const InputDecoration(border: InputBorder.none),
+              ),
+            ),
+          ),
+          if (attachments.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 80,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: attachments.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                itemBuilder: (context, index) {
+                  final imageAttachments = _imageAttachments(attachments);
+                  final audioAttachments = _audioAttachments(attachments);
+                  final attachment = attachments[index];
+                  return _AttachmentThumbnail(
+                    attachment: attachment,
+                    imageAttachments: imageAttachments,
+                    audioAttachments: audioAttachments,
+                    onRemove: onRemoveAttachment == null
+                        ? null
+                        : () => onRemoveAttachment!(index),
+                  );
+                },
+              ),
+            ),
+          ],
+        ],
       );
     }
 

@@ -65,6 +65,9 @@ class TaskRepository {
     String? note,
     List<TaskAttachment> attachments = const [],
     TranscriptionStatus transcriptionStatus = TranscriptionStatus.none,
+    bool isDaily = false,
+    DateTime? dailyUntil,
+    DateTime? dueDate,
   }) async {
     final now = DateTime.now().toUtc();
     final task = Task(
@@ -78,6 +81,9 @@ class TaskRepository {
       createdAt: now,
       updatedAt: now,
       syncVersion: 1,
+      isDaily: isDaily,
+      dailyUntil: dailyUntil,
+      dueDate: isDaily ? null : dueDate,
     );
     await _store.upsert(task);
     return task;

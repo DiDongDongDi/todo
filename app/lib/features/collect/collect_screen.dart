@@ -18,6 +18,7 @@ import 'package:todo_app/shared/widgets/app_snackbar.dart';
 import 'package:todo_app/shared/widgets/big_task_card.dart';
 import 'package:todo_app/shared/widgets/card_stage.dart';
 import 'package:todo_app/shared/widgets/swipeable_card.dart';
+import 'package:todo_app/shared/widgets/task_schedule_editor.dart';
 
 class CollectScreen extends ConsumerStatefulWidget {
   const CollectScreen({super.key});
@@ -38,6 +39,10 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
   Task? _lastUndoTask;
   int _feedbackEpoch = 0;
   bool _saving = false;
+
+  bool _isDaily = false;
+  DateTime? _dailyUntil;
+  DateTime? _dueDate;
 
   static const _switcherDuration = Duration(milliseconds: 200);
 
@@ -154,6 +159,9 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
         _attachments
           ..clear()
           ..addAll(task.attachments);
+        _isDaily = task.isDaily;
+        _dailyUntil = task.dailyUntil;
+        _dueDate = task.dueDate;
       });
       _ensureCaretVisible();
     }
@@ -224,6 +232,9 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
       attachments: List.from(_attachments),
       transcriptionStatus:
           hasAudio ? TranscriptionStatus.pending : TranscriptionStatus.none,
+      isDaily: _isDaily,
+      dailyUntil: _isDaily ? _dailyUntil : null,
+      dueDate: _isDaily ? null : _dueDate,
     );
 
     unawaited(triggerSyncIfSignedIn(ref));
@@ -235,6 +246,9 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
     _controller.clear();
     _ensureCaretVisible();
     _attachments.clear();
+    _isDaily = false;
+    _dailyUntil = null;
+    _dueDate = null;
     _lastUndoTask = task;
 
     if (mounted) {
@@ -415,6 +429,17 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
               onStartSpeech: kIsWeb ? null : _toggleRecording,
               isListening: _recording,
               onSave: () => _save(animated: true),
+              scheduleEditor: TaskScheduleEditor(
+                isDaily: _isDaily,
+                dailyUntil: _dailyUntil,
+                dueDate: _dueDate,
+                onDailyChanged: (value) =>
+                    setState(() => _isDaily = value),
+                onDailyUntilChanged: (value) =>
+                    setState(() => _dailyUntil = value),
+                onDueDateChanged: (value) =>
+                    setState(() => _dueDate = value),
+              ),
             ),
           ),
         ),
