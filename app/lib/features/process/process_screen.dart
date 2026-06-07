@@ -86,6 +86,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     final index = tasks.indexWhere((t) => t.id == task.id);
     if (index < 0) return;
 
+    _editFocusNode.unfocus();
     setState(() {
       _index = index;
       _editing = false;
@@ -186,8 +187,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
             ? {
                 const SingleActivator(LogicalKeyboardKey.enter): () =>
                     _saveEdit(task),
-                const SingleActivator(LogicalKeyboardKey.escape): () =>
-                    setState(() => _editing = false),
+                const SingleActivator(LogicalKeyboardKey.escape): _exitEditMode,
               }
             : {
                 const SingleActivator(LogicalKeyboardKey.arrowLeft): () =>
@@ -284,8 +284,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
                         _editing && !kIsWeb ? _toggleEditRecording : null,
                     isListening: _editRecording,
                     onSave: _editing ? () => _saveEdit(task) : null,
-                    onCancelEdit:
-                        _editing ? () => setState(() => _editing = false) : null,
+                    onCancelEdit: _editing ? _exitEditMode : null,
                     scheduleEditor: _editing
                         ? TaskScheduleEditor(
                             isDaily: _editIsDaily,
@@ -348,6 +347,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     if (clamped == _index) return;
 
     Future<void> apply() async {
+      _editFocusNode.unfocus();
       setState(() {
         _index = clamped;
         _editing = false;
@@ -378,6 +378,12 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _editFocusNode.requestFocus();
     });
+  }
+
+  void _exitEditMode() {
+    if (!_editing) return;
+    _editFocusNode.unfocus();
+    setState(() => _editing = false);
   }
 
   Future<void> _saveEdit(Task task) async {
@@ -416,7 +422,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     }
     unawaited(triggerSyncIfSignedIn(ref));
 
-    setState(() => _editing = false);
+    _exitEditMode();
   }
 
   void _removeEditAttachment(int index) {
