@@ -264,6 +264,79 @@ class BigTaskCard extends StatelessWidget {
     return _buildContent(context);
   }
 
+  /// 只读态用 [GestureDetector.onTap] 进入编辑，避免 pointerDown 立刻禁用滑动手势。
+  /// 编辑态仍用 [Listener] 在 pointerDown 时聚焦，此时滑动已关闭。
+  Widget _wrapProcessContent(
+    BuildContext context, {
+    required bool pendingTitle,
+    required Task displayTask,
+  }) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    final content = SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildFlexibleTitleField(
+            context,
+            fieldController: controller!,
+            readOnly: !editing,
+            onTap: editing ? null : onEnterEdit,
+            textColor: pendingTitle && !editing
+                ? colorScheme.onSurface.withValues(alpha: 0.45)
+                : null,
+          ),
+          if (!editing) ...[
+            if (scheduleLabel != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                scheduleLabel!,
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: scheduleLabel!.startsWith('已逾期')
+                      ? colorScheme.error
+                      : colorScheme.primary,
+                ),
+              ),
+            ],
+            if (displayTask.note != null && displayTask.note!.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Text(displayTask.note!, style: theme.textTheme.bodyLarge),
+            ],
+            if (displayTask.attachments.isNotEmpty) ...[
+              const SizedBox(height: 20),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: displayTask.attachments.map((a) {
+                  return _AttachmentThumbnail(
+                    attachment: a,
+                    imageAttachments: _imageAttachments(displayTask.attachments),
+                    audioAttachments: _audioAttachments(displayTask.attachments),
+                  );
+                }).toList(),
+              ),
+            ],
+          ],
+        ],
+      ),
+    );
+
+    if (editing) {
+      return Listener(
+        behavior: HitTestBehavior.translucent,
+        onPointerDown: (_) => focusNode?.requestFocus(),
+        child: content,
+      );
+    }
+
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onTap: onEnterEdit,
+      child: content,
+    );
+  }
+
   /// 不撑满父级高度，避免键盘动画期间逐帧重排；空白区由 [Listener] 负责聚焦。
   Widget _buildFlexibleTitleField(
     BuildContext context, {
@@ -408,65 +481,10 @@ class BigTaskCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Expanded(
-            child: Listener(
-              behavior: HitTestBehavior.translucent,
-              onPointerDown: (_) {
-                if (editing) {
-                  focusNode?.requestFocus();
-                } else {
-                  onEnterEdit?.call();
-                }
-              },
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _buildFlexibleTitleField(
-                      context,
-                      fieldController: controller!,
-                      readOnly: !editing,
-                      onTap: editing ? null : onEnterEdit,
-                      textColor: pendingTitle && !editing
-                          ? colorScheme.onSurface.withValues(alpha: 0.45)
-                          : null,
-                    ),
-                    if (!editing) ...[
-                      if (scheduleLabel != null) ...[
-                        const SizedBox(height: 8),
-                        Text(
-                          scheduleLabel!,
-                          style: theme.textTheme.labelLarge?.copyWith(
-                            color: scheduleLabel!.startsWith('已逾期')
-                                ? colorScheme.error
-                                : colorScheme.primary,
-                          ),
-                        ),
-                      ],
-                      if (displayTask.note != null &&
-                          displayTask.note!.isNotEmpty) ...[
-                        const SizedBox(height: 16),
-                        Text(displayTask.note!, style: theme.textTheme.bodyLarge),
-                      ],
-                      if (displayTask.attachments.isNotEmpty) ...[
-                        const SizedBox(height: 20),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: displayTask.attachments.map((a) {
-                            return _AttachmentThumbnail(
-                              attachment: a,
-                              imageAttachments:
-                                  _imageAttachments(displayTask.attachments),
-                              audioAttachments:
-                                  _audioAttachments(displayTask.attachments),
-                            );
-                          }).toList(),
-                        ),
-                      ],
-                    ],
-                  ],
-                ),
-              ),
+            child: _wrapProcessContent(
+              context,
+              pendingTitle: pendingTitle,
+              displayTask: displayTask,
             ),
           ),
           if (editing && attachments.isNotEmpty) ...[

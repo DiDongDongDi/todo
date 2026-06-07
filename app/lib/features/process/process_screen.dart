@@ -374,6 +374,27 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     }
   }
 
+  void _ensureEditCaretVisible() {
+    final text = _editController.text;
+    _editController.value = TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+      composing: TextRange.empty,
+    );
+  }
+
+  Future<void> _requestEditFocus() async {
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted || !_editing) return;
+
+    _ensureEditCaretVisible();
+    FocusScope.of(context).requestFocus(_editFocusNode);
+
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted || !_editing) return;
+    _ensureEditCaretVisible();
+  }
+
   void _startEdit(Task task) {
     if (_editing) return;
     _editController.text = task.title;
@@ -385,7 +406,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
       ..addAll(task.attachments);
     _editRecording = false;
     setState(() => _editing = true);
-    _editFocusNode.requestFocus();
+    unawaited(_requestEditFocus());
   }
 
   void _exitEditMode([Task? task]) {
