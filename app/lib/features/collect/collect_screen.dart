@@ -17,7 +17,6 @@ import 'package:todo_app/shared/widgets/app_snackbar.dart';
 import 'package:todo_app/shared/widgets/big_task_card.dart';
 import 'package:todo_app/shared/widgets/card_stage.dart';
 import 'package:todo_app/shared/widgets/swipeable_card.dart';
-import 'package:todo_app/shared/widgets/task_card_footer.dart';
 import 'package:todo_app/shared/widgets/task_schedule_editor.dart';
 
 class CollectScreen extends ConsumerStatefulWidget {
@@ -437,89 +436,52 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
     }
   }
 
-  Widget _buildScheduleEditor() {
-    return TaskScheduleEditor(
-      isDaily: _isDaily,
-      dailyUntil: _dailyUntil,
-      dueDate: _dueDate,
-      onDailyChanged: (value) => setState(() => _isDaily = value),
-      onDailyUntilChanged: (value) => setState(() => _dailyUntil = value),
-      onDueDateChanged: (value) => setState(() => _dueDate = value),
-    );
-  }
-
-  Widget _buildCollectFooter({
-    required bool compact,
-    required Widget scheduleEditor,
-  }) {
-    return TaskCardCollectFooter(
-      compact: compact,
-      scheduleEditor: scheduleEditor,
-      onPickImage: _pickImage,
-      onStartSpeech: kIsWeb ? null : _toggleRecording,
-      isListening: _recording,
-      onSave: () => _save(animated: true),
-      focusNode: _focusNode,
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
-    final keyboardVisible = bottomInset > 0;
-    final scheduleEditor = _buildScheduleEditor();
-    final collectFooter =
-        _buildCollectFooter(compact: keyboardVisible, scheduleEditor: scheduleEditor);
-
-    return AnimatedPadding(
-      duration: const Duration(milliseconds: 50),
-      curve: Curves.easeOut,
-      padding: EdgeInsets.only(bottom: bottomInset),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Expanded(
-            child: ListenableBuilder(
-              listenable: _controller,
-              builder: (context, _) {
-                return CardStage(
-                  swipeKey: _swipeKey,
-                  enabled: true,
-                  resetAfterAction: false,
-                  shouldAnimateFlyout: (_) async => _hasContent,
-                  onFlyoutFeedback: _collectFlyoutFeedback,
-                  onDragStart: _onDragStart,
-                  onDragEnd: _onDragEnd,
-                  onSwipeUp: _onSwipeUp,
-                  rightLabel: '',
-                  leftLabel: '',
-                  child: BigTaskCard(
-                    mode: BigTaskCardMode.collect,
-                    controller: _controller,
-                    focusNode: _focusNode,
-                    onActivateInput: _activateInput,
-                    feedback:
-                        _recording ? CollectCardFeedback.listening : _feedback,
-                    onDismissFeedback: _dismissCardFeedback,
-                    onChanged: (_) {},
-                    attachments: _attachments,
-                    onRemoveAttachment: _removeAttachment,
-                    onPickImage: _pickImage,
-                    onStartSpeech: kIsWeb ? null : _toggleRecording,
-                    isListening: _recording,
-                    onSave: () => _save(animated: true),
-                    showFooter: !keyboardVisible,
-                    scheduleEditor:
-                        keyboardVisible ? null : scheduleEditor,
-                  ),
-                );
-              },
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(
+          child: CardStage(
+            swipeKey: _swipeKey,
+            enabled: true,
+            resetAfterAction: false,
+            shouldAnimateFlyout: (_) async => _hasContent,
+            onFlyoutFeedback: _collectFlyoutFeedback,
+            onDragStart: _onDragStart,
+            onDragEnd: _onDragEnd,
+            onSwipeUp: _onSwipeUp,
+            rightLabel: '',
+            leftLabel: '',
+            child: BigTaskCard(
+              mode: BigTaskCardMode.collect,
+              controller: _controller,
+              focusNode: _focusNode,
+              onActivateInput: _activateInput,
+              feedback: _recording ? CollectCardFeedback.listening : _feedback,
+              onDismissFeedback: _dismissCardFeedback,
+              onChanged: (_) => setState(() {}),
+              attachments: _attachments,
+              onRemoveAttachment: _removeAttachment,
+              onPickImage: _pickImage,
+              onStartSpeech: kIsWeb ? null : _toggleRecording,
+              isListening: _recording,
+              onSave: () => _save(animated: true),
+              scheduleEditor: TaskScheduleEditor(
+                isDaily: _isDaily,
+                dailyUntil: _dailyUntil,
+                dueDate: _dueDate,
+                onDailyChanged: (value) =>
+                    setState(() => _isDaily = value),
+                onDailyUntilChanged: (value) =>
+                    setState(() => _dailyUntil = value),
+                onDueDateChanged: (value) =>
+                    setState(() => _dueDate = value),
+              ),
             ),
           ),
-          if (keyboardVisible)
-            TaskCardKeyboardToolbar(child: collectFooter),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
