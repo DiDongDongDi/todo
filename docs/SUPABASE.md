@@ -14,7 +14,7 @@
 | **身份认证（Auth）** | 邮箱、OAuth（Google/GitHub 等）、魔法链接等 |
 | **实时订阅** | 数据变更可推送到客户端 |
 | **存储（Storage）** | 文件/图片上传与管理 |
-| **Edge Functions** | 在边缘运行的服务端函数 |
+| **Edge Functions** | 在 Supabase 云端运行的服务端函数（见下文） |
 | **REST / GraphQL API** | 基于数据库表自动生成 API |
 
 ## 和 Firebase 的对比
@@ -37,7 +37,45 @@
 当前已接入的部分：
 
 1. **用户认证** — `app/lib/core/auth/auth_service.dart` 通过 `supabase_flutter` 做邮箱 OTP 登录/登出
-2. **云端数据（规划中）** — 配置 `url` 和 `anonKey` 后连接 Supabase 项目，配合 SyncEngine 做增量同步
+2. **云端数据与同步** — SyncEngine 增量同步 tasks；Storage 上传附件
+3. **语音转写** — Edge Function `transcribe`，见 [STT-SETUP.md](./STT-SETUP.md)
+
+## Edge Functions（边缘函数）
+
+### 一句话
+
+**Edge Function = 部署在 Supabase 上的小型后端 API**，用 TypeScript 编写，运行在 Deno 边缘运行时；客户端通过 `functions.invoke` 或 HTTPS 调用。
+
+### 为什么需要它？
+
+不是所有逻辑都适合放在 Flutter App 里：
+
+- **密钥不能进客户端** — 例如 Groq / OpenAI 的 API Key，打进 APK 会被逆向
+- **需要服务端权限** — 用 **service role** 或已登录用户的 JWT，安全地读 Storage、写数据库
+- **统一业务规则** — 转写、计费、限流、换 STT 供应商，只改云端代码，App 不用发版
+
+Firebase 里类似的概念叫 **Cloud Functions**；Supabase 的实现基于 **Deno Deploy** 风格的边缘节点，延迟通常低于自建 VPS 上跑的长驻服务。
+
+### 生命周期（以本项目的 `transcribe` 为例）
+
+1. **本地编写** — `supabase/functions/transcribe/index.ts`
+2. **配置 Secrets** — Dashboard 或 `supabase secrets set GROQ_API_KEY=...`
+3. **部署** — `supabase functions deploy transcribe`（把代码推到你的 Supabase 项目）
+4. **调用** — App：`client.functions.invoke('transcribe', body: {...})`
+5. **执行** — 函数下载 Storage 音频 → 调 Whisper → 更新 `tasks` 表 → 返回 JSON
+
+函数**不是一直占着一台服务器**：有请求时冷启动或热执行，按调用次数与运行时间计费（免费档对个人项目通常够用）。
+
+### 和本项目其他 Supabase 能力的关系
+
+| 能力 | 典型用途 | Edge Function 是否替代 |
+|------|----------|------------------------|
+| PostgreSQL + RLS | 任务 CRUD、权限 | 否；函数可以 **额外** 写库，不能代替 RLS 设计 |
+| Auth | 登录、JWT | 否；函数常 **校验** JWT，知道是哪个用户 |
+| Storage | 存录音、图片 | 否；函数 **读取** 已上传的文件做处理 |
+| Realtime | 数据变更推送 | 否；函数写库后，客户端仍可通过 Realtime 或轮询感知 |
+
+部署与 Groq/OpenAI 配置步骤见 **[STT-SETUP.md](./STT-SETUP.md)**。
 
 ### 配置方式
 

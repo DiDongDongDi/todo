@@ -33,5 +33,11 @@ desktop.ini
 supabase/.branches/
 supabase/.temp/
 
+# Supabase CLI 二进制（本地 tools/ 方式 B）
+/tools/supabase.exe
+/tools/supabase_windows_amd64.tar.gz
+/tools/LICENSE
+/tools/README.md
+
 # Cursor
 .cursor/
