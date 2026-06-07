@@ -14,6 +14,8 @@ void showAppSnackBar(
   final theme = Theme.of(context);
   final colorScheme = theme.colorScheme;
   final semantic = context.semanticColors;
+  final mediaQuery = MediaQuery.of(context);
+  final topInset = mediaQuery.padding.top;
 
   final (Color bg, Color fg) = switch (type) {
     AppSnackType.success => (semantic.successContainer, semantic.onSuccessContainer),
@@ -44,6 +46,9 @@ void showAppSnackBar(
       ),
       backgroundColor: bg,
       duration: duration,
+      behavior: SnackBarBehavior.floating,
+      dismissDirection: DismissDirection.up,
+      margin: EdgeInsets.fromLTRB(16, topInset + 8, 16, 0),
       action: action != null
           ? SnackBarAction(
               label: action.label,

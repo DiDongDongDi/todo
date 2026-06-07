@@ -41,6 +41,8 @@ class BigTaskCard extends StatelessWidget {
     this.onCancelEdit,
     this.editing = false,
     this.onEnterEdit,
+    this.parentTitle,
+    this.onTapParent,
   });
 
   final BigTaskCardMode mode;
@@ -74,6 +76,9 @@ class BigTaskCard extends StatelessWidget {
 
   /// 只读标题被点击时进入编辑（处理 tab）。
   final VoidCallback? onEnterEdit;
+
+  final String? parentTitle;
+  final VoidCallback? onTapParent;
 
   @override
   Widget build(BuildContext context) {
@@ -286,6 +291,24 @@ class BigTaskCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (parentTitle != null && parentTitle!.isNotEmpty) ...[
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: onTapParent,
+                icon: const Icon(Icons.subdirectory_arrow_left, size: 18),
+                label: Text(
+                  parentTitle!,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  alignment: Alignment.centerLeft,
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
           // 只读标题不参与命中测试，避免 TextField.onTap 抢走点击导致无法聚焦。
           if (editing) titleField else IgnorePointer(child: titleField),
           if (!editing) ...[

@@ -54,6 +54,7 @@ class Task {
     this.dailyUntil,
     this.lastDailyCompletedAt,
     this.dueDate,
+    this.parentId,
   });
 
   final String id;
@@ -74,6 +75,9 @@ class Task {
   final DateTime? dailyUntil;
   final DateTime? lastDailyCompletedAt;
   final DateTime? dueDate;
+  final String? parentId;
+
+  bool get isSubtask => parentId != null;
 
   bool get hasContent =>
       title.trim().isNotEmpty || note?.trim().isNotEmpty == true || attachments.isNotEmpty;
@@ -97,7 +101,9 @@ class Task {
     DateTime? dailyUntil,
     DateTime? lastDailyCompletedAt,
     DateTime? dueDate,
+    String? parentId,
     bool clearNote = false,
+    bool clearParentId = false,
     bool clearArchivedAt = false,
     bool clearTrashedAt = false,
     bool clearDailyUntil = false,
@@ -125,6 +131,7 @@ class Task {
           ? null
           : (lastDailyCompletedAt ?? this.lastDailyCompletedAt),
       dueDate: clearDueDate ? null : (dueDate ?? this.dueDate),
+      parentId: clearParentId ? null : (parentId ?? this.parentId),
     );
   }
 
@@ -148,6 +155,7 @@ class Task {
         if (lastDailyCompletedAt != null)
           'last_daily_completed_at': lastDailyCompletedAt!.toIso8601String(),
         if (dueDate != null) 'due_date': _dateOnlyString(dueDate!),
+        if (parentId != null) 'parent_id': parentId,
       };
 
   static String _dateOnlyString(DateTime d) =>
@@ -190,6 +198,7 @@ class Task {
           ? DateTime.parse(json['last_daily_completed_at'] as String)
           : null,
       dueDate: _parseDateOnly(json['due_date']),
+      parentId: json['parent_id'] as String?,
     );
   }
 

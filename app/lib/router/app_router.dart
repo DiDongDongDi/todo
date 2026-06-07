@@ -1,9 +1,11 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:todo_app/features/archive/archive_screen.dart';
 import 'package:todo_app/features/auth/auth_screen.dart';
 import 'package:todo_app/features/shell/shell_screen.dart';
+import 'package:todo_app/features/task_detail/task_detail_screen.dart';
+import 'package:todo_app/features/templates/template_edit_screen.dart';
+import 'package:todo_app/features/templates/template_list_screen.dart';
 import 'package:todo_app/features/trash/trash_screen.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
@@ -28,6 +30,22 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/auth',
         builder: (context, state) => const AuthScreen(),
+      ),
+      GoRoute(
+        path: '/task/:id',
+        builder: (context, state) => TaskDetailScreen(
+          taskId: state.pathParameters['id']!,
+        ),
+      ),
+      GoRoute(
+        path: '/templates',
+        builder: (context, state) => const TemplateListScreen(),
+      ),
+      GoRoute(
+        path: '/templates/:id',
+        builder: (context, state) => TemplateEditScreen(
+          templateId: state.pathParameters['id']!,
+        ),
       ),
     ],
   );

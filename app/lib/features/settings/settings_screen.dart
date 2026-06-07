@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:todo_app/core/settings/collect_sound_settings.dart';
 import 'package:todo_app/core/settings/notification_sound_platform.dart';
 import 'package:todo_app/core/settings/notification_sound_preference.dart';
@@ -33,7 +34,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final collectAsync = ref.watch(collectSoundProvider);
     final processAsync = ref.watch(processSoundProvider);
     final restoreAsync = ref.watch(restoreSoundProvider);
-    final theme = Theme.of(context);
 
     if (collectAsync.isLoading ||
         processAsync.isLoading ||
@@ -61,19 +61,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     return ListView(
       padding: AppLayout.cardPadding.copyWith(top: 24, bottom: 24),
       children: [
-        Text(
-          '设置',
-          style: theme.textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.bookmark_outline),
+          title: const Text('任务模板'),
+          subtitle: const Text('查看、编辑或删除已保存的模板'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => context.push('/templates'),
         ),
+        const Divider(height: 32),
         NotificationSoundSection(
           title: '收集音效',
           description: unsupportedHint ??
               '卡片飞出保存时播放所选系统通知音。',
           preference: collect,
           supported: supported,
-          topSpacing: 28,
+          topSpacing: 0,
           onEnabledChanged: (value) =>
               ref.read(collectSoundProvider.notifier).setEnabled(value),
           onPick: () => _pickCollectSound(collect),

@@ -5,7 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:todo_app/core/auth/auth_service.dart';
 import 'package:todo_app/core/models/task.dart';
+import 'package:todo_app/core/models/task_template.dart';
 import 'package:todo_app/core/repositories/task_repository.dart';
+import 'package:todo_app/core/repositories/template_repository.dart';
 import 'package:todo_app/core/sync/attachment_upload_service.dart';
 import 'package:todo_app/core/sync/sync_repository.dart';
 import 'package:todo_app/core/transcription/transcription_service.dart';
@@ -87,7 +89,14 @@ class SyncEngine {
       local = await _uploadPendingAttachments(taskRepo, local);
       await repo.pushTasks(local);
       final remote = await repo.pullTasks();
-      await _mergeRemote(taskRepo, remote);
+      await _mergeRemoteTasks(taskRepo, remote);
+
+      final templateRepo = await _ref.read(templateRepositoryProvider.future);
+      final localTemplates = await templateRepo.getAll();
+      await repo.pushTemplates(localTemplates);
+      final remoteTemplates = await repo.pullTemplates();
+      await _mergeRemoteTemplates(templateRepo, remoteTemplates);
+
       await _ref.read(transcriptionServiceProvider).processPendingTasks();
       _ref.read(lastSyncAtProvider.notifier).state = DateTime.now();
       _ref.read(syncStatusProvider.notifier).state = SyncStatus.idle;
@@ -140,7 +149,7 @@ class SyncEngine {
     return false;
   }
 
-  Future<void> _mergeRemote(TaskRepository taskRepo, List<Task> remote) async {
+  Future<void> _mergeRemoteTasks(TaskRepository taskRepo, List<Task> remote) async {
     final local = await taskRepo.getAll();
     final localMap = {for (final t in local) t.id: t};
 
@@ -152,6 +161,23 @@ class SyncEngine {
         await taskRepo.update(r);
       } else if (l.updatedAt.isAfter(r.updatedAt)) {
         // local wins — will push on next sync
+      }
+    }
+  }
+
+  Future<void> _mergeRemoteTemplates(
+    TemplateRepository templateRepo,
+    List<TaskTemplate> remote,
+  ) async {
+    final local = await templateRepo.getAll();
+    final localMap = {for (final t in local) t.id: t};
+
+    for (final r in remote) {
+      final l = localMap[r.id];
+      if (l == null) {
+        await templateRepo.upsertRemote(r);
+      } else if (r.updatedAt.isAfter(l.updatedAt)) {
+        await templateRepo.upsertRemote(r);
       }
     }
   }

@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:todo_app/core/database/task_store.dart';
 import 'package:todo_app/core/models/task.dart';
-import 'package:todo_app/core/models/task_schedule.dart';
+import 'package:todo_app/core/models/task_hierarchy.dart';
 import 'package:todo_app/core/settings/process_today_only_settings.dart';
 import 'package:uuid/uuid.dart';
 
@@ -32,9 +32,7 @@ final processTasksProvider = StreamProvider<List<Task>>((ref) async* {
 
   yield* store.watchByStatus(TaskStatus.inbox).map((tasks) {
     final now = DateTime.now();
-    return tasks
-        .where((t) => shouldShowInProcess(t, todayOnly: todayOnly, now: now))
-        .toList();
+    return filterProcessTasks(tasks, todayOnly: todayOnly, now: now);
   });
 });
 
@@ -68,6 +66,7 @@ class TaskRepository {
     bool isDaily = false,
     DateTime? dailyUntil,
     DateTime? dueDate,
+    String? parentId,
   }) async {
     final now = DateTime.now().toUtc();
     final task = Task(
@@ -84,9 +83,44 @@ class TaskRepository {
       isDaily: isDaily,
       dailyUntil: dailyUntil,
       dueDate: isDaily ? null : dueDate,
+      parentId: parentId,
     );
     await _store.upsert(task);
     return task;
+  }
+
+  Future<Task> createSubtask({
+    required String parentId,
+    required String title,
+    String? note,
+    List<TaskAttachment> attachments = const [],
+    TranscriptionStatus transcriptionStatus = TranscriptionStatus.none,
+    bool isDaily = false,
+    DateTime? dailyUntil,
+    DateTime? dueDate,
+  }) async {
+    final parent = await _require(parentId);
+    if (parent.isSubtask) {
+      throw StateError('Cannot add subtask to a subtask');
+    }
+    return createInbox(
+      title: title,
+      note: note,
+      attachments: attachments,
+      transcriptionStatus: transcriptionStatus,
+      isDaily: isDaily,
+      dailyUntil: dailyUntil,
+      dueDate: dueDate,
+      parentId: parentId,
+    );
+  }
+
+  Future<List<Task>> getSubtasks(String parentId) async {
+    final all = await _store.getAll();
+    return all
+        .where((t) => t.parentId == parentId && t.deletedAt == null)
+        .toList()
+      ..sort((a, b) => b.sortOrder.compareTo(a.sortOrder));
   }
 
   Future<Task> update(Task task) async {
@@ -139,6 +173,21 @@ class TaskRepository {
   Future<Task> trash(String id) async {
     final task = await _require(id);
     final now = DateTime.now().toUtc();
+
+    if (task.isSubtask) {
+      return _trashSingle(task, now);
+    }
+
+    final subtasks = await getSubtasks(id);
+    for (final sub in subtasks) {
+      if (sub.status != TaskStatus.trashed) {
+        await _trashSingle(sub, now);
+      }
+    }
+    return _trashSingle(task, now);
+  }
+
+  Future<Task> _trashSingle(Task task, DateTime now) async {
     final updated = task.copyWith(
       status: TaskStatus.trashed,
       trashedAt: now,

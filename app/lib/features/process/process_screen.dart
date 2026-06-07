@@ -10,6 +10,7 @@ import 'package:todo_app/core/models/task.dart';
 import 'package:todo_app/core/models/task_display.dart';
 import 'package:todo_app/core/models/task_schedule.dart';
 import 'package:todo_app/core/repositories/task_repository.dart';
+import 'package:todo_app/core/repositories/template_repository.dart';
 import 'package:todo_app/core/settings/process_sound_settings.dart';
 import 'package:todo_app/core/settings/process_today_only_settings.dart';
 import 'package:todo_app/core/stats/stats_provider.dart';
@@ -24,7 +25,9 @@ import 'package:todo_app/shared/widgets/app_snackbar.dart';
 import 'package:todo_app/shared/widgets/big_task_card.dart';
 import 'package:todo_app/shared/widgets/card_stage.dart';
 import 'package:todo_app/shared/widgets/progress_widgets.dart';
+import 'package:todo_app/shared/widgets/save_template_dialog.dart';
 import 'package:todo_app/shared/widgets/swipeable_card.dart';
+import 'package:todo_app/shared/widgets/tab_more_menu_button.dart';
 import 'package:todo_app/shared/widgets/task_schedule_editor.dart';
 
 class ProcessScreen extends ConsumerStatefulWidget {
@@ -263,30 +266,30 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
       error: (e, _) => Center(child: Text('加载失败: $e')),
       data: (tasks) {
         if (tasks.isEmpty) {
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.all(32),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    todayOnly
-                        ? '今天没有计划任务'
-                        : '收集箱是空的，去收集页记一条吧',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 18),
-                  ),
-                  const SizedBox(height: 24),
-                  FilterChip(
-                    label: const Text('只看今日'),
-                    selected: todayOnly,
-                    onSelected: (value) => ref
-                        .read(processTodayOnlyProvider.notifier)
-                        .setEnabled(value),
-                  ),
-                ],
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _buildTopBar(
+                context,
+                taskCount: 0,
+                archivedToday: statsAsync.value?.archivedToday ?? 0,
+                todayOnly: todayOnly,
               ),
-            ),
+              Expanded(
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32),
+                    child: Text(
+                      todayOnly
+                          ? '今天没有计划任务'
+                          : '收集箱是空的，去收集页记一条吧',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 18),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           );
         }
 
@@ -302,6 +305,16 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
         }
         final archivedToday = statsAsync.value?.archivedToday ?? 0;
         final progress = inboxProgress(archivedToday, tasks.length);
+        final allInbox = ref.watch(inboxTasksProvider).value ?? [];
+        String? parentTitle;
+        if (task.parentId != null) {
+          for (final t in allInbox) {
+            if (t.id == task.parentId) {
+              parentTitle = t.title;
+              break;
+            }
+          }
+        }
 
         final shortcuts = _editUiVisible
             ? {
@@ -324,52 +337,12 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
         final content = Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    children: [
-                      ProcessProgressRing(
-                        completed: archivedToday,
-                        total: archivedToday + tasks.length,
-                      ),
-                      const SizedBox(width: 12),
-                      Text(
-                        '${tasks.length} 待处理',
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                      const Spacer(),
-                      IconButton(
-                        icon: const Icon(Icons.task_alt_outlined),
-                        tooltip: '已完成',
-                        onPressed: () => context.push('/archive'),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.delete_outline),
-                        tooltip: '回收站',
-                        onPressed: () => context.push('/trash'),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.sync_outlined),
-                        tooltip: '同步',
-                        onPressed: () => context.push('/auth'),
-                      ),
-                    ],
-                  ),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: FilterChip(
-                      label: const Text('只看今日'),
-                      selected: todayOnly,
-                      onSelected: (value) => ref
-                          .read(processTodayOnlyProvider.notifier)
-                          .setEnabled(value),
-                    ),
-                  ),
-                ],
-              ),
+            _buildTopBar(
+              context,
+              taskCount: tasks.length,
+              archivedToday: archivedToday,
+              todayOnly: todayOnly,
+              onSaveTemplate: () => _saveCurrentAsTemplate(task),
             ),
             Expanded(
               child: CardStage(
@@ -437,6 +410,10 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
                       : null,
                   scheduleLabel: scheduleLabel(task),
                   completeLabel: task.isDaily ? '今日完成' : '完成',
+                  parentTitle: parentTitle,
+                  onTapParent: task.parentId != null
+                      ? () => context.push('/task/${task.parentId}')
+                      : null,
                 ),
               ),
             ),
@@ -784,5 +761,100 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
       AppHaptics.medium(),
       AppSounds.play(settings.trash),
     ]);
+  }
+
+  Widget _buildTopBar(
+    BuildContext context, {
+    required int taskCount,
+    required int archivedToday,
+    required bool todayOnly,
+    VoidCallback? onSaveTemplate,
+  }) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 8, 12, 0),
+      child: Row(
+        children: [
+          ProcessProgressRing(
+            completed: archivedToday,
+            total: archivedToday + taskCount,
+          ),
+          const SizedBox(width: 12),
+          Text(
+            '$taskCount 待处理',
+            style: theme.textTheme.bodyMedium,
+          ),
+          const Spacer(),
+          IconButton(
+            icon: Icon(
+              todayOnly ? Icons.today : Icons.today_outlined,
+              color: todayOnly ? theme.colorScheme.primary : null,
+            ),
+            tooltip: '只看今日',
+            onPressed: () => ref
+                .read(processTodayOnlyProvider.notifier)
+                .setEnabled(!todayOnly),
+          ),
+          TabMoreMenuButton<ProcessMoreAction>(
+            items: [
+              processMenuItem<ProcessMoreAction>(
+                value: ProcessMoreAction.archive,
+                icon: Icons.task_alt_outlined,
+                label: '已完成',
+              ),
+              processMenuItem<ProcessMoreAction>(
+                value: ProcessMoreAction.trash,
+                icon: Icons.delete_outline,
+                label: '回收站',
+              ),
+              processMenuItem<ProcessMoreAction>(
+                value: ProcessMoreAction.sync,
+                icon: Icons.sync_outlined,
+                label: '同步配置',
+              ),
+              if (onSaveTemplate != null) ...[
+                processMoreMenuDivider,
+                processMenuItem<ProcessMoreAction>(
+                  value: ProcessMoreAction.saveTemplate,
+                  icon: Icons.bookmark_outline,
+                  label: '保存为模板',
+                ),
+              ],
+            ],
+            onSelected: (action) {
+              switch (action) {
+                case ProcessMoreAction.archive:
+                  context.push('/archive');
+                case ProcessMoreAction.trash:
+                  context.push('/trash');
+                case ProcessMoreAction.sync:
+                  context.push('/auth');
+                case ProcessMoreAction.saveTemplate:
+                  onSaveTemplate?.call();
+              }
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _saveCurrentAsTemplate(Task task) async {
+    final name = await showSaveTemplateDialog(
+      context,
+      defaultTitle: task.title,
+    );
+    if (name == null || !mounted) return;
+
+    final templateRepo = await ref.read(templateRepositoryProvider.future);
+    await templateRepo.saveFromTask(task.id, titleOverride: name);
+    unawaited(triggerSyncIfSignedIn(ref));
+    if (!mounted) return;
+    showAppSnackBar(
+      context,
+      message: '已保存为模板',
+      icon: Icons.bookmark_outline,
+      type: AppSnackType.success,
+    );
   }
 }

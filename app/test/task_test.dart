@@ -35,6 +35,7 @@ void main() {
       dailyUntil: DateTime(2026, 6, 30),
       lastDailyCompletedAt: DateTime.utc(2026, 6, 7, 12),
       dueDate: DateTime(2026, 6, 15),
+      parentId: 'parent-uuid',
       attachments: [
         TaskAttachment(type: AttachmentType.image, localPath: '/tmp/a.png'),
       ],
@@ -46,5 +47,6 @@ void main() {
     expect(restored.dailyUntil, DateTime(2026, 6, 30));
     expect(restored.lastDailyCompletedAt, DateTime.utc(2026, 6, 7, 12));
     expect(restored.dueDate, DateTime(2026, 6, 15));
+    expect(restored.parentId, 'parent-uuid');
   });
 }

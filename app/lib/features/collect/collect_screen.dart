@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:todo_app/core/models/task.dart';
 import 'package:todo_app/core/repositories/task_repository.dart';
+import 'package:todo_app/core/repositories/template_repository.dart';
 import 'package:todo_app/core/settings/collect_sound_settings.dart';
 import 'package:todo_app/core/sync/sync_engine.dart';
 import 'package:todo_app/core/transcription/transcription_service.dart';
@@ -16,8 +17,11 @@ import 'package:todo_app/shared/utils/sounds.dart';
 import 'package:todo_app/shared/widgets/app_snackbar.dart';
 import 'package:todo_app/shared/widgets/big_task_card.dart';
 import 'package:todo_app/shared/widgets/card_stage.dart';
+import 'package:todo_app/shared/widgets/save_template_dialog.dart';
 import 'package:todo_app/shared/widgets/swipeable_card.dart';
+import 'package:todo_app/shared/widgets/tab_more_menu_button.dart';
 import 'package:todo_app/shared/widgets/task_schedule_editor.dart';
+import 'package:todo_app/shared/widgets/template_picker_sheet.dart';
 
 class CollectScreen extends ConsumerStatefulWidget {
   const CollectScreen({super.key});
@@ -435,6 +439,29 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 8, 12, 0),
+          child: Row(
+            children: [
+              const Spacer(),
+              TabMoreMenuButton<CollectMoreAction>(
+                items: [
+                  collectMenuItem<CollectMoreAction>(
+                    value: CollectMoreAction.saveTemplate,
+                    icon: Icons.bookmark_outline,
+                    label: '保存为模板',
+                  ),
+                  collectMenuItem<CollectMoreAction>(
+                    value: CollectMoreAction.createFromTemplate,
+                    icon: Icons.note_add_outlined,
+                    label: '从模板创建',
+                  ),
+                ],
+                onSelected: _onCollectMoreAction,
+              ),
+            ],
+          ),
+        ),
         Expanded(
           child: CardStage(
             swipeKey: _swipeKey,
@@ -478,6 +505,68 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Future<void> _onCollectMoreAction(CollectMoreAction action) async {
+    switch (action) {
+      case CollectMoreAction.saveTemplate:
+        await _saveDraftAsTemplate();
+      case CollectMoreAction.createFromTemplate:
+        await _createFromTemplate();
+    }
+  }
+
+  Future<void> _saveDraftAsTemplate() async {
+    if (!_hasContent) {
+      showAppSnackBar(
+        context,
+        message: '请先输入内容',
+        icon: Icons.edit_outlined,
+        type: AppSnackType.warning,
+      );
+      return;
+    }
+
+    final name = await showSaveTemplateDialog(
+      context,
+      defaultTitle: _controller.text.trim(),
+    );
+    if (name == null || !mounted) return;
+
+    final templateRepo = await ref.read(templateRepositoryProvider.future);
+    await templateRepo.saveFromDraft(
+      title: _controller.text.trim(),
+      note: null,
+      attachments: List.from(_attachments),
+      isDaily: _isDaily,
+      dailyUntil: _dailyUntil,
+      dueDate: _dueDate,
+      titleOverride: name,
+    );
+    unawaited(triggerSyncIfSignedIn(ref));
+    if (!mounted) return;
+    showAppSnackBar(
+      context,
+      message: '已保存为模板',
+      icon: Icons.bookmark_outline,
+      type: AppSnackType.success,
+    );
+  }
+
+  Future<void> _createFromTemplate() async {
+    final template = await showTemplatePickerSheet(context);
+    if (template == null || !mounted) return;
+
+    final templateRepo = await ref.read(templateRepositoryProvider.future);
+    final created = await templateRepo.createTasksFromTemplate(template.id);
+    unawaited(triggerSyncIfSignedIn(ref));
+    if (!mounted) return;
+    showAppSnackBar(
+      context,
+      message: '已创建 ${created.length} 个任务',
+      icon: Icons.check_circle_outline,
+      type: AppSnackType.success,
     );
   }
 }
