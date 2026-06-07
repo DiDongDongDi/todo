@@ -274,19 +274,21 @@ class BigTaskCard extends StatelessWidget {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
+    final titleField = _buildFlexibleTitleField(
+      context,
+      fieldController: controller!,
+      readOnly: !editing,
+      textColor: pendingTitle && !editing
+          ? colorScheme.onSurface.withValues(alpha: 0.45)
+          : null,
+    );
+
     final content = SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _buildFlexibleTitleField(
-            context,
-            fieldController: controller!,
-            readOnly: !editing,
-            onTap: editing ? null : onEnterEdit,
-            textColor: pendingTitle && !editing
-                ? colorScheme.onSurface.withValues(alpha: 0.45)
-                : null,
-          ),
+          // 只读标题不参与命中测试，避免 TextField.onTap 抢走点击导致无法聚焦。
+          if (editing) titleField else IgnorePointer(child: titleField),
           if (!editing) ...[
             if (scheduleLabel != null) ...[
               const SizedBox(height: 8),
