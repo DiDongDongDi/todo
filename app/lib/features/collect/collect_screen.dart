@@ -243,19 +243,21 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
       unawaited(ref.read(transcriptionServiceProvider).processTask(task));
     }
 
-    _controller.clear();
-    _ensureCaretVisible();
-    _attachments.clear();
-    _isDaily = false;
-    _dailyUntil = null;
-    _dueDate = null;
-    _lastUndoTask = task;
+    if (!mounted) return;
 
-    if (mounted) {
-      await _swipeKey.currentState?.resetPosition(enterFromBottom: true);
-      await _requestInputFocus(recycleFocus: true);
-      _showSaveSnackbar();
-    }
+    setState(() {
+      _controller.clear();
+      _attachments.clear();
+      _isDaily = false;
+      _dailyUntil = null;
+      _dueDate = null;
+      _lastUndoTask = task;
+    });
+    _ensureCaretVisible();
+
+    await _swipeKey.currentState?.resetPosition(enterFromBottom: true);
+    await _requestInputFocus(recycleFocus: true);
+    _showSaveSnackbar();
   }
 
   Future<void> _save({bool animated = false}) async {
