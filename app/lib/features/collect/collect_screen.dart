@@ -58,14 +58,11 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
     );
   }
 
-  /// 单击卡片：空卡片假聚焦时强制 recycle，保证第一次点击就有光标。
+  /// 单击卡片空白区：仅在未聚焦时请求焦点；已聚焦时不做任何事，避免键盘回弹。
   void _activateInput() {
+    if (_focusNode.hasFocus) return;
     _ensureCaretVisible();
-    if (!_focusNode.hasFocus) {
-      _focusNode.requestFocus();
-    } else if (_controller.text.isEmpty) {
-      unawaited(_requestInputFocus(recycleFocus: true));
-    }
+    _focusNode.requestFocus();
   }
 
   void _onDragStart() {

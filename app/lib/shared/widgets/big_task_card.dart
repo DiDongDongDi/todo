@@ -268,7 +268,6 @@ class BigTaskCard extends StatelessWidget {
                       autofocus: true,
                       showCursor: true,
                       cursorColor: colorScheme.primary,
-                      onTap: onActivateInput,
                       onChanged: onChanged,
                       expands: true,
                       maxLines: null,
