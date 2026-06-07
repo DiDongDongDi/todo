@@ -59,48 +59,75 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     super.dispose();
   }
 
+  Future<List<Task>> _waitForProcessTask(String taskId) async {
+    for (var i = 0; i < 30; i++) {
+      final tasks = ref.read(processTasksProvider).value;
+      if (tasks != null && tasks.any((t) => t.id == taskId)) {
+        return tasks;
+      }
+      await WidgetsBinding.instance.endOfFrame;
+    }
+    return ref.read(processTasksProvider).value ?? [];
+  }
+
   Future<void> _undo() async {
     final task = _lastUndoTask;
     final from = _lastUndoFrom;
+    final wasDaily = _lastUndoWasDailyCompletion;
     if (task == null || from == null) return;
 
     final enterFromLeft = from == TaskStatus.trashed;
-    final enterFromRight =
-        from == TaskStatus.archived || _lastUndoWasDailyCompletion;
+    final enterFromRight = from == TaskStatus.archived || wasDaily;
     if (!enterFromLeft && !enterFromRight) return;
 
-    final repo = await ref.read(taskRepositoryProvider.future);
-    if (_lastUndoWasDailyCompletion) {
-      await repo.undoDailyCompletion(task.id);
-    } else {
-      await repo.restoreToInbox(task.id);
+    Future<void> restoreAndSwitch() async {
+      final repo = await ref.read(taskRepositoryProvider.future);
+      if (wasDaily) {
+        await repo.undoDailyCompletion(task.id);
+      } else {
+        await repo.restoreToInbox(task.id);
+      }
+
+      final tasks = await _waitForProcessTask(task.id);
+      if (!mounted) return;
+
+      final index = tasks.indexWhere((t) => t.id == task.id);
+      if (index < 0) return;
+
+      _lastUndoTask = null;
+      _lastUndoFrom = null;
+      _lastUndoWasDailyCompletion = false;
+
+      _editFocusNode.unfocus();
+      setState(() {
+        _index = index;
+        _editing = false;
+      });
     }
-    final tasks = ref.read(processTasksProvider).value ?? [];
 
-    _lastUndoTask = null;
-    _lastUndoFrom = null;
-    _lastUndoWasDailyCompletion = false;
-
-    if (!mounted) return;
-
-    final index = tasks.indexWhere((t) => t.id == task.id);
-    if (index < 0) return;
-
-    _editFocusNode.unfocus();
-    setState(() {
-      _index = index;
-      _editing = false;
-    });
-
-    await WidgetsBinding.instance.endOfFrame;
-    if (!mounted) return;
-
-    final state = _swipeKey.currentState;
-    if (state != null) {
-      await state.resetPosition(
+    Future<void> playEnterAnimation() async {
+      await WidgetsBinding.instance.endOfFrame;
+      if (!mounted) return;
+      await _swipeKey.currentState?.resetPosition(
         enterFromLeft: enterFromLeft,
         enterFromRight: enterFromRight,
       );
+    }
+
+    final state = _swipeKey.currentState;
+    if (state != null) {
+      await state.animateFlyout(
+        const Offset(0, 1.5),
+        restoreAndSwitch,
+        resetAfter: false,
+        feedback: () async => AppHaptics.light(),
+      );
+      if (!mounted) return;
+      await playEnterAnimation();
+    } else {
+      await restoreAndSwitch();
+      if (!mounted) return;
+      await playEnterAnimation();
     }
   }
 
