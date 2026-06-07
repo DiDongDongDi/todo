@@ -46,7 +46,11 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
   /// 手势/保存开始前输入法是否打开；用于保存后保持相同状态。
   bool? _keyboardWasOpenBeforeGesture;
 
-  bool _inputReconnecting = false;
+  /// 保存后重建 TextField 的世代号（配合新 FocusNode 重连 IME）。
+  int _collectInputGeneration = 0;
+
+  /// 保存后自动恢复失败时，允许点击再重置一次。
+  bool _caretRefreshPending = false;
 
   static const _switcherDuration = Duration(milliseconds: 200);
 
@@ -61,6 +65,13 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
   }
 
   void _activateInput() {
+    if (_caretRefreshPending) {
+      _caretRefreshPending = false;
+      if (_focusNode.hasFocus) {
+        unawaited(_resetCollectInput(requestFocus: true));
+        return;
+      }
+    }
     _ensureCaretVisible();
     if (!_focusNode.hasFocus) {
       _focusNode.requestFocus();
@@ -71,20 +82,8 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
     _keyboardWasOpenBeforeGesture ??= _focusNode.hasFocus;
   }
 
-  /// 切换 readOnly 一帧，重连 IME 且通常不收起键盘。
-  Future<void> _reconnectInputSoft() async {
-    if (!mounted || _recording) return;
-    setState(() => _inputReconnecting = true);
-    await WidgetsBinding.instance.endOfFrame;
-    if (!mounted) return;
-    setState(() => _inputReconnecting = false);
-    await WidgetsBinding.instance.endOfFrame;
-    if (!mounted) return;
-    _ensureCaretVisible();
-  }
-
-  /// 换新 FocusNode，让 TextField 重新挂载并绑定 IME。
-  Future<void> _swapInputFocusNode() async {
+  /// 换新 FocusNode + 新 TextField，完整重连 IME。
+  Future<void> _resetCollectInput({required bool requestFocus}) async {
     if (!mounted || _recording) return;
 
     final oldNode = _focusNode;
@@ -92,8 +91,10 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
 
     _focusNode = FocusNode();
     _focusNode.addListener(_onInputFocusChange);
+    _collectInputGeneration++;
     setState(() {});
 
+    await WidgetsBinding.instance.endOfFrame;
     await WidgetsBinding.instance.endOfFrame;
     if (!mounted) {
       oldNode.dispose();
@@ -101,10 +102,23 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
     }
 
     _ensureCaretVisible();
-    FocusScope.of(context).requestFocus(_focusNode);
+    if (requestFocus) {
+      FocusScope.of(context).requestFocus(_focusNode);
+    }
 
     await WidgetsBinding.instance.endOfFrame;
     oldNode.dispose();
+    if (!mounted) return;
+    _ensureCaretVisible();
+  }
+
+  Future<void> _finalizeInputFocus() async {
+    if (!mounted || _recording) return;
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) return;
+    _ensureCaretVisible();
+    FocusScope.of(context).requestFocus(_focusNode);
+    await WidgetsBinding.instance.endOfFrame;
     if (!mounted) return;
     _ensureCaretVisible();
   }
@@ -151,21 +165,14 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
     if (!mounted) return;
 
     if (!keepKeyboard) {
+      _caretRefreshPending = false;
       _focusNode.unfocus();
       return;
     }
 
-    await _reconnectInputSoft();
-    if (!mounted) return;
-
-    if (!_focusNode.hasFocus) {
-      FocusScope.of(context).requestFocus(_focusNode);
-      await WidgetsBinding.instance.endOfFrame;
-      if (!mounted) return;
-      _ensureCaretVisible();
-    } else {
-      // 假聚焦：FocusNode 显示已聚焦但 IME 未连接，换新节点重挂 TextField。
-      await _swapInputFocusNode();
+    await _resetCollectInput(requestFocus: true);
+    if (mounted) {
+      _caretRefreshPending = true;
     }
   }
 
@@ -341,14 +348,19 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
     await _swipeKey.currentState?.resetPosition(enterFromBottom: true);
     if (!mounted) return;
 
-    _showSaveSnackbar();
     await _restoreInputAfterSave(
       keepKeyboard: keepKeyboard,
       delay: _switcherDuration,
     );
-    if (keepKeyboard && mounted && !_focusNode.hasFocus) {
-      _ensureCaretVisible();
-      FocusScope.of(context).requestFocus(_focusNode);
+    if (!mounted) return;
+
+    _showSaveSnackbar();
+
+    if (keepKeyboard) {
+      await _finalizeInputFocus();
+      if (mounted) {
+        _caretRefreshPending = true;
+      }
     }
   }
 
@@ -510,11 +522,14 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
               mode: BigTaskCardMode.collect,
               controller: _controller,
               focusNode: _focusNode,
-              inputReadOnly: _inputReconnecting,
+              inputFieldKey: ValueKey('collect-input-$_collectInputGeneration'),
               onActivateInput: _activateInput,
               feedback: _recording ? CollectCardFeedback.listening : _feedback,
               onDismissFeedback: _dismissCardFeedback,
-              onChanged: (_) => setState(() {}),
+              onChanged: (_) {
+                _caretRefreshPending = false;
+                setState(() {});
+              },
               attachments: _attachments,
               onRemoveAttachment: _removeAttachment,
               onPickImage: _pickImage,

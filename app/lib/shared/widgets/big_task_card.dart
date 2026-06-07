@@ -25,7 +25,7 @@ class BigTaskCard extends StatelessWidget {
     this.isListening = false,
     this.onSave,
     this.onActivateInput,
-    this.inputReadOnly = false,
+    this.inputFieldKey,
     this.feedback = CollectCardFeedback.none,
     this.onDismissFeedback,
     this.onTrash,
@@ -53,7 +53,7 @@ class BigTaskCard extends StatelessWidget {
   final bool isListening;
   final VoidCallback? onSave;
   final VoidCallback? onActivateInput;
-  final bool inputReadOnly;
+  final Key? inputFieldKey;
   final CollectCardFeedback feedback;
   final VoidCallback? onDismissFeedback;
   final VoidCallback? onTrash;
@@ -269,11 +269,12 @@ class BigTaskCard extends StatelessWidget {
                         ? 0
                         : 1,
                     child: TextField(
+                      key: inputFieldKey,
                       controller: controller,
                       focusNode: focusNode,
-                      readOnly: inputReadOnly,
                       autofocus: true,
                       showCursor: true,
+                      cursorColor: colorScheme.primary,
                       onTap: onActivateInput,
                       onChanged: onChanged,
                       expands: true,
