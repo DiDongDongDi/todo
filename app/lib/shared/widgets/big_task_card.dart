@@ -6,6 +6,7 @@ import 'package:todo_app/shared/utils/audio_storage.dart';
 import 'package:todo_app/shared/widgets/attachment_image.dart';
 import 'package:todo_app/shared/widgets/audio_preview.dart';
 import 'package:todo_app/shared/widgets/image_preview.dart';
+import 'package:todo_app/shared/widgets/task_card_footer.dart';
 enum BigTaskCardMode { collect, process, readOnly }
 
 enum CollectCardFeedback { none, emptyHint, listening }
@@ -38,6 +39,7 @@ class BigTaskCard extends StatelessWidget {
     this.completeLabel = '完成',
     this.scheduleEditor,
     this.onCancelEdit,
+    this.showFooter = true,
   });
 
   final BigTaskCardMode mode;
@@ -65,6 +67,7 @@ class BigTaskCard extends StatelessWidget {
   final String completeLabel;
   final Widget? scheduleEditor;
   final VoidCallback? onCancelEdit;
+  final bool showFooter;
 
   @override
   Widget build(BuildContext context) {
@@ -87,88 +90,25 @@ class BigTaskCard extends StatelessWidget {
               Expanded(
                 child: _buildContentArea(context),
               ),
-              if (mode == BigTaskCardMode.collect) ...[
-                if (scheduleEditor != null) ...[
-                  const SizedBox(height: 8),
-                  scheduleEditor!,
-                ],
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    IconButton.filledTonal(
-                      onPressed: onPickImage,
-                      icon: const Icon(Icons.image_outlined),
-                      tooltip: '添加图片',
-                    ),
-                    const SizedBox(width: 8),
-                    IconButton.filledTonal(
-                      onPressed: onStartSpeech,
-                      icon: Icon(isListening ? Icons.stop : Icons.mic_none_outlined),
-                      tooltip: isListening ? '停止录音' : '录音',
-                      style: IconButton.styleFrom(
-                        backgroundColor: isListening
-                            ? colorScheme.errorContainer
-                            : null,
-                      ),
-                    ),
-                    const Spacer(),
-                    Focus(
-                      canRequestFocus: false,
-                      child: FilledButton.icon(
-                        onPressed: () {
-                          final keepKeyboard = focusNode?.hasFocus ?? false;
-                          onSave?.call();
-                          if (keepKeyboard &&
-                              focusNode != null &&
-                              !focusNode!.hasFocus) {
-                            focusNode!.requestFocus();
-                          }
-                        },
-                        icon: const Icon(Icons.check, size: 20),
-                        label: const Text('保存'),
-                      ),
-                    ),
-                  ],
-                ),
-              ] else if (mode == BigTaskCardMode.process) ...[
-                const SizedBox(height: 12),
-                if (scheduleEditor != null) scheduleEditor!,
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    IconButton.filledTonal(
-                      onPressed: onPickImage,
-                      icon: const Icon(Icons.image_outlined),
-                      tooltip: '添加图片',
-                      visualDensity: VisualDensity.compact,
-                    ),
-                    const SizedBox(width: 8),
-                    IconButton.filledTonal(
-                      onPressed: onStartSpeech,
-                      icon: Icon(
-                        isListening ? Icons.stop : Icons.mic_none_outlined,
-                      ),
-                      tooltip: isListening ? '停止录音' : '录音',
-                      visualDensity: VisualDensity.compact,
-                      style: IconButton.styleFrom(
-                        backgroundColor: isListening
-                            ? colorScheme.errorContainer
-                            : null,
-                      ),
-                    ),
-                    const Spacer(),
-                    TextButton(
-                      onPressed: onCancelEdit,
-                      child: const Text('取消'),
-                    ),
-                    const SizedBox(width: 8),
-                    FilledButton(
-                      onPressed: onSave,
-                      child: const Text('保存'),
-                    ),
-                  ],
-                ),
-              ] else if (mode == BigTaskCardMode.readOnly && task != null) ...[
+              if (showFooter && mode == BigTaskCardMode.collect)
+                TaskCardCollectFooter(
+                  scheduleEditor: scheduleEditor,
+                  onPickImage: onPickImage,
+                  onStartSpeech: onStartSpeech,
+                  isListening: isListening,
+                  onSave: onSave,
+                  focusNode: focusNode,
+                )
+              else if (showFooter && mode == BigTaskCardMode.process)
+                TaskCardProcessFooter(
+                  scheduleEditor: scheduleEditor,
+                  onPickImage: onPickImage,
+                  onStartSpeech: onStartSpeech,
+                  isListening: isListening,
+                  onSave: onSave,
+                  onCancelEdit: onCancelEdit,
+                )
+              else if (mode == BigTaskCardMode.readOnly && task != null) ...[
                 const SizedBox(height: 16),
                 Row(
                   children: [
@@ -248,61 +188,68 @@ class BigTaskCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Expanded(
-            // expands 空态时 TextField 命中区常小于视觉区域；用 Listener（非
-            // GestureDetector）在首次 pointerDown 即聚焦，避免与 TextField 手势冲突。
-            // 仅包裹文本区，附件缩略图不在其内，避免点图预览时唤起键盘。
-            child: Listener(
-              behavior: HitTestBehavior.translucent,
-              onPointerDown: (_) => onActivateInput?.call(),
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  Opacity(
-                    opacity: feedback == CollectCardFeedback.emptyHint ||
-                            feedback == CollectCardFeedback.listening
-                        ? 0
-                        : 1,
-                    child: TextField(
-                      controller: controller,
-                      focusNode: focusNode,
-                      autofocus: true,
-                      showCursor: true,
-                      cursorColor: colorScheme.primary,
-                      onTap: onActivateInput,
-                      onChanged: onChanged,
-                      expands: true,
-                      maxLines: null,
-                      scrollPhysics: const NeverScrollableScrollPhysics(),
-                      textAlignVertical: TextAlignVertical.top,
-                      style: theme.textTheme.headlineMedium?.copyWith(
-                        color: colorScheme.onSurface,
-                        height: 1.35,
-                      ),
-                      decoration: const InputDecoration(
-                        hintText: '记下一件事…',
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return SingleChildScrollView(
+                  child: ConstrainedBox(
+                    constraints:
+                        BoxConstraints(minHeight: constraints.maxHeight),
+                    child: Listener(
+                      behavior: HitTestBehavior.translucent,
+                      onPointerDown: (_) => onActivateInput?.call(),
+                      child: Stack(
+                        children: [
+                          Opacity(
+                            opacity: feedback ==
+                                        CollectCardFeedback.emptyHint ||
+                                    feedback == CollectCardFeedback.listening
+                                ? 0
+                                : 1,
+                            child: TextField(
+                              controller: controller,
+                              focusNode: focusNode,
+                              autofocus: true,
+                              showCursor: true,
+                              cursorColor: colorScheme.primary,
+                              onTap: onActivateInput,
+                              onChanged: onChanged,
+                              maxLines: null,
+                              minLines: 1,
+                              keyboardType: TextInputType.multiline,
+                              textAlignVertical: TextAlignVertical.top,
+                              style: theme.textTheme.headlineMedium?.copyWith(
+                                color: colorScheme.onSurface,
+                                height: 1.35,
+                              ),
+                              decoration: const InputDecoration(
+                                hintText: '记下一件事…',
+                              ),
+                            ),
+                          ),
+                          if (feedback == CollectCardFeedback.emptyHint)
+                            Positioned.fill(
+                              child: GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onTap: onDismissFeedback,
+                                child: _buildCollectCenterHint(
+                                  context,
+                                  _feedbackMessage(feedback),
+                                ),
+                              ),
+                            ),
+                          if (feedback == CollectCardFeedback.listening)
+                            Positioned.fill(
+                              child: _buildCollectCenterHint(
+                                context,
+                                _feedbackMessage(feedback),
+                              ),
+                            ),
+                        ],
                       ),
                     ),
                   ),
-                  if (feedback == CollectCardFeedback.emptyHint)
-                    Positioned.fill(
-                      child: GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onTap: onDismissFeedback,
-                        child: _buildCollectCenterHint(
-                          context,
-                          _feedbackMessage(feedback),
-                        ),
-                      ),
-                    ),
-                  if (feedback == CollectCardFeedback.listening)
-                    Positioned.fill(
-                      child: _buildCollectCenterHint(
-                        context,
-                        _feedbackMessage(feedback),
-                      ),
-                    ),
-                ],
-              ),
+                );
+              },
             ),
           ),
           if (attachments.isNotEmpty) ...[
@@ -350,22 +297,34 @@ class BigTaskCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Expanded(
-            child: GestureDetector(
-              behavior: HitTestBehavior.translucent,
-              onTap: () => focusNode?.requestFocus(),
-              child: TextField(
-                controller: controller,
-                focusNode: focusNode,
-                onChanged: onChanged,
-                expands: true,
-                maxLines: null,
-                textAlignVertical: TextAlignVertical.top,
-                style: theme.textTheme.headlineMedium?.copyWith(
-                  color: colorScheme.onSurface,
-                  height: 1.35,
-                ),
-                decoration: const InputDecoration(border: InputBorder.none),
-              ),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return SingleChildScrollView(
+                  child: ConstrainedBox(
+                    constraints:
+                        BoxConstraints(minHeight: constraints.maxHeight),
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.translucent,
+                      onTap: () => focusNode?.requestFocus(),
+                      child: TextField(
+                        controller: controller,
+                        focusNode: focusNode,
+                        onChanged: onChanged,
+                        maxLines: null,
+                        minLines: 1,
+                        keyboardType: TextInputType.multiline,
+                        textAlignVertical: TextAlignVertical.top,
+                        style: theme.textTheme.headlineMedium?.copyWith(
+                          color: colorScheme.onSurface,
+                          height: 1.35,
+                        ),
+                        decoration:
+                            const InputDecoration(border: InputBorder.none),
+                      ),
+                    ),
+                  ),
+                );
+              },
             ),
           ),
           if (attachments.isNotEmpty) ...[

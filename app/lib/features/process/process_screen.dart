@@ -25,6 +25,7 @@ import 'package:todo_app/shared/widgets/big_task_card.dart';
 import 'package:todo_app/shared/widgets/card_stage.dart';
 import 'package:todo_app/shared/widgets/progress_widgets.dart';
 import 'package:todo_app/shared/widgets/swipeable_card.dart';
+import 'package:todo_app/shared/widgets/task_card_footer.dart';
 import 'package:todo_app/shared/widgets/task_schedule_editor.dart';
 
 class ProcessScreen extends ConsumerStatefulWidget {
@@ -132,6 +133,17 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     }
   }
 
+  Widget _buildEditScheduleEditor() {
+    return TaskScheduleEditor(
+      isDaily: _editIsDaily,
+      dailyUntil: _editDailyUntil,
+      dueDate: _editDueDate,
+      onDailyChanged: (value) => setState(() => _editIsDaily = value),
+      onDailyUntilChanged: (value) => setState(() => _editDailyUntil = value),
+      onDueDateChanged: (value) => setState(() => _editDueDate = value),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final tasksAsync = ref.watch(processTasksProvider);
@@ -200,7 +212,16 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
                     _setIndex(clampedIndex + 1, tasks.length, animated: true),
               };
 
-        final content = Column(
+        final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+        final keyboardVisible = _editing && bottomInset > 0;
+        final editScheduleEditor =
+            _editing ? _buildEditScheduleEditor() : null;
+
+        final content = AnimatedPadding(
+          duration: const Duration(milliseconds: 50),
+          curve: Curves.easeOut,
+          padding: EdgeInsets.only(bottom: _editing ? bottomInset : 0),
+          child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
@@ -275,7 +296,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
                     task: task,
                     controller: _editing ? _editController : null,
                     focusNode: _editing ? _editFocusNode : null,
-                    onChanged: _editing ? (_) => setState(() {}) : null,
+                    onChanged: _editing ? (_) {} : null,
                     attachments: _editing ? _editAttachments : const [],
                     onRemoveAttachment:
                         _editing ? _removeEditAttachment : null,
@@ -286,19 +307,9 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
                     onSave: _editing ? () => _saveEdit(task) : null,
                     onCancelEdit:
                         _editing ? () => setState(() => _editing = false) : null,
-                    scheduleEditor: _editing
-                        ? TaskScheduleEditor(
-                            isDaily: _editIsDaily,
-                            dailyUntil: _editDailyUntil,
-                            dueDate: _editDueDate,
-                            onDailyChanged: (value) =>
-                                setState(() => _editIsDaily = value),
-                            onDailyUntilChanged: (value) =>
-                                setState(() => _editDailyUntil = value),
-                            onDueDateChanged: (value) =>
-                                setState(() => _editDueDate = value),
-                          )
-                        : null,
+                    showFooter: _editing && !keyboardVisible,
+                    scheduleEditor:
+                        _editing && !keyboardVisible ? editScheduleEditor : null,
                     onTrash: () => _trash(task, animated: true),
                     onComplete: () => _archive(task, animated: true),
                     onPrevious: () => _setIndex(
@@ -322,8 +333,21 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
                 ),
               ),
             ),
+            if (keyboardVisible)
+              TaskCardKeyboardToolbar(
+                child: TaskCardProcessFooter(
+                  compact: true,
+                  scheduleEditor: editScheduleEditor,
+                  onPickImage: _pickEditImage,
+                  onStartSpeech: kIsWeb ? null : _toggleEditRecording,
+                  isListening: _editRecording,
+                  onSave: () => _saveEdit(task),
+                  onCancelEdit: () => setState(() => _editing = false),
+                ),
+              ),
             if (progress >= 1 && tasks.isNotEmpty) const SizedBox(height: 4),
           ],
+        ),
         );
 
         if (kIsWeb) return content;
