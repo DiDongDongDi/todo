@@ -4,6 +4,7 @@ import 'package:todo_app/core/auth/auth_service.dart';
 import 'package:todo_app/core/sync/sync_engine.dart';
 import 'package:todo_app/router/app_router.dart';
 import 'package:todo_app/shared/theme/app_theme.dart';
+import 'package:todo_app/shared/widgets/haptic_tap_scope.dart';
 
 class TodoApp extends ConsumerStatefulWidget {
   const TodoApp({super.key});
@@ -50,8 +51,10 @@ class _TodoAppState extends ConsumerState<TodoApp> {
       routerConfig: router,
       builder: (context, child) {
         // Web 上 go_router 页面有时拿不到满屏约束，强制撑满视口。
-        return SizedBox.expand(
-          child: child ?? const SizedBox.shrink(),
+        return HapticTapScope(
+          child: SizedBox.expand(
+            child: child ?? const SizedBox.shrink(),
+          ),
         );
       },
     );

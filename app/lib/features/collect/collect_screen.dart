@@ -404,7 +404,6 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
           ),
         );
       });
-      await AppHaptics.light();
       return;
     }
 
@@ -425,7 +424,6 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
       await _audioRecorder.start();
       if (!mounted) return;
       setState(() => _recording = true);
-      await AppHaptics.light();
     } catch (e) {
       debugPrint('Recording start failed: $e');
       if (!mounted) return;

@@ -528,7 +528,6 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
           ),
         );
       });
-      await AppHaptics.light();
       return;
     }
 
@@ -549,7 +548,6 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
       await _editAudioRecorder.start();
       if (!mounted) return;
       setState(() => _editRecording = true);
-      await AppHaptics.light();
     } catch (e) {
       debugPrint('Recording start failed: $e');
       if (!mounted) return;
