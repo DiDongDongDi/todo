@@ -11,8 +11,12 @@
 
 ## 1. 注册 Groq（默认供应商）
 
-1. 打开 [console.groq.com](https://console.groq.com) 注册
-2. 创建 API Key
+> **国内直连常见问题：** 浏览器打开 [console.groq.com](https://console.groq.com) 可能返回 `{"error":{"message":"Forbidden"}}`，属于 Groq 对部分地区或 IP 的拦截，并非账号或项目错误。
+
+### 1a. 仍想用 Groq 时
+
+1. 使用 **VPN / 系统代理** 后再打开控制台（本机代理示例：`http://127.0.0.1:12369`，以你实际可用的为准）
+2. 注册并创建 API Key（格式通常以 `gsk_` 开头）
 3. 在 Supabase Dashboard → **Project Settings → Edge Functions → Secrets** 添加：
 
 ```
@@ -25,6 +29,23 @@ STT_PROVIDER=groq
 ```
 GROQ_WHISPER_MODEL=whisper-large-v3
 ```
+
+**说明：** 即使你在国内无法打开 Groq 控制台，只要 Supabase Edge Function 所在区域能访问 Groq API，部署后转写仍可能正常工作；但 **API Key 必须先通过能访问控制台的方式创建**。
+
+### 1b. 无法访问 Groq 时的替代（推荐国内用户）
+
+不必强求 Groq，改用 **OpenAI Whisper**（若你有 OpenAI 账号与 Key）：
+
+在 Supabase Secrets 中设置：
+
+```
+STT_PROVIDER=openai
+OPENAI_API_KEY=sk-...
+```
+
+OpenAI 平台：[platform.openai.com](https://platform.openai.com)（同样可能需要代理注册；Key 仅保存在 Supabase，不进 App）。
+
+若 Groq / OpenAI 均不可用，见下文 [§7 国内网络与 Plan B](#7-国内网络与-plan-b)。
 
 ## 2. 部署 Edge Function
 
@@ -69,6 +90,12 @@ OPENAI_API_KEY=sk-...
 
 Groq Whisper：短语音（10–30 秒）在免费额度内通常足够个人使用。
 
-## 7. 国内网络
+## 7. 国内网络与 Plan B
 
-若 Groq/OpenAI 在 Edge Function 所在区域不可达，可将 `STT_PROVIDER` 换为自建网关或后续接入火山/阿里 ASR（在 Edge Function 内扩展 `STTProvider` 即可，客户端无需改动）。
+| 现象 | 原因 | 建议 |
+|------|------|------|
+| `console.groq.com` 返回 `Forbidden` | Groq 控制台地域/WAF 限制 | 代理后注册，或改用 OpenAI（§1b） |
+| Edge Function 日志里 Groq 请求失败 | Supabase 机房访问 Groq 不稳定 | Secrets 改为 `STT_PROVIDER=openai` |
+| 控制台与 API 均不可达 | 无可用海外 STT | 在 Edge Function 内扩展国内 ASR（火山/阿里等），客户端无需改 |
+
+国内 ASR 接入需在 [`supabase/functions/transcribe/index.ts`](../supabase/functions/transcribe/index.ts) 增加对应 `STTProvider`；当前仓库已预留 `STT_PROVIDER` 切换，**App 端录音与 pending 流程不变**。
