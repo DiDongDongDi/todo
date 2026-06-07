@@ -57,10 +57,7 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
   }
 
   void _activateInput() {
-    _ensureCaretVisible();
-    if (!_focusNode.hasFocus) {
-      _focusNode.requestFocus();
-    }
+    unawaited(_requestInputFocus(recycleFocus: _focusNode.hasFocus));
   }
 
   Future<void> _requestInputFocus({
@@ -75,14 +72,17 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
     await WidgetsBinding.instance.endOfFrame;
     if (!mounted) return;
 
-    if (recycleFocus && _focusNode.hasFocus) {
+    // 拖拽/动画后 IME 可能处于半连接状态；始终先 unfocus 再 requestFocus。
+    if (recycleFocus) {
       _focusNode.unfocus();
       await WidgetsBinding.instance.endOfFrame;
       if (!mounted) return;
     }
 
     _ensureCaretVisible();
-    _focusNode.requestFocus();
+    if (mounted) {
+      FocusScope.of(context).requestFocus(_focusNode);
+    }
 
     await WidgetsBinding.instance.endOfFrame;
     if (!mounted) return;
@@ -256,8 +256,16 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
     _ensureCaretVisible();
 
     await _swipeKey.currentState?.resetPosition(enterFromBottom: true);
-    await _requestInputFocus(recycleFocus: true);
+    if (!mounted) return;
+
     _showSaveSnackbar();
+    await _requestInputFocus(
+      delay: _switcherDuration,
+      recycleFocus: true,
+    );
+    if (!mounted) return;
+    // SnackBar 插入常会抢走焦点，补一次聚焦。
+    await _requestInputFocus(recycleFocus: true);
   }
 
   Future<void> _save({bool animated = false}) async {
