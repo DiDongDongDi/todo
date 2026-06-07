@@ -13,25 +13,19 @@ class ShellScreen extends StatefulWidget {
 class _ShellScreenState extends State<ShellScreen> {
   int _index = 0;
 
-  Widget _buildTab(int index) {
-    switch (index) {
-      case 0:
-        return const CollectScreen(key: ValueKey('collect'));
-      case 1:
-        return const ProcessScreen(key: ValueKey('process'));
-      case 2:
-        return const SettingsScreen(key: ValueKey('settings'));
-      default:
-        return const SizedBox.shrink();
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
         bottom: false,
-        child: _buildTab(_index),
+        child: IndexedStack(
+          index: _index,
+          children: const [
+            CollectScreen(key: ValueKey('collect')),
+            ProcessScreen(key: ValueKey('process')),
+            SettingsScreen(key: ValueKey('settings')),
+          ],
+        ),
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,

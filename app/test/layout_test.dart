@@ -20,6 +20,29 @@ void main() {
     expect(find.byType(TextField), findsOneWidget);
   });
 
+  testWidgets('Collect tab preserves draft when switching tabs',
+      (WidgetTester tester) async {
+    await tester.binding.setSurfaceSize(const Size(800, 600));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(const ProviderScope(child: TodoApp()));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 800));
+
+    await tester.enterText(find.byType(TextField), '未保存的草稿');
+    await tester.pump();
+
+    await tester.tap(find.byIcon(Icons.swipe_outlined));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    await tester.tap(find.byIcon(Icons.add_circle_outline));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('未保存的草稿'), findsOneWidget);
+  });
+
   testWidgets('Process tab shows content', (WidgetTester tester) async {
     await tester.binding.setSurfaceSize(const Size(800, 600));
     addTearDown(() => tester.binding.setSurfaceSize(null));
