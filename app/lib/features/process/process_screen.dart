@@ -48,9 +48,9 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
   final _swipeKey = GlobalKey<SwipeableCardState>();
   Task? _lastUndoTask;
   TaskStatus? _lastUndoFrom;
-  bool _lastUndoWasDailyCompletion = false;
+  bool _lastUndoWasPeriodCompletion = false;
 
-  bool _editIsDaily = false;
+  TaskRecurrence _editRecurrence = TaskRecurrence.none;
   DateTime? _editDailyUntil;
   DateTime? _editDueDate;
   final List<TaskAttachment> _editAttachments = [];
@@ -166,16 +166,16 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
   Future<void> _undo() async {
     final task = _lastUndoTask;
     final from = _lastUndoFrom;
-    final wasDaily = _lastUndoWasDailyCompletion;
+    final wasPeriod = _lastUndoWasPeriodCompletion;
     if (task == null || from == null) return;
 
     final enterFromLeft = from == TaskStatus.trashed;
-    final enterFromRight = from == TaskStatus.archived || wasDaily;
+    final enterFromRight = from == TaskStatus.archived || wasPeriod;
     if (!enterFromLeft && !enterFromRight) return;
 
     Future<void> restoreAndSwitch() async {
       final repo = await ref.read(taskRepositoryProvider.future);
-      if (wasDaily) {
+      if (wasPeriod) {
         await repo.undoDailyCompletion(task.id);
       } else {
         await repo.restoreToInbox(task.id);
@@ -189,7 +189,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
 
       _lastUndoTask = null;
       _lastUndoFrom = null;
-      _lastUndoWasDailyCompletion = false;
+      _lastUndoWasPeriodCompletion = false;
 
       _editFocusNode.unfocus();
       setState(() {
@@ -381,11 +381,11 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
                   onCancelEdit: _editUiVisible ? () => _exitEditMode(task) : null,
                   scheduleEditor: _editUiVisible
                       ? TaskScheduleEditor(
-                          isDaily: _editIsDaily,
+                          recurrence: _editRecurrence,
                           dailyUntil: _editDailyUntil,
                           dueDate: _editDueDate,
-                          onDailyChanged: (value) =>
-                              setState(() => _editIsDaily = value),
+                          onRecurrenceChanged: (value) =>
+                              setState(() => _editRecurrence = value),
                           onDailyUntilChanged: (value) =>
                               setState(() => _editDailyUntil = value),
                           onDueDateChanged: (value) =>
@@ -412,7 +412,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
                       ? () => _retryTranscription(task)
                       : null,
                   scheduleLabel: scheduleLabel(task),
-                  completeLabel: task.isDaily ? '今日完成' : '完成',
+                  completeLabel: completeLabelFor(task),
                   parentTitle: parentTitle,
                   onTapParent: task.parentId != null
                       ? () => context.push('/task/${task.parentId}')
@@ -519,7 +519,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
       _editing = false;
     }
     _editController.text = task.title;
-    _editIsDaily = task.isDaily;
+    _editRecurrence = task.recurrence;
     _editDailyUntil = task.dailyUntil;
     _editDueDate = task.dueDate;
     _editAttachments
@@ -564,11 +564,13 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
         title: _editController.text.trim(),
         attachments: List.from(_editAttachments),
         transcriptionStatus: transcriptionStatus,
-        isDaily: _editIsDaily,
+        recurrence: _editRecurrence,
         dailyUntil: _editDailyUntil,
-        dueDate: _editIsDaily ? null : _editDueDate,
-        clearDailyUntil: _editIsDaily && _editDailyUntil == null,
-        clearDueDate: _editIsDaily || _editDueDate == null,
+        dueDate: _editRecurrence == TaskRecurrence.daily ? null : _editDueDate,
+        clearDailyUntil:
+            _editRecurrence == TaskRecurrence.daily && _editDailyUntil == null,
+        clearDueDate:
+            _editRecurrence == TaskRecurrence.daily || _editDueDate == null,
       ),
     );
 
@@ -687,19 +689,19 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
 
   Future<void> _performArchive(Task task) async {
     final repo = await ref.read(taskRepositoryProvider.future);
-    final isDaily = task.isDaily;
+    final recurring = isRecurring(task);
 
-    if (isDaily) {
-      await repo.completeDailyToday(task.id);
+    if (recurring) {
+      await repo.completeRecurringPeriod(task.id);
     } else {
       await repo.archive(task.id);
     }
 
     _lastUndoTask = task;
-    _lastUndoFrom = isDaily ? TaskStatus.inbox : TaskStatus.archived;
-    _lastUndoWasDailyCompletion = isDaily;
+    _lastUndoFrom = recurring ? TaskStatus.inbox : TaskStatus.archived;
+    _lastUndoWasPeriodCompletion = recurring;
     _showUndoSnackbar(
-      message: isDaily ? '今日已完成' : '已完成',
+      message: completeSnackbarFor(task),
       icon: Icons.check_circle_outline,
       type: AppSnackType.success,
     );

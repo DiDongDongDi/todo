@@ -63,7 +63,7 @@ class TaskRepository {
     String? note,
     List<TaskAttachment> attachments = const [],
     TranscriptionStatus transcriptionStatus = TranscriptionStatus.none,
-    bool isDaily = false,
+    TaskRecurrence recurrence = TaskRecurrence.none,
     DateTime? dailyUntil,
     DateTime? dueDate,
     String? parentId,
@@ -80,9 +80,9 @@ class TaskRepository {
       createdAt: now,
       updatedAt: now,
       syncVersion: 1,
-      isDaily: isDaily,
-      dailyUntil: dailyUntil,
-      dueDate: isDaily ? null : dueDate,
+      recurrence: recurrence,
+      dailyUntil: recurrence == TaskRecurrence.daily ? dailyUntil : null,
+      dueDate: recurrence == TaskRecurrence.daily ? null : dueDate,
       parentId: parentId,
     );
     await _store.upsert(task);
@@ -95,7 +95,7 @@ class TaskRepository {
     String? note,
     List<TaskAttachment> attachments = const [],
     TranscriptionStatus transcriptionStatus = TranscriptionStatus.none,
-    bool isDaily = false,
+    TaskRecurrence recurrence = TaskRecurrence.none,
     DateTime? dailyUntil,
     DateTime? dueDate,
   }) async {
@@ -108,7 +108,7 @@ class TaskRepository {
       note: note,
       attachments: attachments,
       transcriptionStatus: transcriptionStatus,
-      isDaily: isDaily,
+      recurrence: recurrence,
       dailyUntil: dailyUntil,
       dueDate: dueDate,
       parentId: parentId,
@@ -146,7 +146,7 @@ class TaskRepository {
     return updated;
   }
 
-  Future<Task> completeDailyToday(String id) async {
+  Future<Task> completeRecurringPeriod(String id) async {
     final task = await _require(id);
     final nowLocal = DateTime.now();
     final todayLocal = DateTime(nowLocal.year, nowLocal.month, nowLocal.day);
@@ -159,6 +159,8 @@ class TaskRepository {
     await _store.upsert(updated);
     return updated;
   }
+
+  Future<Task> completeDailyToday(String id) => completeRecurringPeriod(id);
 
   Future<Task> undoDailyCompletion(String id) async {
     final task = await _require(id);

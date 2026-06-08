@@ -3,7 +3,7 @@ import 'package:todo_app/core/models/task.dart';
 import 'package:todo_app/core/models/task_schedule.dart';
 
 Task _task({
-  bool isDaily = false,
+  TaskRecurrence recurrence = TaskRecurrence.none,
   DateTime? dailyUntil,
   DateTime? lastDailyCompletedAt,
   DateTime? dueDate,
@@ -15,7 +15,7 @@ Task _task({
     status: status,
     createdAt: DateTime(2025, 1, 1),
     updatedAt: DateTime(2025, 1, 1),
-    isDaily: isDaily,
+    recurrence: recurrence,
     dailyUntil: dailyUntil,
     lastDailyCompletedAt: lastDailyCompletedAt,
     dueDate: dueDate,
@@ -29,23 +29,23 @@ void main() {
 
   group('daily tasks', () {
     test('active daily task is due today', () {
-      final task = _task(isDaily: true);
+      final task = _task(recurrence: TaskRecurrence.daily);
       expect(isDueToday(task, today), isTrue);
     });
 
     test('expired daily task is not due', () {
-      final task = _task(isDaily: true, dailyUntil: yesterday);
+      final task = _task(recurrence: TaskRecurrence.daily, dailyUntil: yesterday);
       expect(isDueToday(task, today), isFalse);
     });
 
     test('daily task on expiry day is still due', () {
-      final task = _task(isDaily: true, dailyUntil: today);
+      final task = _task(recurrence: TaskRecurrence.daily, dailyUntil: today);
       expect(isDueToday(task, today), isTrue);
     });
 
     test('daily task completed today is not due', () {
       final task = _task(
-        isDaily: true,
+        recurrence: TaskRecurrence.daily,
         lastDailyCompletedAt: DateTime(2026, 6, 7, 10),
       );
       expect(isDueToday(task, today), isFalse);
@@ -53,7 +53,7 @@ void main() {
 
     test('daily task completed yesterday reappears today', () {
       final task = _task(
-        isDaily: true,
+        recurrence: TaskRecurrence.daily,
         lastDailyCompletedAt: DateTime(2026, 6, 6, 22),
       );
       expect(isDueToday(task, today), isTrue);
@@ -68,7 +68,10 @@ void main() {
         localDay.day,
         2,
       );
-      final task = _task(isDaily: true, lastDailyCompletedAt: utcStored);
+      final task = _task(
+        recurrence: TaskRecurrence.daily,
+        lastDailyCompletedAt: utcStored,
+      );
       expect(isDueToday(task, today), isFalse);
       expect(
         shouldShowInProcess(task, todayOnly: false, now: today),
@@ -84,13 +87,16 @@ void main() {
         localDay.month,
         localDay.day,
       ).add(const Duration(days: 1));
-      final task = _task(isDaily: true, lastDailyCompletedAt: utcStored);
+      final task = _task(
+        recurrence: TaskRecurrence.daily,
+        lastDailyCompletedAt: utcStored,
+      );
       expect(isDueToday(task, nextLocalDay), isTrue);
     });
 
     test('date-only completion hides task for that day', () {
       final task = _task(
-        isDaily: true,
+        recurrence: TaskRecurrence.daily,
         lastDailyCompletedAt: DateTime(2026, 6, 7),
       );
       expect(
@@ -107,6 +113,108 @@ void main() {
           todayOnly: false,
           now: DateTime(2026, 6, 8, 8),
         ),
+        isTrue,
+      );
+    });
+  });
+
+  group('monthly tasks', () {
+    test('before anchor day is not due', () {
+      final task = _task(
+        recurrence: TaskRecurrence.monthly,
+        dueDate: DateTime(2026, 1, 15),
+      );
+      expect(isDueToday(task, today), isFalse);
+    });
+
+    test('on anchor day is due', () {
+      final task = _task(
+        recurrence: TaskRecurrence.monthly,
+        dueDate: DateTime(2026, 1, 15),
+      );
+      expect(isDueToday(task, DateTime(2026, 6, 15)), isTrue);
+    });
+
+    test('after anchor day is due', () {
+      final task = _task(
+        recurrence: TaskRecurrence.monthly,
+        dueDate: DateTime(2026, 1, 15),
+      );
+      expect(isDueToday(task, DateTime(2026, 6, 20)), isTrue);
+    });
+
+    test('completed this month is hidden', () {
+      final task = _task(
+        recurrence: TaskRecurrence.monthly,
+        dueDate: DateTime(2026, 1, 15),
+        lastDailyCompletedAt: DateTime(2026, 6, 16),
+      );
+      expect(
+        shouldShowInProcess(task, todayOnly: false, now: DateTime(2026, 6, 20)),
+        isFalse,
+      );
+    });
+
+    test('reappears next month', () {
+      final task = _task(
+        recurrence: TaskRecurrence.monthly,
+        dueDate: DateTime(2026, 1, 15),
+        lastDailyCompletedAt: DateTime(2026, 6, 16),
+      );
+      expect(
+        shouldShowInProcess(task, todayOnly: false, now: DateTime(2026, 7, 15)),
+        isTrue,
+      );
+    });
+
+    test('anchor day 31 clamps in February', () {
+      final task = _task(
+        recurrence: TaskRecurrence.monthly,
+        dueDate: DateTime(2026, 1, 31),
+      );
+      expect(periodDueDate(task, DateTime(2026, 2, 1)), DateTime(2026, 2, 28));
+      expect(isDueToday(task, DateTime(2026, 2, 28)), isTrue);
+      expect(isDueToday(task, DateTime(2026, 2, 27)), isFalse);
+    });
+  });
+
+  group('yearly tasks', () {
+    test('before anchor date is not due', () {
+      final task = _task(
+        recurrence: TaskRecurrence.yearly,
+        dueDate: DateTime(2020, 6, 9),
+      );
+      expect(isDueToday(task, today), isFalse);
+    });
+
+    test('on anchor date is due', () {
+      final task = _task(
+        recurrence: TaskRecurrence.yearly,
+        dueDate: DateTime(2020, 6, 9),
+      );
+      expect(isDueToday(task, DateTime(2026, 6, 9)), isTrue);
+    });
+
+    test('completed this year is hidden', () {
+      final task = _task(
+        recurrence: TaskRecurrence.yearly,
+        dueDate: DateTime(2020, 6, 9),
+        lastDailyCompletedAt: DateTime(2026, 6, 9),
+      );
+      expect(
+        shouldShowInProcess(task, todayOnly: false, now: DateTime(2026, 6, 10)),
+        isFalse,
+      );
+    });
+
+    test('reappears next year', () {
+      final task = _task(
+        recurrence: TaskRecurrence.yearly,
+        dueDate: DateTime(2020, 6, 9),
+        lastDailyCompletedAt: DateTime(2026, 6, 9),
+      );
+      expect(
+        shouldShowInProcess(task, todayOnly: false, now: DateTime(2027, 6, 9)),
         isTrue,
       );
     });
@@ -129,7 +237,7 @@ void main() {
   group('shouldShowInProcess', () {
     test('hides daily completed today in default mode', () {
       final task = _task(
-        isDaily: true,
+        recurrence: TaskRecurrence.daily,
         lastDailyCompletedAt: DateTime(2026, 6, 7, 8),
       );
       expect(
@@ -154,7 +262,11 @@ void main() {
 
     test('todayOnly shows daily and due today', () {
       expect(
-        shouldShowInProcess(_task(isDaily: true), todayOnly: true, now: today),
+        shouldShowInProcess(
+          _task(recurrence: TaskRecurrence.daily),
+          todayOnly: true,
+          now: today,
+        ),
         isTrue,
       );
       expect(
@@ -177,7 +289,7 @@ void main() {
     test('hides expired daily in default mode', () {
       expect(
         shouldShowInProcess(
-          _task(isDaily: true, dailyUntil: yesterday),
+          _task(recurrence: TaskRecurrence.daily, dailyUntil: yesterday),
           todayOnly: false,
           now: today,
         ),
@@ -188,13 +300,19 @@ void main() {
 
   group('scheduleLabel', () {
     test('daily without expiry', () {
-      expect(scheduleLabel(_task(isDaily: true), now: today), '每日');
+      expect(
+        scheduleLabel(_task(recurrence: TaskRecurrence.daily), now: today),
+        '每日',
+      );
     });
 
     test('daily with expiry', () {
       expect(
         scheduleLabel(
-          _task(isDaily: true, dailyUntil: DateTime(2026, 6, 30)),
+          _task(
+            recurrence: TaskRecurrence.daily,
+            dailyUntil: DateTime(2026, 6, 30),
+          ),
           now: today,
         ),
         '每日 · 至 6/30',
@@ -205,6 +323,45 @@ void main() {
       expect(
         scheduleLabel(_task(dueDate: yesterday), now: today),
         '已逾期 · 6/6',
+      );
+    });
+
+    test('monthly label', () {
+      expect(
+        scheduleLabel(
+          _task(
+            recurrence: TaskRecurrence.monthly,
+            dueDate: DateTime(2026, 1, 15),
+          ),
+          now: today,
+        ),
+        '每月 · 15日',
+      );
+    });
+
+    test('monthly overdue label', () {
+      expect(
+        scheduleLabel(
+          _task(
+            recurrence: TaskRecurrence.monthly,
+            dueDate: DateTime(2026, 1, 15),
+          ),
+          now: DateTime(2026, 6, 20),
+        ),
+        '已逾期 · 每月 15日',
+      );
+    });
+
+    test('yearly label', () {
+      expect(
+        scheduleLabel(
+          _task(
+            recurrence: TaskRecurrence.yearly,
+            dueDate: DateTime(2020, 6, 9),
+          ),
+          now: today,
+        ),
+        '每年 · 6/9',
       );
     });
   });

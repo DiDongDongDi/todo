@@ -44,7 +44,7 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
   int _feedbackEpoch = 0;
   bool _saving = false;
 
-  bool _isDaily = false;
+  TaskRecurrence _recurrence = TaskRecurrence.none;
   DateTime? _dailyUntil;
   DateTime? _dueDate;
 
@@ -187,7 +187,7 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
         _attachments
           ..clear()
           ..addAll(task.attachments);
-        _isDaily = task.isDaily;
+        _recurrence = task.recurrence;
         _dailyUntil = task.dailyUntil;
         _dueDate = task.dueDate;
       });
@@ -265,9 +265,9 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
         attachments: List.from(_attachments),
         transcriptionStatus:
             hasAudio ? TranscriptionStatus.pending : TranscriptionStatus.none,
-        isDaily: _isDaily,
-        dailyUntil: _isDaily ? _dailyUntil : null,
-        dueDate: _isDaily ? null : _dueDate,
+        recurrence: _recurrence,
+        dailyUntil: _recurrence == TaskRecurrence.daily ? _dailyUntil : null,
+        dueDate: _recurrence == TaskRecurrence.daily ? null : _dueDate,
       );
 
       unawaited(triggerSyncIfSignedIn(ref));
@@ -281,7 +281,7 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
       setState(() {
         _controller.clear();
         _attachments.clear();
-        _isDaily = false;
+        _recurrence = TaskRecurrence.none;
         _dailyUntil = null;
         _dueDate = null;
         _lastUndoTask = task;
@@ -484,11 +484,11 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
               onCancelEdit: _cancelInput,
               editing: _inputUiVisible,
               scheduleEditor: TaskScheduleEditor(
-                isDaily: _isDaily,
+                recurrence: _recurrence,
                 dailyUntil: _dailyUntil,
                 dueDate: _dueDate,
-                onDailyChanged: (value) =>
-                    setState(() => _isDaily = value),
+                onRecurrenceChanged: (value) =>
+                    setState(() => _recurrence = value),
                 onDailyUntilChanged: (value) =>
                     setState(() => _dailyUntil = value),
                 onDueDateChanged: (value) =>
@@ -532,7 +532,7 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
       title: _controller.text.trim(),
       note: null,
       attachments: List.from(_attachments),
-      isDaily: _isDaily,
+      recurrence: _recurrence,
       dailyUntil: _dailyUntil,
       dueDate: _dueDate,
       titleOverride: name,

@@ -1,24 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:todo_app/core/models/task.dart';
 import 'package:todo_app/core/models/task_schedule.dart';
 
-/// 紧凑的任务计划配置：每日重复 / 一次性计划日期（互斥）。
+/// 紧凑的任务计划配置：每日 / 每月 / 每年重复，或一次性计划日期（互斥）。
 class TaskScheduleEditor extends StatelessWidget {
   const TaskScheduleEditor({
     super.key,
-    required this.isDaily,
+    required this.recurrence,
     required this.dailyUntil,
     required this.dueDate,
-    required this.onDailyChanged,
+    required this.onRecurrenceChanged,
     required this.onDailyUntilChanged,
     required this.onDueDateChanged,
     this.onTransientUiOpening,
     this.onTransientUiClosed,
   });
 
-  final bool isDaily;
+  final TaskRecurrence recurrence;
   final DateTime? dailyUntil;
   final DateTime? dueDate;
-  final ValueChanged<bool> onDailyChanged;
+  final ValueChanged<TaskRecurrence> onRecurrenceChanged;
   final ValueChanged<DateTime?> onDailyUntilChanged;
   final ValueChanged<DateTime?> onDueDateChanged;
   final VoidCallback? onTransientUiOpening;
@@ -48,6 +49,40 @@ class TaskScheduleEditor extends StatelessWidget {
     }
   }
 
+  void _selectRecurrence(TaskRecurrence type) {
+    if (recurrence == type) {
+      onRecurrenceChanged(TaskRecurrence.none);
+      if (type == TaskRecurrence.daily) {
+        onDailyUntilChanged(null);
+      } else {
+        onDueDateChanged(null);
+      }
+      return;
+    }
+    onRecurrenceChanged(type);
+    if (type == TaskRecurrence.daily) {
+      onDueDateChanged(null);
+    } else {
+      onDailyUntilChanged(null);
+    }
+  }
+
+  Widget _recurrenceChip(
+    BuildContext context, {
+    required String label,
+    required TaskRecurrence type,
+  }) {
+    final theme = Theme.of(context);
+    return FilterChip(
+      label: Text(label, style: theme.textTheme.labelMedium),
+      selected: recurrence == type,
+      onSelected: (_) => _selectRecurrence(type),
+      visualDensity: VisualDensity.compact,
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -58,18 +93,10 @@ class TaskScheduleEditor extends StatelessWidget {
       runSpacing: 4,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        FilterChip(
-          label: Text('每日', style: labelStyle),
-          selected: isDaily,
-          onSelected: (value) {
-            onDailyChanged(value);
-            if (value) onDueDateChanged(null);
-          },
-          visualDensity: VisualDensity.compact,
-          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          padding: const EdgeInsets.symmetric(horizontal: 4),
-        ),
-        if (isDaily)
+        _recurrenceChip(context, label: '每日', type: TaskRecurrence.daily),
+        _recurrenceChip(context, label: '每月', type: TaskRecurrence.monthly),
+        _recurrenceChip(context, label: '每年', type: TaskRecurrence.yearly),
+        if (recurrence == TaskRecurrence.daily)
           ActionChip(
             label: Text(
               dailyUntil == null ? '无限期' : '至 ${_formatShortDate(dailyUntil!)}',
@@ -86,6 +113,46 @@ class TaskScheduleEditor extends StatelessWidget {
             avatar: dailyUntil != null
                 ? null
                 : Icon(Icons.calendar_today_outlined, size: 16, color: theme.colorScheme.primary),
+          )
+        else if (recurrence == TaskRecurrence.monthly)
+          ActionChip(
+            label: Text(
+              dueDate == null
+                  ? '每月日期'
+                  : '每月 ${dueDate!.day}日',
+              style: labelStyle,
+            ),
+            onPressed: () => _pickDate(
+              context,
+              initial: dueDate,
+              onPicked: onDueDateChanged,
+            ),
+            visualDensity: VisualDensity.compact,
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            avatar: dueDate == null
+                ? Icon(Icons.calendar_today_outlined, size: 16, color: theme.colorScheme.primary)
+                : null,
+          )
+        else if (recurrence == TaskRecurrence.yearly)
+          ActionChip(
+            label: Text(
+              dueDate == null
+                  ? '每年日期'
+                  : '每年 ${_formatShortDate(dueDate!)}',
+              style: labelStyle,
+            ),
+            onPressed: () => _pickDate(
+              context,
+              initial: dueDate,
+              onPicked: onDueDateChanged,
+            ),
+            visualDensity: VisualDensity.compact,
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            avatar: dueDate == null
+                ? Icon(Icons.calendar_today_outlined, size: 16, color: theme.colorScheme.primary)
+                : null,
           )
         else
           ActionChip(
@@ -105,7 +172,7 @@ class TaskScheduleEditor extends StatelessWidget {
                 ? Icon(Icons.calendar_today_outlined, size: 16, color: theme.colorScheme.primary)
                 : null,
           ),
-        if (isDaily && dailyUntil != null)
+        if (recurrence == TaskRecurrence.daily && dailyUntil != null)
           IconButton(
             icon: const Icon(Icons.close, size: 16),
             tooltip: '清除到期日',
@@ -114,10 +181,10 @@ class TaskScheduleEditor extends StatelessWidget {
             constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
             onPressed: () => onDailyUntilChanged(null),
           )
-        else if (!isDaily && dueDate != null)
+        else if (recurrence != TaskRecurrence.daily && dueDate != null)
           IconButton(
             icon: const Icon(Icons.close, size: 16),
-            tooltip: '清除计划日期',
+            tooltip: recurrence == TaskRecurrence.none ? '清除计划日期' : '清除日期',
             visualDensity: VisualDensity.compact,
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(minWidth: 28, minHeight: 28),

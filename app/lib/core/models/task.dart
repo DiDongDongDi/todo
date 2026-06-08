@@ -4,6 +4,8 @@ enum TranscriptionStatus { none, pending, done, failed }
 
 enum AttachmentType { image, audio }
 
+enum TaskRecurrence { none, daily, monthly, yearly }
+
 class TaskAttachment {
   const TaskAttachment({
     required this.type,
@@ -50,7 +52,7 @@ class Task {
     this.trashedAt,
     this.deletedAt,
     this.syncVersion = 0,
-    this.isDaily = false,
+    this.recurrence = TaskRecurrence.none,
     this.dailyUntil,
     this.lastDailyCompletedAt,
     this.dueDate,
@@ -71,13 +73,15 @@ class Task {
   final DateTime updatedAt;
   final DateTime? deletedAt;
   final int syncVersion;
-  final bool isDaily;
+  final TaskRecurrence recurrence;
   final DateTime? dailyUntil;
   final DateTime? lastDailyCompletedAt;
   final DateTime? dueDate;
   final String? parentId;
 
   bool get isSubtask => parentId != null;
+
+  bool get isDaily => recurrence == TaskRecurrence.daily;
 
   bool get hasContent =>
       title.trim().isNotEmpty || note?.trim().isNotEmpty == true || attachments.isNotEmpty;
@@ -97,7 +101,7 @@ class Task {
     DateTime? updatedAt,
     DateTime? deletedAt,
     int? syncVersion,
-    bool? isDaily,
+    TaskRecurrence? recurrence,
     DateTime? dailyUntil,
     DateTime? lastDailyCompletedAt,
     DateTime? dueDate,
@@ -125,7 +129,7 @@ class Task {
       updatedAt: updatedAt ?? this.updatedAt,
       deletedAt: deletedAt ?? this.deletedAt,
       syncVersion: syncVersion ?? this.syncVersion,
-      isDaily: isDaily ?? this.isDaily,
+      recurrence: recurrence ?? this.recurrence,
       dailyUntil: clearDailyUntil ? null : (dailyUntil ?? this.dailyUntil),
       lastDailyCompletedAt: clearLastDailyCompletedAt
           ? null
@@ -151,6 +155,7 @@ class Task {
         'deleted_at': deletedAt?.toIso8601String(),
         'sync_version': syncVersion,
         'is_daily': isDaily,
+        'recurrence_type': recurrence.name,
         if (dailyUntil != null) 'daily_until': _dateOnlyString(dailyUntil!),
         if (lastDailyCompletedAt != null)
           'last_daily_completed_at': _dateOnlyString(lastDailyCompletedAt!),
@@ -192,12 +197,23 @@ class Task {
           ? DateTime.parse(json['deleted_at'] as String)
           : null,
       syncVersion: json['sync_version'] as int? ?? 0,
-      isDaily: json['is_daily'] as bool? ?? false,
+      recurrence: parseRecurrence(json),
       dailyUntil: _parseDateOnly(json['daily_until']),
       lastDailyCompletedAt: _parseDateOnly(json['last_daily_completed_at']),
       dueDate: _parseDateOnly(json['due_date']),
       parentId: json['parent_id'] as String?,
     );
+  }
+
+  static TaskRecurrence parseRecurrence(Map<String, dynamic> json) {
+    final type = json['recurrence_type'] as String?;
+    if (type != null) {
+      return TaskRecurrence.values.byName(type);
+    }
+    if (json['is_daily'] as bool? ?? false) {
+      return TaskRecurrence.daily;
+    }
+    return TaskRecurrence.none;
   }
 
   static DateTime? _parseDateOnly(dynamic value) {

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:todo_app/core/models/task.dart';
 import 'package:todo_app/core/models/task_template.dart';
 import 'package:todo_app/core/repositories/template_repository.dart';
 import 'package:todo_app/core/sync/sync_engine.dart';
@@ -24,7 +25,7 @@ class _TemplateEditScreenState extends ConsumerState<TemplateEditScreen> {
 
   bool _loading = true;
   TaskTemplate? _template;
-  bool _isDaily = false;
+  TaskRecurrence _recurrence = TaskRecurrence.none;
   DateTime? _dailyUntil;
   DateTime? _dueDate;
   bool _saving = false;
@@ -53,7 +54,7 @@ class _TemplateEditScreenState extends ConsumerState<TemplateEditScreen> {
     if (template != null) {
       _titleController.text = template.title;
       _noteController.text = template.note ?? '';
-      _isDaily = template.isDaily;
+      _recurrence = template.recurrence;
       _dailyUntil = template.dailyUntil;
       _dueDate = template.dueDate;
       for (final title in template.subtaskTitles) {
@@ -101,12 +102,13 @@ class _TemplateEditScreenState extends ConsumerState<TemplateEditScreen> {
         note: _noteController.text.trim().isEmpty
             ? null
             : _noteController.text.trim(),
-        isDaily: _isDaily,
+        recurrence: _recurrence,
         dailyUntil: _dailyUntil,
-        dueDate: _isDaily ? null : _dueDate,
+        dueDate: _recurrence == TaskRecurrence.daily ? null : _dueDate,
         clearNote: _noteController.text.trim().isEmpty,
-        clearDailyUntil: _isDaily && _dailyUntil == null,
-        clearDueDate: _isDaily || _dueDate == null,
+        clearDailyUntil:
+            _recurrence == TaskRecurrence.daily && _dailyUntil == null,
+        clearDueDate: _recurrence == TaskRecurrence.daily || _dueDate == null,
         subtaskTitles: _subtaskControllers
             .map((c) => c.text.trim())
             .where((t) => t.isNotEmpty)
@@ -184,10 +186,11 @@ class _TemplateEditScreenState extends ConsumerState<TemplateEditScreen> {
           ),
           const SizedBox(height: 16),
           TaskScheduleEditor(
-            isDaily: _isDaily,
+            recurrence: _recurrence,
             dailyUntil: _dailyUntil,
             dueDate: _dueDate,
-            onDailyChanged: (value) => setState(() => _isDaily = value),
+            onRecurrenceChanged: (value) =>
+                setState(() => _recurrence = value),
             onDailyUntilChanged: (value) =>
                 setState(() => _dailyUntil = value),
             onDueDateChanged: (value) => setState(() => _dueDate = value),

@@ -19,6 +19,8 @@ class Tasks extends Table {
   DateTimeColumn get deletedAt => dateTime().nullable()();
   IntColumn get syncVersion => integer().withDefault(const Constant(0))();
   BoolColumn get isDaily => boolean().withDefault(const Constant(false))();
+  TextColumn get recurrenceType =>
+      text().withDefault(const Constant('none'))();
   DateTimeColumn get dailyUntil => dateTime().nullable()();
   DateTimeColumn get lastDailyCompletedAt => dateTime().nullable()();
   DateTimeColumn get dueDate => dateTime().nullable()();

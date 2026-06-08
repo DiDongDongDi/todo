@@ -9,7 +9,7 @@ class TaskTemplate {
     this.userId,
     this.note,
     this.attachments = const [],
-    this.isDaily = false,
+    this.recurrence = TaskRecurrence.none,
     this.dailyUntil,
     this.dueDate,
     this.subtaskTitles = const [],
@@ -21,13 +21,15 @@ class TaskTemplate {
   final String title;
   final String? note;
   final List<TaskAttachment> attachments;
-  final bool isDaily;
+  final TaskRecurrence recurrence;
   final DateTime? dailyUntil;
   final DateTime? dueDate;
   final List<String> subtaskTitles;
   final DateTime createdAt;
   final DateTime updatedAt;
   final int syncVersion;
+
+  bool get isDaily => recurrence == TaskRecurrence.daily;
 
   bool get hasContent =>
       title.trim().isNotEmpty ||
@@ -41,7 +43,7 @@ class TaskTemplate {
     String? title,
     String? note,
     List<TaskAttachment>? attachments,
-    bool? isDaily,
+    TaskRecurrence? recurrence,
     DateTime? dailyUntil,
     DateTime? dueDate,
     List<String>? subtaskTitles,
@@ -58,7 +60,7 @@ class TaskTemplate {
       title: title ?? this.title,
       note: clearNote ? null : (note ?? this.note),
       attachments: attachments ?? this.attachments,
-      isDaily: isDaily ?? this.isDaily,
+      recurrence: recurrence ?? this.recurrence,
       dailyUntil: clearDailyUntil ? null : (dailyUntil ?? this.dailyUntil),
       dueDate: clearDueDate ? null : (dueDate ?? this.dueDate),
       subtaskTitles: subtaskTitles ?? this.subtaskTitles,
@@ -75,6 +77,7 @@ class TaskTemplate {
         'note': note,
         'attachments': attachments.map((e) => e.toJson()).toList(),
         'is_daily': isDaily,
+        'recurrence_type': recurrence.name,
         if (dailyUntil != null) 'daily_until': _dateOnlyString(dailyUntil!),
         if (dueDate != null) 'due_date': _dateOnlyString(dueDate!),
         'subtask_titles': subtaskTitles,
@@ -107,7 +110,7 @@ class TaskTemplate {
       title: json['title'] as String? ?? '',
       note: json['note'] as String?,
       attachments: attachments,
-      isDaily: json['is_daily'] as bool? ?? false,
+      recurrence: Task.parseRecurrence(json),
       dailyUntil: _parseDateOnly(json['daily_until']),
       dueDate: _parseDateOnly(json['due_date']),
       subtaskTitles: subtaskTitles,
