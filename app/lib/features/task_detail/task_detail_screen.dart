@@ -143,7 +143,9 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
             Text(
               scheduleLabel(task)!,
               style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: Theme.of(context).colorScheme.primary,
+                    color: isOverdue(task)
+                        ? Theme.of(context).colorScheme.error
+                        : Theme.of(context).colorScheme.primary,
                   ),
             ),
           ],

@@ -296,6 +296,102 @@ void main() {
         isFalse,
       );
     });
+
+    test('default mode hides future due date', () {
+      expect(
+        shouldShowInProcess(
+          _task(dueDate: tomorrow),
+          todayOnly: false,
+          now: today,
+        ),
+        isFalse,
+      );
+    });
+
+    test('default mode shows due today and overdue', () {
+      expect(
+        shouldShowInProcess(
+          _task(dueDate: today),
+          todayOnly: false,
+          now: today,
+        ),
+        isTrue,
+      );
+      expect(
+        shouldShowInProcess(
+          _task(dueDate: yesterday),
+          todayOnly: false,
+          now: today,
+        ),
+        isTrue,
+      );
+    });
+
+    test('default mode hides monthly before anchor day', () {
+      expect(
+        shouldShowInProcess(
+          _task(
+            recurrence: TaskRecurrence.monthly,
+            dueDate: DateTime(2026, 1, 15),
+          ),
+          todayOnly: false,
+          now: today,
+        ),
+        isFalse,
+      );
+    });
+
+    test('default mode hides yearly before anchor date', () {
+      expect(
+        shouldShowInProcess(
+          _task(
+            recurrence: TaskRecurrence.yearly,
+            dueDate: DateTime(2020, 6, 9),
+          ),
+          todayOnly: false,
+          now: today,
+        ),
+        isFalse,
+      );
+    });
+  });
+
+  group('overdueDays', () {
+    test('one day overdue', () {
+      expect(overdueDays(_task(dueDate: yesterday), today), 1);
+    });
+
+    test('three days overdue', () {
+      expect(
+        overdueDays(_task(dueDate: DateTime(2026, 6, 4)), today),
+        3,
+      );
+    });
+
+    test('not overdue returns null', () {
+      expect(overdueDays(_task(dueDate: today), today), isNull);
+      expect(overdueDays(_task(dueDate: tomorrow), today), isNull);
+    });
+
+    test('monthly overdue uses period due date', () {
+      final task = _task(
+        recurrence: TaskRecurrence.monthly,
+        dueDate: DateTime(2026, 1, 15),
+      );
+      expect(overdueDays(task, DateTime(2026, 6, 20)), 5);
+    });
+  });
+
+  group('isOverdue', () {
+    test('true when overdue', () {
+      expect(isOverdue(_task(dueDate: yesterday), now: today), isTrue);
+    });
+
+    test('false when not overdue', () {
+      expect(isOverdue(_task(dueDate: today), now: today), isFalse);
+      expect(isOverdue(_task(dueDate: tomorrow), now: today), isFalse);
+      expect(isOverdue(_task(), now: today), isFalse);
+    });
   });
 
   group('scheduleLabel', () {
@@ -322,7 +418,14 @@ void main() {
     test('overdue due date', () {
       expect(
         scheduleLabel(_task(dueDate: yesterday), now: today),
-        '已逾期 · 6/6',
+        '已逾期 1 天',
+      );
+    });
+
+    test('overdue due date multiple days', () {
+      expect(
+        scheduleLabel(_task(dueDate: DateTime(2026, 6, 4)), now: today),
+        '已逾期 3 天',
       );
     });
 
@@ -348,7 +451,7 @@ void main() {
           ),
           now: DateTime(2026, 6, 20),
         ),
-        '已逾期 · 每月 15日',
+        '已逾期 5 天',
       );
     });
 

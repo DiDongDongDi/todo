@@ -418,6 +418,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
                       ? () => _retryTranscription(task)
                       : null,
                   scheduleLabel: scheduleLabel(task),
+                  scheduleOverdue: isOverdue(task),
                   completeLabel: completeLabelFor(task),
                   parentTitle: parentTitle,
                   onTapParent: task.parentId != null
