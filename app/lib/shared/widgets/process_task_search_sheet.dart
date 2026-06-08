@@ -24,6 +24,7 @@ Future<Task?> showProcessTaskSearchSheet(
   return showModalBottomSheet<Task>(
     context: context,
     isScrollControlled: true,
+    showDragHandle: true,
     useSafeArea: true,
     builder: (context) => _ProcessTaskSearchSheet(
       tasks: tasks,
@@ -47,72 +48,99 @@ class _ProcessTaskSearchSheet extends StatefulWidget {
 
 class _ProcessTaskSearchSheetState extends State<_ProcessTaskSearchSheet> {
   final _queryController = TextEditingController();
-  String _query = '';
+  final _searchFocusNode = FocusNode();
 
   @override
   void initState() {
     super.initState();
-    _queryController.addListener(() {
-      setState(() => _query = _queryController.text);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _scheduleFocusAfterSheetAnimation();
     });
+  }
+
+  void _scheduleFocusAfterSheetAnimation() {
+    final animation = ModalRoute.of(context)?.animation;
+    if (animation == null || animation.isCompleted) {
+      _searchFocusNode.requestFocus();
+      return;
+    }
+
+    void onStatus(AnimationStatus status) {
+      if (status == AnimationStatus.completed) {
+        animation.removeStatusListener(onStatus);
+        if (mounted) {
+          _searchFocusNode.requestFocus();
+        }
+      }
+    }
+
+    animation.addStatusListener(onStatus);
   }
 
   @override
   void dispose() {
     _queryController.dispose();
+    _searchFocusNode.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final filtered = filterTasksForSearch(widget.tasks, _query);
-    final maxHeight = MediaQuery.sizeOf(context).height * 0.75;
+    final hintStyle = theme.textTheme.bodyMedium?.copyWith(
+      color: theme.colorScheme.onSurface.withValues(alpha: 0.35),
+    );
 
     return Padding(
       padding: EdgeInsets.only(
         bottom: MediaQuery.viewInsetsOf(context).bottom,
       ),
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxHeight: maxHeight),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 8),
-            Container(
-              width: 32,
-              height: 4,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-              child: TextField(
-                controller: _queryController,
-                autofocus: true,
-                decoration: const InputDecoration(
-                  hintText: '搜索任务',
-                  prefixIcon: Icon(Icons.search),
-                  border: OutlineInputBorder(),
-                  isDense: true,
+      child: DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.55,
+        minChildSize: 0.35,
+        maxChildSize: 0.85,
+        builder: (context, scrollController) {
+          return Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: TextField(
+                  controller: _queryController,
+                  focusNode: _searchFocusNode,
+                  style: theme.textTheme.bodyMedium,
+                  decoration: InputDecoration(
+                    hintText: '搜索任务',
+                    hintStyle: hintStyle,
+                    prefixIcon: const Icon(Icons.search),
+                    border: const OutlineInputBorder(),
+                    isDense: true,
+                  ),
                 ),
               ),
-            ),
-            Flexible(
-              child: filtered.isEmpty
-                  ? Padding(
-                      padding: const EdgeInsets.all(32),
-                      child: Text(
-                        _query.trim().isEmpty ? '暂无任务' : '没有匹配的任务',
-                        style: theme.textTheme.bodyLarge?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
+              Expanded(
+                child: ValueListenableBuilder<TextEditingValue>(
+                  valueListenable: _queryController,
+                  builder: (context, value, _) {
+                    final query = value.text;
+                    final filtered = filterTasksForSearch(widget.tasks, query);
+
+                    if (filtered.isEmpty) {
+                      return Padding(
+                        padding: const EdgeInsets.all(32),
+                        child: Text(
+                          query.trim().isEmpty ? '暂无任务' : '没有匹配的任务',
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
                         ),
-                      ),
-                    )
-                  : ListView.builder(
-                      shrinkWrap: true,
+                      );
+                    }
+
+                    return ListView.builder(
+                      controller: scrollController,
+                      padding: const EdgeInsets.only(bottom: 16),
                       itemCount: filtered.length,
                       itemBuilder: (context, index) {
                         final task = filtered[index];
@@ -132,10 +160,13 @@ class _ProcessTaskSearchSheetState extends State<_ProcessTaskSearchSheet> {
                           onTap: () => Navigator.pop(context, task),
                         );
                       },
-                    ),
-            ),
-          ],
-        ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
