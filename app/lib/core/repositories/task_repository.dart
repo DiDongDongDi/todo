@@ -148,10 +148,12 @@ class TaskRepository {
 
   Future<Task> completeDailyToday(String id) async {
     final task = await _require(id);
-    final now = DateTime.now().toUtc();
+    final nowLocal = DateTime.now();
+    final todayLocal = DateTime(nowLocal.year, nowLocal.month, nowLocal.day);
+    final nowUtc = DateTime.now().toUtc();
     final updated = task.copyWith(
-      lastDailyCompletedAt: now,
-      updatedAt: now,
+      lastDailyCompletedAt: todayLocal,
+      updatedAt: nowUtc,
       syncVersion: task.syncVersion + 1,
     );
     await _store.upsert(updated);

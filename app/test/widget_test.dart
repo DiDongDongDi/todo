@@ -20,4 +20,17 @@ void main() {
     expect(find.text('处理'), findsOneWidget);
     expect(find.byIcon(Icons.settings_outlined), findsOneWidget);
   });
+
+  testWidgets('Collect tab starts unfocused on cold launch',
+      (WidgetTester tester) async {
+    await tester.binding.setSurfaceSize(const Size(800, 600));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(const ProviderScope(child: TodoApp()));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(tester.testTextInput.isVisible, isFalse);
+    expect(find.text('取消'), findsNothing);
+  });
 }

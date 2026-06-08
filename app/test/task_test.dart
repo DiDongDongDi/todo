@@ -33,7 +33,7 @@ void main() {
       updatedAt: _t,
       isDaily: true,
       dailyUntil: DateTime(2026, 6, 30),
-      lastDailyCompletedAt: DateTime.utc(2026, 6, 7, 12),
+      lastDailyCompletedAt: DateTime(2026, 6, 7),
       dueDate: DateTime(2026, 6, 15),
       parentId: 'parent-uuid',
       attachments: [
@@ -45,8 +45,27 @@ void main() {
     expect(restored.attachments.length, 1);
     expect(restored.isDaily, isTrue);
     expect(restored.dailyUntil, DateTime(2026, 6, 30));
-    expect(restored.lastDailyCompletedAt, DateTime.utc(2026, 6, 7, 12));
+    expect(restored.lastDailyCompletedAt, DateTime(2026, 6, 7));
+    expect(restored.toJson()['last_daily_completed_at'], '2026-06-07');
     expect(restored.dueDate, DateTime(2026, 6, 15));
     expect(restored.parentId, 'parent-uuid');
+  });
+
+  test('Task fromJson parses legacy ISO last_daily_completed_at', () {
+    final utcIso = DateTime.utc(2026, 6, 8, 18).toIso8601String();
+    final restored = Task.fromJson({
+      'id': 'abc',
+      'title': 'test',
+      'status': 'inbox',
+      'created_at': _t.toIso8601String(),
+      'updated_at': _t.toIso8601String(),
+      'is_daily': true,
+      'last_daily_completed_at': utcIso,
+    });
+    final expectedLocal = DateTime.utc(2026, 6, 8, 18).toLocal();
+    expect(
+      restored.lastDailyCompletedAt,
+      DateTime(expectedLocal.year, expectedLocal.month, expectedLocal.day),
+    );
   });
 }

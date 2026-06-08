@@ -153,7 +153,7 @@ class Task {
         'is_daily': isDaily,
         if (dailyUntil != null) 'daily_until': _dateOnlyString(dailyUntil!),
         if (lastDailyCompletedAt != null)
-          'last_daily_completed_at': lastDailyCompletedAt!.toIso8601String(),
+          'last_daily_completed_at': _dateOnlyString(lastDailyCompletedAt!),
         if (dueDate != null) 'due_date': _dateOnlyString(dueDate!),
         if (parentId != null) 'parent_id': parentId,
       };
@@ -194,9 +194,7 @@ class Task {
       syncVersion: json['sync_version'] as int? ?? 0,
       isDaily: json['is_daily'] as bool? ?? false,
       dailyUntil: _parseDateOnly(json['daily_until']),
-      lastDailyCompletedAt: json['last_daily_completed_at'] != null
-          ? DateTime.parse(json['last_daily_completed_at'] as String)
-          : null,
+      lastDailyCompletedAt: _parseDateOnly(json['last_daily_completed_at']),
       dueDate: _parseDateOnly(json['due_date']),
       parentId: json['parent_id'] as String?,
     );
@@ -205,6 +203,11 @@ class Task {
   static DateTime? _parseDateOnly(dynamic value) {
     if (value == null) return null;
     if (value is String) {
+      if (value.contains('T')) {
+        final parsed = DateTime.parse(value);
+        final local = parsed.toLocal();
+        return DateTime(local.year, local.month, local.day);
+      }
       final parts = value.split('-');
       if (parts.length >= 3) {
         return DateTime(

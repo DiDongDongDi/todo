@@ -6,9 +6,11 @@ bool isDailyExpired(Task task, DateTime today) =>
     task.dailyUntil != null &&
     localDate(task.dailyUntil!).isBefore(localDate(today));
 
-bool isDailyCompletedToday(Task task, DateTime today) =>
-    task.lastDailyCompletedAt != null &&
-    localDate(task.lastDailyCompletedAt!) == localDate(today);
+bool isDailyCompletedToday(Task task, DateTime today) {
+  if (task.lastDailyCompletedAt == null) return false;
+  final completedLocal = localDate(task.lastDailyCompletedAt!.toLocal());
+  return completedLocal == localDate(today);
+}
 
 bool isDueToday(Task task, DateTime today) {
   if (task.isDaily) {

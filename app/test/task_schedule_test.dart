@@ -58,6 +58,58 @@ void main() {
       );
       expect(isDueToday(task, today), isTrue);
     });
+
+    test('UTC timestamp completed on local calendar day is not due', () {
+      final utcStored = DateTime.utc(2026, 6, 8, 18);
+      final localDay = utcStored.toLocal();
+      final today = DateTime(
+        localDay.year,
+        localDay.month,
+        localDay.day,
+        2,
+      );
+      final task = _task(isDaily: true, lastDailyCompletedAt: utcStored);
+      expect(isDueToday(task, today), isFalse);
+      expect(
+        shouldShowInProcess(task, todayOnly: false, now: today),
+        isFalse,
+      );
+    });
+
+    test('UTC timestamp from previous local day reappears today', () {
+      final utcStored = DateTime.utc(2026, 6, 8, 18);
+      final localDay = utcStored.toLocal();
+      final nextLocalDay = DateTime(
+        localDay.year,
+        localDay.month,
+        localDay.day,
+      ).add(const Duration(days: 1));
+      final task = _task(isDaily: true, lastDailyCompletedAt: utcStored);
+      expect(isDueToday(task, nextLocalDay), isTrue);
+    });
+
+    test('date-only completion hides task for that day', () {
+      final task = _task(
+        isDaily: true,
+        lastDailyCompletedAt: DateTime(2026, 6, 7),
+      );
+      expect(
+        shouldShowInProcess(
+          task,
+          todayOnly: false,
+          now: DateTime(2026, 6, 7, 14),
+        ),
+        isFalse,
+      );
+      expect(
+        shouldShowInProcess(
+          task,
+          todayOnly: false,
+          now: DateTime(2026, 6, 8, 8),
+        ),
+        isTrue,
+      );
+    });
   });
 
   group('due date tasks', () {

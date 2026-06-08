@@ -113,11 +113,6 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
     super.initState();
     _focusNode = FocusNode();
     _focusNode.addListener(_onInputFocusChange);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && !_recording) {
-        _focusNode.requestFocus();
-      }
-    });
   }
 
   void _onInputFocusChange() {
