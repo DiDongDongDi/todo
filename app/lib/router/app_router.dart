@@ -4,6 +4,7 @@ import 'package:todo_app/features/archive/archive_screen.dart';
 import 'package:todo_app/features/auth/auth_screen.dart';
 import 'package:todo_app/features/shell/shell_screen.dart';
 import 'package:todo_app/features/task_detail/task_detail_screen.dart';
+import 'package:todo_app/features/settings/sound_settings_screen.dart';
 import 'package:todo_app/features/templates/template_edit_screen.dart';
 import 'package:todo_app/features/templates/template_list_screen.dart';
 import 'package:todo_app/features/trash/trash_screen.dart';
@@ -36,6 +37,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => TaskDetailScreen(
           taskId: state.pathParameters['id']!,
         ),
+      ),
+      GoRoute(
+        path: '/sounds',
+        builder: (context, state) => const SoundSettingsScreen(),
       ),
       GoRoute(
         path: '/templates',
