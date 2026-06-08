@@ -20,6 +20,7 @@ import 'package:todo_app/shared/widgets/card_stage.dart';
 import 'package:todo_app/shared/widgets/save_template_dialog.dart';
 import 'package:todo_app/shared/widgets/swipeable_card.dart';
 import 'package:todo_app/shared/widgets/tab_more_menu_button.dart';
+import 'package:todo_app/shared/widgets/tab_page_header.dart';
 import 'package:todo_app/shared/widgets/task_schedule_editor.dart';
 import 'package:todo_app/shared/widgets/template_picker_sheet.dart';
 
@@ -439,28 +440,25 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 8, 12, 0),
-          child: Row(
-            children: [
-              const Spacer(),
-              TabMoreMenuButton<CollectMoreAction>(
-                items: [
-                  collectMenuItem<CollectMoreAction>(
-                    value: CollectMoreAction.saveTemplate,
-                    icon: Icons.bookmark_outline,
-                    label: '保存为模板',
-                  ),
-                  collectMenuItem<CollectMoreAction>(
-                    value: CollectMoreAction.createFromTemplate,
-                    icon: Icons.note_add_outlined,
-                    label: '从模板创建',
-                  ),
-                ],
-                onSelected: _onCollectMoreAction,
-              ),
-            ],
-          ),
+        TabPageHeader(
+          title: '收集',
+          actions: [
+            TabMoreMenuButton<CollectMoreAction>(
+              items: [
+                collectMenuItem<CollectMoreAction>(
+                  value: CollectMoreAction.saveTemplate,
+                  icon: Icons.bookmark_outline,
+                  label: '保存为模板',
+                ),
+                collectMenuItem<CollectMoreAction>(
+                  value: CollectMoreAction.createFromTemplate,
+                  icon: Icons.note_add_outlined,
+                  label: '从模板创建',
+                ),
+              ],
+              onSelected: _onCollectMoreAction,
+            ),
+          ],
         ),
         Expanded(
           child: CardStage(
