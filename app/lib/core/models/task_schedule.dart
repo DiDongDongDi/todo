@@ -77,6 +77,29 @@ bool isDueToday(Task task, DateTime today) {
 bool isScheduled(Task task) =>
     task.recurrence != TaskRecurrence.none || task.dueDate != null;
 
+int? overdueDays(Task task, DateTime today) {
+  final t = localDate(today);
+  switch (task.recurrence) {
+    case TaskRecurrence.none:
+      if (task.dueDate == null) return null;
+      final due = localDate(task.dueDate!);
+      if (!t.isAfter(due)) return null;
+      return t.difference(due).inDays;
+    case TaskRecurrence.monthly:
+    case TaskRecurrence.yearly:
+      final due = periodDueDate(task, today);
+      if (due == null || !t.isAfter(due)) return null;
+      return t.difference(due).inDays;
+    case TaskRecurrence.daily:
+      return null;
+  }
+}
+
+bool isOverdue(Task task, {DateTime? now}) {
+  final today = localDate(now ?? DateTime.now());
+  return overdueDays(task, today) != null;
+}
+
 bool shouldShowInProcess(
   Task task, {
   required bool todayOnly,
@@ -89,11 +112,15 @@ bool shouldShowInProcess(
   }
   if (isRecurring(task) && isPeriodCompleted(task, today)) return false;
   if (todayOnly) return isDueToday(task, today);
+  if (isScheduled(task)) return isDueToday(task, today);
   return true;
 }
 
 String? scheduleLabel(Task task, {DateTime? now}) {
   final today = localDate(now ?? DateTime.now());
+  final overdue = overdueDays(task, today);
+  if (overdue != null) return '已逾期 $overdue 天';
+
   switch (task.recurrence) {
     case TaskRecurrence.daily:
       if (isDailyExpired(task, today)) return null;
@@ -105,25 +132,14 @@ String? scheduleLabel(Task task, {DateTime? now}) {
     case TaskRecurrence.monthly:
       if (task.dueDate == null) return null;
       final anchor = localDate(task.dueDate!);
-      final due = periodDueDate(task, today);
-      if (due != null && today.isAfter(due)) {
-        return '已逾期 · 每月 ${anchor.day}日';
-      }
       return '每月 · ${anchor.day}日';
     case TaskRecurrence.yearly:
       if (task.dueDate == null) return null;
       final anchor = localDate(task.dueDate!);
-      final due = periodDueDate(task, today);
-      if (due != null && today.isAfter(due)) {
-        return '已逾期 · 每年 ${anchor.month}/${anchor.day}';
-      }
       return '每年 · ${anchor.month}/${anchor.day}';
     case TaskRecurrence.none:
       if (task.dueDate != null) {
         final due = localDate(task.dueDate!);
-        if (due.isBefore(today)) {
-          return '已逾期 · ${due.month}/${due.day}';
-        }
         return '计划 · ${due.month}/${due.day}';
       }
       return null;

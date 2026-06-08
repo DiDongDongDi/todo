@@ -37,6 +37,7 @@ class BigTaskCard extends StatelessWidget {
     this.canGoNext = true,
     this.onRetryTranscription,
     this.scheduleLabel,
+    this.scheduleOverdue = false,
     this.completeLabel = '完成',
     this.scheduleEditor,
     this.onCancelEdit,
@@ -68,6 +69,7 @@ class BigTaskCard extends StatelessWidget {
   final bool canGoNext;
   final VoidCallback? onRetryTranscription;
   final String? scheduleLabel;
+  final bool scheduleOverdue;
   final String completeLabel;
   final Widget? scheduleEditor;
   final VoidCallback? onCancelEdit;
@@ -320,7 +322,7 @@ class BigTaskCard extends StatelessWidget {
               Text(
                 scheduleLabel!,
                 style: theme.textTheme.labelLarge?.copyWith(
-                  color: scheduleLabel!.startsWith('已逾期')
+                  color: scheduleOverdue
                       ? colorScheme.error
                       : colorScheme.primary,
                 ),
