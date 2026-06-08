@@ -92,6 +92,10 @@ flutter build apk --release
 adb install -r build\app\outputs\flutter-apk\app-debug.apk
 ```
 
+```powershell
+adb install -r build\app\outputs\flutter-apk\app-release.apk
+```
+
 `-r` 表示覆盖安装旧版。
 
 ---
