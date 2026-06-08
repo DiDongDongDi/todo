@@ -116,6 +116,35 @@ bool shouldShowInProcess(
   return true;
 }
 
+/// 计划编辑器入口 Chip 的摘要文案（未设置时显示「计划」）。
+String scheduleEditorSummary({
+  required TaskRecurrence recurrence,
+  required DateTime? dailyUntil,
+  required DateTime? dueDate,
+}) {
+  switch (recurrence) {
+    case TaskRecurrence.daily:
+      if (dailyUntil != null) {
+        final until = localDate(dailyUntil);
+        return '每日 · 至 ${until.month}/${until.day}';
+      }
+      return '每日';
+    case TaskRecurrence.monthly:
+      if (dueDate == null) return '每月';
+      return '每月 · ${localDate(dueDate).day}日';
+    case TaskRecurrence.yearly:
+      if (dueDate == null) return '每年';
+      final anchor = localDate(dueDate);
+      return '每年 · ${anchor.month}/${anchor.day}';
+    case TaskRecurrence.none:
+      if (dueDate != null) {
+        final due = localDate(dueDate);
+        return '计划 · ${due.month}/${due.day}';
+      }
+      return '计划';
+  }
+}
+
 String? scheduleLabel(Task task, {DateTime? now}) {
   final today = localDate(now ?? DateTime.now());
   final overdue = overdueDays(task, today);
