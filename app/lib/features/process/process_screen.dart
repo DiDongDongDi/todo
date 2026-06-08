@@ -797,24 +797,24 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
           ),
           TabMoreMenuButton<ProcessMoreAction>(
             items: [
-              processMenuItem<ProcessMoreAction>(
+              TabMoreMenuEntry.item(
                 value: ProcessMoreAction.archive,
                 icon: Icons.task_alt_outlined,
                 label: '已完成',
               ),
-              processMenuItem<ProcessMoreAction>(
+              TabMoreMenuEntry.item(
                 value: ProcessMoreAction.trash,
                 icon: Icons.delete_outline,
                 label: '回收站',
               ),
-              processMenuItem<ProcessMoreAction>(
+              TabMoreMenuEntry.item(
                 value: ProcessMoreAction.sync,
                 icon: Icons.sync_outlined,
                 label: '同步配置',
               ),
               if (onSaveTemplate != null) ...[
-                processMoreMenuDivider,
-                processMenuItem<ProcessMoreAction>(
+                const TabMoreMenuEntry.divider(),
+                TabMoreMenuEntry.item(
                   value: ProcessMoreAction.saveTemplate,
                   icon: Icons.bookmark_outline,
                   label: '保存为模板',

@@ -445,12 +445,12 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
           actions: [
             TabMoreMenuButton<CollectMoreAction>(
               items: [
-                collectMenuItem<CollectMoreAction>(
+                TabMoreMenuEntry.item(
                   value: CollectMoreAction.saveTemplate,
                   icon: Icons.bookmark_outline,
                   label: '保存为模板',
                 ),
-                collectMenuItem<CollectMoreAction>(
+                TabMoreMenuEntry.item(
                   value: CollectMoreAction.createFromTemplate,
                   icon: Icons.note_add_outlined,
                   label: '从模板创建',

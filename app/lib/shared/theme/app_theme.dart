@@ -39,6 +39,14 @@ class AppTheme {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         color: colorScheme.surfaceContainerHighest,
       ),
+      popupMenuTheme: PopupMenuThemeData(
+        elevation: 3,
+        color: colorScheme.surfaceContainerHighest,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        textStyle: const TextStyle(fontSize: 15),
+      ),
       inputDecorationTheme: InputDecorationTheme(
         border: InputBorder.none,
         hintStyle: TextStyle(
