@@ -47,12 +47,6 @@ class AppTheme {
           fontWeight: FontWeight.w300,
         ),
       ),
-      snackBarTheme: SnackBarThemeData(
-        behavior: SnackBarBehavior.floating,
-        elevation: 4,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        insetPadding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-      ),
       textTheme: const TextTheme(
         headlineMedium: TextStyle(fontSize: 24, fontWeight: FontWeight.w500),
         bodyLarge: TextStyle(fontSize: 17, height: 1.5),

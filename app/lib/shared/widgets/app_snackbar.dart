@@ -1,7 +1,19 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:todo_app/shared/theme/app_semantic_colors.dart';
 
 enum AppSnackType { info, success, warning, error }
+
+OverlayEntry? _activeBanner;
+Timer? _activeBannerTimer;
+
+void _hideActiveBanner() {
+  _activeBannerTimer?.cancel();
+  _activeBannerTimer = null;
+  _activeBanner?.remove();
+  _activeBanner = null;
+}
 
 void showAppSnackBar(
   BuildContext context, {
@@ -14,48 +26,80 @@ void showAppSnackBar(
   final theme = Theme.of(context);
   final colorScheme = theme.colorScheme;
   final semantic = context.semanticColors;
-  final mediaQuery = MediaQuery.of(context);
-  final topInset = mediaQuery.padding.top;
 
   final (Color bg, Color fg) = switch (type) {
-    AppSnackType.success => (semantic.successContainer, semantic.onSuccessContainer),
-    AppSnackType.error => (colorScheme.errorContainer, colorScheme.onErrorContainer),
-    AppSnackType.warning => (colorScheme.tertiaryContainer, colorScheme.onTertiaryContainer),
-    AppSnackType.info => (colorScheme.inverseSurface, colorScheme.onInverseSurface),
+    AppSnackType.success =>
+      (semantic.successContainer, semantic.onSuccessContainer),
+    AppSnackType.error =>
+      (colorScheme.errorContainer, colorScheme.onErrorContainer),
+    AppSnackType.warning =>
+      (colorScheme.tertiaryContainer, colorScheme.onTertiaryContainer),
+    AppSnackType.info =>
+      (colorScheme.inverseSurface, colorScheme.onInverseSurface),
   };
 
-  final messenger = ScaffoldMessenger.of(context);
-  messenger.hideCurrentSnackBar();
-  messenger.showSnackBar(
-    SnackBar(
-      content: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: messenger.hideCurrentSnackBar,
-        child: Row(
-          children: [
-            Icon(icon, color: fg, size: 22),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                message,
-                style: theme.textTheme.bodyMedium?.copyWith(color: fg),
-              ),
+  _hideActiveBanner();
+
+  final overlay = Overlay.of(context, rootOverlay: true);
+  late OverlayEntry entry;
+  entry = OverlayEntry(
+    builder: (ctx) {
+      final topInset = MediaQuery.of(ctx).padding.top;
+      return Positioned(
+        top: topInset + 8,
+        left: 16,
+        right: 16,
+        child: Material(
+          elevation: 4,
+          color: bg,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            child: Row(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: _hideActiveBanner,
+                    child: Row(
+                      children: [
+                        Icon(icon, color: fg, size: 22),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            message,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: fg,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                if (action != null)
+                  TextButton(
+                    onPressed: () {
+                      _hideActiveBanner();
+                      action.onPressed();
+                    },
+                    style: TextButton.styleFrom(
+                      foregroundColor: fg,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    child: Text(action.label),
+                  ),
+              ],
             ),
-          ],
+          ),
         ),
-      ),
-      backgroundColor: bg,
-      duration: duration,
-      behavior: SnackBarBehavior.floating,
-      dismissDirection: DismissDirection.up,
-      margin: EdgeInsets.fromLTRB(16, topInset + 8, 16, 0),
-      action: action != null
-          ? SnackBarAction(
-              label: action.label,
-              onPressed: action.onPressed,
-              textColor: fg,
-            )
-          : null,
-    ),
+      );
+    },
   );
+
+  _activeBanner = entry;
+  overlay.insert(entry);
+  _activeBannerTimer = Timer(duration, _hideActiveBanner);
 }
