@@ -180,6 +180,10 @@ flutter build apk --debug
 adb install -r build\app\outputs\flutter-apk\app-debug.apk
 ```
 
+```powershell
+flutter install --use-application-binary=build\app\outputs\flutter-apk\app-debug.apk -d android
+```
+
 这样不连电脑，打开也是这一版。
 
 ---
