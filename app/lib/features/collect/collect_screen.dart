@@ -67,6 +67,7 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
   }
 
   void _cancelInput() {
+    unawaited(AppHaptics.light());
     _focusNode.unfocus();
   }
 

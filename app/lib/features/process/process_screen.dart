@@ -331,7 +331,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
                   meta: true,
                 ): () => _saveEdit(task),
                 const SingleActivator(LogicalKeyboardKey.escape): () =>
-                    _exitEditMode(task),
+                    _cancelEdit(task),
               }
             : {
                 const SingleActivator(LogicalKeyboardKey.arrowLeft): () =>
@@ -387,7 +387,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
                       _editUiVisible && !kIsWeb ? _toggleEditRecording : null,
                   isListening: _editRecording,
                   onSave: _editUiVisible ? () => _saveEdit(task) : null,
-                  onCancelEdit: _editUiVisible ? () => _exitEditMode(task) : null,
+                  onCancelEdit: _editUiVisible ? () => _cancelEdit(task) : null,
                   scheduleEditor: _editUiVisible
                       ? TaskScheduleEditor(
                           recurrence: _editRecurrence,
@@ -551,7 +551,13 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     }
   }
 
+  void _cancelEdit(Task task) {
+    unawaited(AppHaptics.light());
+    _exitEditMode(task);
+  }
+
   Future<void> _saveEdit(Task task) async {
+    await AppHaptics.light();
     final repo = await ref.read(taskRepositoryProvider.future);
     final hasAudio =
         _editAttachments.any((a) => a.type == AttachmentType.audio);
