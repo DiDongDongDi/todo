@@ -325,6 +325,7 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
           const Offset(0, -1.2),
           _performSave,
           resetAfter: false,
+          feedback: AppHaptics.none,
         );
       } else {
         await _performSave();

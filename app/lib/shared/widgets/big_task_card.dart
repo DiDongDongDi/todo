@@ -5,6 +5,7 @@ import 'package:todo_app/shared/theme/app_semantic_colors.dart';
 import 'package:todo_app/shared/utils/audio_storage.dart';
 import 'package:todo_app/shared/widgets/attachment_image.dart';
 import 'package:todo_app/shared/widgets/audio_preview.dart';
+import 'package:todo_app/shared/widgets/haptic_tap_scope.dart';
 import 'package:todo_app/shared/widgets/image_preview.dart';
 import 'package:todo_app/shared/widgets/keyboard_lift.dart';
 enum BigTaskCardMode { collect, process }
@@ -256,10 +257,12 @@ class BigTaskCard extends StatelessWidget {
   Widget _keyboardLiftedFooter(BuildContext context, List<Widget> children) {
     return KeyboardLift(
       bottomObstruction: shellBottomObstruction(context),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: children,
+      child: SuppressTapHaptic(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: children,
+        ),
       ),
     );
   }
