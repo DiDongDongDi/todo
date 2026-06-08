@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:todo_app/core/models/task.dart';
 import 'package:todo_app/core/models/task_display.dart';
+import 'package:todo_app/core/models/task_hierarchy.dart';
 import 'package:todo_app/core/models/task_schedule.dart';
 import 'package:todo_app/core/repositories/task_repository.dart';
 import 'package:todo_app/core/repositories/template_repository.dart';
@@ -24,6 +25,7 @@ import 'package:todo_app/shared/utils/platform_capabilities.dart';
 import 'package:todo_app/shared/widgets/app_snackbar.dart';
 import 'package:todo_app/shared/widgets/big_task_card.dart';
 import 'package:todo_app/shared/widgets/card_stage.dart';
+import 'package:todo_app/shared/widgets/process_task_search_sheet.dart';
 import 'package:todo_app/shared/widgets/progress_widgets.dart';
 import 'package:todo_app/shared/widgets/save_template_dialog.dart';
 import 'package:todo_app/shared/widgets/swipeable_card.dart';
@@ -350,6 +352,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
               taskCount: tasks.length,
               archivedToday: archivedToday,
               todayOnly: todayOnly,
+              onSearch: () => _openTaskSearch(tasks, task),
               onSaveTemplate: () => _saveCurrentAsTemplate(task),
             ),
             Expanded(
@@ -777,11 +780,58 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     ]);
   }
 
+  Future<void> _openTaskSearch(List<Task> processTasks, Task currentTask) async {
+    final inbox = ref.read(inboxTasksProvider).value ?? [];
+    if (inbox.isEmpty) return;
+
+    final selected = await showProcessTaskSearchSheet(
+      context,
+      tasks: inbox,
+      currentTaskId: currentTask.id,
+    );
+    if (selected == null || !mounted) return;
+    await _jumpToTask(selected);
+  }
+
+  Future<void> _jumpToTask(Task target) async {
+    var processTasks = ref.read(processTasksProvider).value ?? [];
+    var index = processTasks.indexWhere((t) => t.id == target.id);
+    if (index >= 0) {
+      await _setIndex(index, processTasks.length, animated: true);
+      return;
+    }
+
+    final todayOnly = ref.read(processTodayOnlyProvider).value ?? false;
+    if (todayOnly) {
+      final inbox = ref.read(inboxTasksProvider).value ?? [];
+      final unfiltered = filterProcessTasks(inbox, todayOnly: false);
+      if (unfiltered.any((t) => t.id == target.id)) {
+        await ref.read(processTodayOnlyProvider.notifier).setEnabled(false);
+        processTasks = await _waitForProcessTask(target.id);
+        if (!mounted) return;
+        index = processTasks.indexWhere((t) => t.id == target.id);
+        if (index >= 0) {
+          await _setIndex(index, processTasks.length, animated: true);
+          return;
+        }
+      }
+    }
+
+    if (!mounted) return;
+    showAppSnackBar(
+      context,
+      message: '该任务当前不在处理队列中',
+      icon: Icons.info_outline,
+      type: AppSnackType.info,
+    );
+  }
+
   Widget _buildTopBar(
     BuildContext context, {
     required int taskCount,
     required int archivedToday,
     required bool todayOnly,
+    VoidCallback? onSearch,
     VoidCallback? onSaveTemplate,
   }) {
     final theme = Theme.of(context);
@@ -799,6 +849,11 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
             style: theme.textTheme.bodyMedium,
           ),
           const Spacer(),
+          IconButton(
+            icon: const Icon(Icons.search),
+            tooltip: '搜索任务',
+            onPressed: taskCount > 0 ? onSearch : null,
+          ),
           IconButton(
             icon: Icon(
               todayOnly ? Icons.today : Icons.today_outlined,
