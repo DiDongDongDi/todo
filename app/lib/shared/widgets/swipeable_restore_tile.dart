@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:todo_app/core/models/task.dart';
 import 'package:todo_app/shared/theme/app_semantic_colors.dart';
 import 'package:todo_app/shared/utils/haptics.dart';
+import 'package:todo_app/shared/widgets/haptic_tap_scope.dart';
 
 typedef RestoreCallback = Future<void> Function();
 
@@ -217,10 +218,12 @@ class SwipeableRestoreTileState extends State<SwipeableRestoreTile>
       child: ListTile(
         title: Text(task.title),
         subtitle: task.note != null ? Text(task.note!) : null,
-        trailing: IconButton(
-          icon: Icon(widget.restoreIcon),
-          tooltip: widget.restoreTooltip,
-          onPressed: () => restore(),
+        trailing: SuppressTapHaptic(
+          child: IconButton(
+            icon: Icon(widget.restoreIcon),
+            tooltip: widget.restoreTooltip,
+            onPressed: () => restore(),
+          ),
         ),
       ),
     );

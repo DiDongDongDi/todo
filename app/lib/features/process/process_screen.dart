@@ -196,6 +196,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
         _index = index;
         _editing = false;
       });
+      AppHaptics.light();
     }
 
     Future<void> playEnterAnimation() async {
@@ -213,7 +214,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
         const Offset(0, 1.5),
         restoreAndSwitch,
         resetAfter: false,
-        feedback: () async => AppHaptics.light(),
+        feedback: AppHaptics.none,
       );
       if (!mounted) return;
       await playEnterAnimation();
@@ -243,11 +244,12 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
 
   Future<void> _animateFlyout(
     Offset flyout,
-    Future<void> Function() action,
-  ) async {
+    Future<void> Function() action, {
+    FlyoutFeedback? feedback,
+  }) async {
     final state = _swipeKey.currentState;
     if (state != null) {
-      await state.animateFlyout(flyout, action);
+      await state.animateFlyout(flyout, action, feedback: feedback);
     } else {
       await action();
     }
@@ -349,6 +351,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
                 swipeKey: _swipeKey,
                 enabled: touchFirst && !_editUiVisible,
                 verticalEnterAnimation: true,
+                onFlyoutFeedback: AppHaptics.none,
                 shouldAnimateFlyout: (flyout) async {
                   if (flyout.dy != 0) return tasks.length > 1;
                   return true;
@@ -474,7 +477,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     if (animated) {
       final flyout =
           forward ? const Offset(0, -1.5) : const Offset(0, 1.5);
-      await _animateFlyout(flyout, apply);
+      await _animateFlyout(flyout, apply, feedback: AppHaptics.none);
     } else {
       await apply();
     }
@@ -675,6 +678,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
       await _animateFlyout(
         const Offset(1.5, 0),
         () => _performArchive(task),
+        feedback: AppHaptics.none,
       );
     } else {
       await _performArchive(task);
@@ -733,6 +737,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
       await _animateFlyout(
         const Offset(-1.5, 0),
         () => _performTrash(task),
+        feedback: AppHaptics.none,
       );
     } else {
       await _performTrash(task);

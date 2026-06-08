@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:todo_app/shared/utils/haptics.dart';
+import 'package:todo_app/shared/widgets/haptic_tap_scope.dart';
 
 enum ProcessMoreAction {
   archive,
@@ -219,11 +220,13 @@ class _TabMoreMenuButtonState<T> extends State<TabMoreMenuButton<T>>
 
   @override
   Widget build(BuildContext context) {
-    return IconButton(
-      key: _anchorKey,
-      icon: const Icon(Icons.more_vert),
-      tooltip: '更多',
-      onPressed: _openMenu,
+    return SuppressTapHaptic(
+      child: IconButton(
+        key: _anchorKey,
+        icon: const Icon(Icons.more_vert),
+        tooltip: '更多',
+        onPressed: _openMenu,
+      ),
     );
   }
 }

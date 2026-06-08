@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:todo_app/shared/theme/app_semantic_colors.dart';
+import 'package:todo_app/shared/widgets/haptic_tap_scope.dart';
 
 enum AppSnackType { info, success, warning, error }
 
@@ -80,16 +81,18 @@ void showAppSnackBar(
                   ),
                 ),
                 if (action != null)
-                  TextButton(
-                    onPressed: () {
-                      _hideActiveBanner();
-                      action.onPressed();
-                    },
-                    style: TextButton.styleFrom(
-                      foregroundColor: fg,
-                      visualDensity: VisualDensity.compact,
+                  SuppressTapHaptic(
+                    child: TextButton(
+                      onPressed: () {
+                        _hideActiveBanner();
+                        action.onPressed();
+                      },
+                      style: TextButton.styleFrom(
+                        foregroundColor: fg,
+                        visualDensity: VisualDensity.compact,
+                      ),
+                      child: Text(action.label),
                     ),
-                    child: Text(action.label),
                   ),
               ],
             ),
