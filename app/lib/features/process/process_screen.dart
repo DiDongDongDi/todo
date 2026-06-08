@@ -320,8 +320,14 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
 
         final shortcuts = _editUiVisible
             ? {
-                const SingleActivator(LogicalKeyboardKey.enter): () =>
-                    _saveEdit(task),
+                const SingleActivator(
+                  LogicalKeyboardKey.enter,
+                  control: true,
+                ): () => _saveEdit(task),
+                const SingleActivator(
+                  LogicalKeyboardKey.enter,
+                  meta: true,
+                ): () => _saveEdit(task),
                 const SingleActivator(LogicalKeyboardKey.escape): () =>
                     _exitEditMode(task),
               }
