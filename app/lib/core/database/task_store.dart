@@ -42,7 +42,8 @@ class JsonTaskStore implements TaskStore {
 
   @override
   Future<List<Task>> getByStatus(TaskStatus status) async {
-    return _sorted(_tasks.where((t) => t.status == status && t.deletedAt == null));
+    final filtered = _tasks.where((t) => t.status == status && t.deletedAt == null);
+    return _sortedByStatus(filtered, status);
   }
 
   @override
@@ -53,14 +54,39 @@ class JsonTaskStore implements TaskStore {
     }
   }
 
-  List<Task> _sorted(Iterable<Task> items) {
-    final list = items.toList()
-      ..sort((a, b) {
-        final order = b.sortOrder.compareTo(a.sortOrder);
-        if (order != 0) return order;
-        return b.createdAt.compareTo(a.createdAt);
-      });
+  List<Task> _sortedByStatus(Iterable<Task> items, TaskStatus status) {
+    final list = items.toList();
+    switch (status) {
+      case TaskStatus.inbox:
+        list.sort(_compareInbox);
+      case TaskStatus.archived:
+        list.sort(_compareArchived);
+      case TaskStatus.trashed:
+        list.sort(_compareTrashed);
+    }
     return list;
+  }
+
+  int _compareInbox(Task a, Task b) {
+    final order = b.sortOrder.compareTo(a.sortOrder);
+    if (order != 0) return order;
+    return b.createdAt.compareTo(a.createdAt);
+  }
+
+  int _compareArchived(Task a, Task b) {
+    final aTime = a.archivedAt ?? a.updatedAt;
+    final bTime = b.archivedAt ?? b.updatedAt;
+    final cmp = bTime.compareTo(aTime);
+    if (cmp != 0) return cmp;
+    return b.updatedAt.compareTo(a.updatedAt);
+  }
+
+  int _compareTrashed(Task a, Task b) {
+    final aTime = a.trashedAt ?? a.updatedAt;
+    final bTime = b.trashedAt ?? b.updatedAt;
+    final cmp = bTime.compareTo(aTime);
+    if (cmp != 0) return cmp;
+    return b.updatedAt.compareTo(a.updatedAt);
   }
 
   @override
