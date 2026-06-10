@@ -77,9 +77,13 @@ class _BatchImportDialogState extends State<_BatchImportDialog> {
               autofocus: true,
               maxLines: 8,
               minLines: 4,
-              decoration: const InputDecoration(
+              style: theme.textTheme.bodyMedium,
+              decoration: InputDecoration(
                 hintText: '粘贴任务文本…',
-                border: OutlineInputBorder(),
+                hintStyle: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.35),
+                ),
+                border: const OutlineInputBorder(),
                 alignLabelWithHint: true,
               ),
             ),
