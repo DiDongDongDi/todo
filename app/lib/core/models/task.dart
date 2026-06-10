@@ -44,7 +44,6 @@ class Task {
     required this.createdAt,
     required this.updatedAt,
     this.userId,
-    this.note,
     this.sortOrder = 0,
     this.attachments = const [],
     this.transcriptionStatus = TranscriptionStatus.none,
@@ -62,7 +61,6 @@ class Task {
   final String id;
   final String? userId;
   final String title;
-  final String? note;
   final TaskStatus status;
   final double sortOrder;
   final List<TaskAttachment> attachments;
@@ -84,13 +82,12 @@ class Task {
   bool get isDaily => recurrence == TaskRecurrence.daily;
 
   bool get hasContent =>
-      title.trim().isNotEmpty || note?.trim().isNotEmpty == true || attachments.isNotEmpty;
+      title.trim().isNotEmpty || attachments.isNotEmpty;
 
   Task copyWith({
     String? id,
     String? userId,
     String? title,
-    String? note,
     TaskStatus? status,
     double? sortOrder,
     List<TaskAttachment>? attachments,
@@ -106,7 +103,6 @@ class Task {
     DateTime? lastDailyCompletedAt,
     DateTime? dueDate,
     String? parentId,
-    bool clearNote = false,
     bool clearParentId = false,
     bool clearArchivedAt = false,
     bool clearTrashedAt = false,
@@ -118,7 +114,6 @@ class Task {
       id: id ?? this.id,
       userId: userId ?? this.userId,
       title: title ?? this.title,
-      note: clearNote ? null : (note ?? this.note),
       status: status ?? this.status,
       sortOrder: sortOrder ?? this.sortOrder,
       attachments: attachments ?? this.attachments,
@@ -143,7 +138,6 @@ class Task {
         'id': id,
         'user_id': userId,
         'title': title,
-        'note': note,
         'status': status.name,
         'sort_order': sortOrder,
         'attachments': attachments.map((e) => e.toJson()).toList(),
@@ -179,7 +173,6 @@ class Task {
       id: json['id'] as String,
       userId: json['user_id'] as String?,
       title: json['title'] as String? ?? '',
-      note: json['note'] as String?,
       status: TaskStatus.values.byName(json['status'] as String? ?? 'inbox'),
       sortOrder: (json['sort_order'] as num?)?.toDouble() ?? 0,
       attachments: attachments,

@@ -120,7 +120,6 @@ class TaskRepository {
 
   Future<Task> createInbox({
     required String title,
-    String? note,
     List<TaskAttachment> attachments = const [],
     TranscriptionStatus transcriptionStatus = TranscriptionStatus.none,
     TaskRecurrence recurrence = TaskRecurrence.none,
@@ -132,7 +131,6 @@ class TaskRepository {
     final task = Task(
       id: _uuid.v4(),
       title: title.trim(),
-      note: note?.trim(),
       status: TaskStatus.inbox,
       sortOrder: now.millisecondsSinceEpoch.toDouble(),
       attachments: attachments,
@@ -152,7 +150,6 @@ class TaskRepository {
   Future<Task> createSubtask({
     required String parentId,
     required String title,
-    String? note,
     List<TaskAttachment> attachments = const [],
     TranscriptionStatus transcriptionStatus = TranscriptionStatus.none,
     TaskRecurrence recurrence = TaskRecurrence.none,
@@ -165,7 +162,6 @@ class TaskRepository {
     }
     return createInbox(
       title: title,
-      note: note,
       attachments: attachments,
       transcriptionStatus: transcriptionStatus,
       recurrence: recurrence,

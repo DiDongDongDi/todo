@@ -14,6 +14,7 @@ enum ProcessMoreAction {
 enum CollectMoreAction {
   saveTemplate,
   createFromTemplate,
+  batchImport,
 }
 
 class TabMoreMenuEntry<T> {

@@ -18,6 +18,7 @@ import 'package:todo_app/shared/utils/attachment_storage.dart';
 import 'package:todo_app/shared/utils/haptics.dart';
 import 'package:todo_app/shared/utils/sounds.dart';
 import 'package:todo_app/shared/widgets/app_snackbar.dart';
+import 'package:todo_app/shared/widgets/batch_import_dialog.dart';
 import 'package:todo_app/shared/widgets/big_task_card.dart';
 import 'package:todo_app/shared/widgets/card_stage.dart';
 import 'package:todo_app/shared/widgets/save_template_dialog.dart';
@@ -487,6 +488,11 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
                   icon: Icons.note_add_outlined,
                   label: '从模板创建',
                 ),
+                TabMoreMenuEntry.item(
+                  value: CollectMoreAction.batchImport,
+                  icon: Icons.playlist_add,
+                  label: '批量导入',
+                ),
               ],
               onSelected: _onCollectMoreAction,
             ),
@@ -544,6 +550,8 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
         await _saveDraftAsTemplate();
       case CollectMoreAction.createFromTemplate:
         await _createFromTemplate();
+      case CollectMoreAction.batchImport:
+        await _batchImport();
     }
   }
 
@@ -567,7 +575,6 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
     final templateRepo = await ref.read(templateRepositoryProvider.future);
     await templateRepo.saveFromDraft(
       title: _controller.text.trim(),
-      note: null,
       attachments: List.from(_attachments),
       recurrence: _recurrence,
       dailyUntil: _dailyUntil,
@@ -595,6 +602,24 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
     showAppSnackBar(
       context,
       message: '已创建 ${created.length} 个任务',
+      icon: Icons.check_circle_outline,
+      type: AppSnackType.success,
+    );
+  }
+
+  Future<void> _batchImport() async {
+    final titles = await showBatchImportDialog(context);
+    if (titles == null || titles.isEmpty || !mounted) return;
+
+    final repo = await ref.read(taskRepositoryProvider.future);
+    for (final title in titles) {
+      await repo.createInbox(title: title);
+    }
+    unawaited(triggerSyncIfSignedIn(ref));
+    if (!mounted) return;
+    showAppSnackBar(
+      context,
+      message: '已导入 ${titles.length} 条任务',
       icon: Icons.check_circle_outline,
       type: AppSnackType.success,
     );
