@@ -575,6 +575,12 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
       transcriptionStatus = TranscriptionStatus.pending;
     }
 
+    final editDue = _editRecurrence == TaskRecurrence.daily ? null : _editDueDate;
+    final normalizedDue = normalizeRecurringDueDate(
+      recurrence: _editRecurrence,
+      dueDate: editDue,
+    );
+
     final updated = await repo.update(
       task.copyWith(
         title: _editController.text.trim(),
@@ -582,11 +588,11 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
         transcriptionStatus: transcriptionStatus,
         recurrence: _editRecurrence,
         dailyUntil: _editDailyUntil,
-        dueDate: _editRecurrence == TaskRecurrence.daily ? null : _editDueDate,
+        dueDate: normalizedDue,
         clearDailyUntil:
             _editRecurrence == TaskRecurrence.daily && _editDailyUntil == null,
         clearDueDate:
-            _editRecurrence == TaskRecurrence.daily || _editDueDate == null,
+            _editRecurrence == TaskRecurrence.daily || editDue == null,
       ),
     );
 

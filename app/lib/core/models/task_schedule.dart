@@ -9,6 +9,70 @@ DateTime clampDay(int year, int month, int anchorDay) {
   return DateTime(year, month, day);
 }
 
+/// 若锚点映射到当前月/年已过期，返回下一周期的首次到期日；否则 null。
+DateTime? nextPeriodDueDate({
+  required TaskRecurrence recurrence,
+  required DateTime dueDate,
+  required DateTime today,
+}) {
+  final t = localDate(today);
+  final a = localDate(dueDate);
+  late final DateTime periodDue;
+  switch (recurrence) {
+    case TaskRecurrence.monthly:
+      periodDue = clampDay(t.year, t.month, a.day);
+    case TaskRecurrence.yearly:
+      periodDue = clampDay(t.year, a.month, a.day);
+    case TaskRecurrence.daily:
+    case TaskRecurrence.none:
+      return null;
+  }
+  if (!t.isAfter(periodDue)) return null;
+  switch (recurrence) {
+    case TaskRecurrence.monthly:
+      final nextMonth = DateTime(t.year, t.month + 1, 1);
+      return clampDay(nextMonth.year, nextMonth.month, a.day);
+    case TaskRecurrence.yearly:
+      return clampDay(t.year + 1, a.month, a.day);
+    case TaskRecurrence.daily:
+    case TaskRecurrence.none:
+      return null;
+  }
+}
+
+/// 创建/编辑月年任务时，跳过已过期周期，将 dueDate 设为首次生效到期日。
+DateTime? normalizeRecurringDueDate({
+  required TaskRecurrence recurrence,
+  required DateTime? dueDate,
+  DateTime? today,
+}) {
+  if (dueDate == null) return null;
+  if (recurrence != TaskRecurrence.monthly &&
+      recurrence != TaskRecurrence.yearly) {
+    return dueDate;
+  }
+  final t = localDate(today ?? DateTime.now());
+  final next = nextPeriodDueDate(
+    recurrence: recurrence,
+    dueDate: dueDate,
+    today: t,
+  );
+  return next ?? localDate(dueDate);
+}
+
+/// 月/年重复任务是否已到达首次生效到期日。
+bool isRecurrenceStarted(Task task, DateTime today) {
+  if (task.dueDate == null) return true;
+  switch (task.recurrence) {
+    case TaskRecurrence.monthly:
+    case TaskRecurrence.yearly:
+      return !localDate(today).isBefore(localDate(task.dueDate!));
+    case TaskRecurrence.daily:
+    case TaskRecurrence.none:
+      return true;
+  }
+}
+
 bool isRecurring(Task task) =>
     task.recurrence == TaskRecurrence.daily ||
     task.recurrence == TaskRecurrence.monthly ||
@@ -63,6 +127,7 @@ bool isDueToday(Task task, DateTime today) {
       return !isDailyExpired(task, today) && !isDailyCompletedToday(task, today);
     case TaskRecurrence.monthly:
     case TaskRecurrence.yearly:
+      if (!isRecurrenceStarted(task, today)) return false;
       final due = periodDueDate(task, today);
       if (due == null) return false;
       return !t.isBefore(due) && !isPeriodCompleted(task, today);
@@ -87,6 +152,7 @@ int? overdueDays(Task task, DateTime today) {
       return t.difference(due).inDays;
     case TaskRecurrence.monthly:
     case TaskRecurrence.yearly:
+      if (!isRecurrenceStarted(task, today)) return null;
       final due = periodDueDate(task, today);
       if (due == null || !t.isAfter(due)) return null;
       return t.difference(due).inDays;
@@ -172,6 +238,11 @@ String? completedScheduleLabel(Task task) {
 String? scheduleLabel(Task task, {DateTime? now}) {
   final today = localDate(now ?? DateTime.now());
   if (isRecurring(task) && isPeriodCompleted(task, today)) return null;
+  if ((task.recurrence == TaskRecurrence.monthly ||
+          task.recurrence == TaskRecurrence.yearly) &&
+      !isRecurrenceStarted(task, today)) {
+    return null;
+  }
   final overdue = overdueDays(task, today);
   if (overdue != null) return '已逾期 $overdue 天';
 
