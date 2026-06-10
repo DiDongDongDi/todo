@@ -6,6 +6,8 @@ import 'package:todo_app/shared/widgets/haptic_tap_scope.dart';
 
 enum AppSnackType { info, success, warning, error }
 
+const double _kAppSnackBarHeight = 52;
+
 OverlayEntry? _activeBanner;
 Timer? _activeBannerTimer;
 
@@ -53,48 +55,59 @@ void showAppSnackBar(
         child: Material(
           elevation: 4,
           color: bg,
+          clipBehavior: Clip.antiAlias,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            child: Row(
-              children: [
-                Expanded(
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: _hideActiveBanner,
-                    child: Row(
-                      children: [
-                        Icon(icon, color: fg, size: 22),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            message,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: fg,
+          child: SizedBox(
+            height: _kAppSnackBarHeight,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: _hideActiveBanner,
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Icon(icon, color: fg, size: 22),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              message,
+                              overflow: TextOverflow.clip,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: fg,
+                              ),
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                if (action != null)
-                  SuppressTapHaptic(
-                    child: TextButton(
-                      onPressed: () {
-                        _hideActiveBanner();
-                        action.onPressed();
-                      },
-                      style: TextButton.styleFrom(
-                        foregroundColor: fg,
-                        visualDensity: VisualDensity.compact,
+                        ],
                       ),
-                      child: Text(action.label),
                     ),
                   ),
-              ],
+                  if (action != null)
+                    SuppressTapHaptic(
+                      child: TextButton(
+                        onPressed: () {
+                          _hideActiveBanner();
+                          action.onPressed();
+                        },
+                        style: TextButton.styleFrom(
+                          foregroundColor: fg,
+                          visualDensity: VisualDensity.compact,
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          fixedSize: const Size(48, _kAppSnackBarHeight),
+                        ),
+                        child: Text(action.label),
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
         ),
