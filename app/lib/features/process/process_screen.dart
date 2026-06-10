@@ -82,11 +82,15 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
   @override
   void didUpdateWidget(ProcessScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.isActive && !widget.isActive) {
-      _handleTabHidden();
-    }
     if (oldWidget.isActive != widget.isActive) {
-      _syncVolumeKeyHandler();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        if (oldWidget.isActive && !widget.isActive) {
+          _handleTabHidden();
+        } else {
+          _syncVolumeKeyHandler();
+        }
+      });
     }
   }
 

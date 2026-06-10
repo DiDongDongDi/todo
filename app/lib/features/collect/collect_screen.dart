@@ -127,7 +127,10 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
   void didUpdateWidget(CollectScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.isActive != widget.isActive) {
-      _syncVolumeKeyHandler();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _syncVolumeKeyHandler();
+      });
     }
   }
 
