@@ -8,6 +8,9 @@ import 'package:todo_app/core/models/task.dart';
 import 'package:todo_app/core/repositories/task_repository.dart';
 import 'package:todo_app/core/repositories/template_repository.dart';
 import 'package:todo_app/core/settings/collect_sound_settings.dart';
+import 'package:todo_app/core/settings/volume_key_handler.dart';
+import 'package:todo_app/core/settings/volume_key_platform.dart';
+import 'package:todo_app/core/settings/volume_key_settings.dart';
 import 'package:todo_app/core/sync/sync_engine.dart';
 import 'package:todo_app/core/transcription/transcription_service.dart';
 import 'package:todo_app/shared/utils/app_audio_recorder.dart';
@@ -25,7 +28,10 @@ import 'package:todo_app/shared/widgets/task_schedule_editor.dart';
 import 'package:todo_app/shared/widgets/template_picker_sheet.dart';
 
 class CollectScreen extends ConsumerStatefulWidget {
-  const CollectScreen({super.key});
+  const CollectScreen({super.key, this.isActive = true});
+
+  /// 当前是否为 Shell 中选中的 tab。
+  final bool isActive;
 
   @override
   ConsumerState<CollectScreen> createState() => _CollectScreenState();
@@ -114,6 +120,30 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
     super.initState();
     _focusNode = FocusNode();
     _focusNode.addListener(_onInputFocusChange);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _syncVolumeKeyHandler());
+  }
+
+  @override
+  void didUpdateWidget(CollectScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isActive != widget.isActive) {
+      _syncVolumeKeyHandler();
+    }
+  }
+
+  void _syncVolumeKeyHandler() {
+    final enabled = ref.read(volumeKeyShortcutsProvider).value ?? false;
+    if (widget.isActive && enabled) {
+      ref.read(volumeKeyHandlerProvider.notifier).registerCollect(_handleVolumeKey);
+    } else {
+      ref.read(volumeKeyHandlerProvider.notifier).registerCollect(null);
+    }
+  }
+
+  void _handleVolumeKey(VolumeKeyDirection direction) {
+    if (direction == VolumeKeyDirection.down) {
+      unawaited(_save(animated: true));
+    }
   }
 
   void _onInputFocusChange() {
@@ -137,6 +167,7 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
 
   @override
   void dispose() {
+    ref.read(volumeKeyHandlerProvider.notifier).registerCollect(null);
     _focusNode.removeListener(_onInputFocusChange);
     _controller.dispose();
     _focusNode.dispose();
@@ -433,6 +464,8 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(volumeKeyShortcutsProvider, (_, __) => _syncVolumeKeyHandler());
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [

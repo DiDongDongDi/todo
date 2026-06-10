@@ -1,14 +1,38 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:todo_app/core/settings/volume_key_platform.dart';
+import 'package:todo_app/core/settings/volume_key_settings.dart';
 import 'package:todo_app/shared/layout/app_layout.dart';
 import 'package:todo_app/shared/widgets/tab_page_header.dart';
 
-class SettingsScreen extends ConsumerWidget {
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+  bool? _volumeKeySupported;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_loadVolumeKeySupport());
+  }
+
+  Future<void> _loadVolumeKeySupport() async {
+    final supported = await VolumeKeyPlatform.isSupported;
+    if (mounted) setState(() => _volumeKeySupported = supported);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final shortcutsAsync = ref.watch(volumeKeyShortcutsProvider);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -17,6 +41,23 @@ class SettingsScreen extends ConsumerWidget {
           child: ListView(
             padding: AppLayout.cardPadding.copyWith(top: 8, bottom: 24),
             children: [
+              if (_volumeKeySupported == true) ...[
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  secondary: const Icon(Icons.volume_down_outlined),
+                  title: const Text('音量键快捷键'),
+                  subtitle: const Text(
+                    '收集页：音量下键保存；处理页：音量上/下键切换任务',
+                  ),
+                  value: shortcutsAsync.value ?? false,
+                  onChanged: shortcutsAsync.isLoading
+                      ? null
+                      : (value) => ref
+                          .read(volumeKeyShortcutsProvider.notifier)
+                          .setEnabled(value),
+                ),
+                const SizedBox(height: 8),
+              ],
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.bookmark_outline),
