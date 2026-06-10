@@ -10,18 +10,18 @@ Future<List<String>?> showBatchImportDialog(BuildContext context) async {
     isScrollControlled: true,
     showDragHandle: true,
     useSafeArea: true,
-    builder: (context) => const _BatchImportSheet(),
+    builder: (context) => const _BatchImportDialog(),
   );
 }
 
-class _BatchImportSheet extends StatefulWidget {
-  const _BatchImportSheet();
+class _BatchImportDialog extends StatefulWidget {
+  const _BatchImportDialog();
 
   @override
-  State<_BatchImportSheet> createState() => _BatchImportSheetState();
+  State<_BatchImportDialog> createState() => _BatchImportDialogState();
 }
 
-class _BatchImportSheetState extends State<_BatchImportSheet> {
+class _BatchImportDialogState extends State<_BatchImportDialog> {
   final _controller = TextEditingController();
   final _focusNode = FocusNode();
   List<String> _preview = const [];
