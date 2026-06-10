@@ -13,12 +13,14 @@ class SwipeableRestoreTile extends StatefulWidget {
     required this.onRestore,
     this.restoreIcon = Icons.undo,
     this.restoreTooltip = '恢复到收集箱',
+    this.subtitle,
   });
 
   final Task task;
   final RestoreCallback onRestore;
   final IconData restoreIcon;
   final String restoreTooltip;
+  final String? subtitle;
 
   @override
   SwipeableRestoreTileState createState() => SwipeableRestoreTileState();
@@ -217,7 +219,11 @@ class SwipeableRestoreTileState extends State<SwipeableRestoreTile>
     final tileChild = Card(
       child: ListTile(
         title: Text(task.title),
-        subtitle: task.note != null ? Text(task.note!) : null,
+        subtitle: widget.subtitle != null
+            ? Text(widget.subtitle!)
+            : task.note != null
+                ? Text(task.note!)
+                : null,
         trailing: SuppressTapHaptic(
           child: IconButton(
             icon: Icon(widget.restoreIcon),

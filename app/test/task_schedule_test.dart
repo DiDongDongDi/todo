@@ -467,5 +467,133 @@ void main() {
         '每年 · 6/9',
       );
     });
+
+    test('period-completed monthly overdue returns null not overdue label', () {
+      expect(
+        scheduleLabel(
+          _task(
+            recurrence: TaskRecurrence.monthly,
+            dueDate: DateTime(2026, 1, 15),
+            lastDailyCompletedAt: DateTime(2026, 6, 7, 10),
+          ),
+          now: DateTime(2026, 6, 20),
+        ),
+        isNull,
+      );
+    });
+  });
+
+  group('shouldIncludeInSearch', () {
+    test('includes active inbox tasks', () {
+      expect(shouldIncludeInSearch(_task(), now: today), isTrue);
+    });
+
+    test('excludes daily completed today', () {
+      expect(
+        shouldIncludeInSearch(
+          _task(
+            recurrence: TaskRecurrence.daily,
+            lastDailyCompletedAt: DateTime(2026, 6, 7, 10),
+          ),
+          now: today,
+        ),
+        isFalse,
+      );
+    });
+
+    test('excludes monthly completed this month', () {
+      expect(
+        shouldIncludeInSearch(
+          _task(
+            recurrence: TaskRecurrence.monthly,
+            dueDate: DateTime(2026, 1, 15),
+            lastDailyCompletedAt: DateTime(2026, 6, 5),
+          ),
+          now: today,
+        ),
+        isFalse,
+      );
+    });
+
+    test('excludes yearly completed this year', () {
+      expect(
+        shouldIncludeInSearch(
+          _task(
+            recurrence: TaskRecurrence.yearly,
+            dueDate: DateTime(2020, 6, 9),
+            lastDailyCompletedAt: DateTime(2026, 1, 1),
+          ),
+          now: today,
+        ),
+        isFalse,
+      );
+    });
+
+    test('includes monthly not yet completed this month', () {
+      expect(
+        shouldIncludeInSearch(
+          _task(
+            recurrence: TaskRecurrence.monthly,
+            dueDate: DateTime(2026, 1, 15),
+          ),
+          now: today,
+        ),
+        isTrue,
+      );
+    });
+
+    test('excludes archived tasks', () {
+      expect(
+        shouldIncludeInSearch(
+          _task(status: TaskStatus.archived),
+          now: today,
+        ),
+        isFalse,
+      );
+    });
+  });
+
+  group('completedScheduleLabel', () {
+    test('daily', () {
+      expect(
+        completedScheduleLabel(_task(recurrence: TaskRecurrence.daily)),
+        '每日 · 今日已完成',
+      );
+    });
+
+    test('monthly', () {
+      expect(
+        completedScheduleLabel(
+          _task(
+            recurrence: TaskRecurrence.monthly,
+            dueDate: DateTime(2026, 1, 15),
+          ),
+        ),
+        '每月 · 本月已完成',
+      );
+    });
+
+    test('yearly', () {
+      expect(
+        completedScheduleLabel(
+          _task(
+            recurrence: TaskRecurrence.yearly,
+            dueDate: DateTime(2020, 6, 9),
+          ),
+        ),
+        '每年 · 今年已完成',
+      );
+    });
+
+    test('planned one-off', () {
+      expect(
+        completedScheduleLabel(_task(dueDate: DateTime(2026, 6, 7))),
+        '计划 · 6/7',
+      );
+    });
+
+    test('no schedule returns null', () {
+      expect(completedScheduleLabel(_task()), isNull);
+    });
   });
 }

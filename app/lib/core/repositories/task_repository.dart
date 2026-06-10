@@ -5,10 +5,48 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:todo_app/core/database/task_store.dart';
 import 'package:todo_app/core/models/task.dart';
 import 'package:todo_app/core/models/task_hierarchy.dart';
+import 'package:todo_app/core/models/task_schedule.dart';
 import 'package:todo_app/core/settings/process_today_only_settings.dart';
 import 'package:uuid/uuid.dart';
 
 const _storageKey = 'todo_tasks_v1';
+
+class CompletedTaskEntry {
+  const CompletedTaskEntry({
+    required this.task,
+    required this.isPeriodCompletion,
+  });
+
+  final Task task;
+  final bool isPeriodCompletion;
+}
+
+DateTime completedAt(CompletedTaskEntry entry) {
+  if (entry.isPeriodCompletion) {
+    return entry.task.lastDailyCompletedAt ?? entry.task.updatedAt;
+  }
+  return entry.task.archivedAt ?? entry.task.updatedAt;
+}
+
+List<CompletedTaskEntry> mergeCompletedTasks({
+  required List<Task> archived,
+  required List<Task> inbox,
+  DateTime? now,
+}) {
+  final today = now ?? DateTime.now();
+  final entries = <CompletedTaskEntry>[
+    ...archived.map(
+      (task) => CompletedTaskEntry(task: task, isPeriodCompletion: false),
+    ),
+    ...inbox
+        .where((task) => isRecurring(task) && isPeriodCompleted(task, today))
+        .map(
+          (task) => CompletedTaskEntry(task: task, isPeriodCompletion: true),
+        ),
+  ];
+  entries.sort((a, b) => completedAt(b).compareTo(completedAt(a)));
+  return entries;
+}
 
 final taskStoreInitProvider = FutureProvider<TaskStore>((ref) async {
   final prefs = await SharedPreferences.getInstance();
@@ -39,6 +77,28 @@ final processTasksProvider = StreamProvider<List<Task>>((ref) async* {
 final archivedTasksProvider = StreamProvider<List<Task>>((ref) async* {
   final store = await ref.watch(taskStoreInitProvider.future);
   yield* store.watchByStatus(TaskStatus.archived);
+});
+
+final completedTasksProvider = Provider<AsyncValue<List<CompletedTaskEntry>>>((ref) {
+  final inboxAsync = ref.watch(inboxTasksProvider);
+  final archivedAsync = ref.watch(archivedTasksProvider);
+
+  if (inboxAsync.isLoading || archivedAsync.isLoading) {
+    return const AsyncValue.loading();
+  }
+  if (inboxAsync.hasError) {
+    return AsyncValue.error(inboxAsync.error!, inboxAsync.stackTrace!);
+  }
+  if (archivedAsync.hasError) {
+    return AsyncValue.error(archivedAsync.error!, archivedAsync.stackTrace!);
+  }
+
+  return AsyncValue.data(
+    mergeCompletedTasks(
+      archived: archivedAsync.value ?? [],
+      inbox: inboxAsync.value ?? [],
+    ),
+  );
 });
 
 final trashedTasksProvider = StreamProvider<List<Task>>((ref) async* {

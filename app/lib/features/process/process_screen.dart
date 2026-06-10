@@ -788,11 +788,12 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
 
   Future<void> _openTaskSearch(List<Task> processTasks, Task currentTask) async {
     final inbox = ref.read(inboxTasksProvider).value ?? [];
-    if (inbox.isEmpty) return;
+    final searchable = inbox.where((t) => shouldIncludeInSearch(t)).toList();
+    if (searchable.isEmpty) return;
 
     final selected = await showProcessTaskSearchSheet(
       context,
-      tasks: inbox,
+      tasks: searchable,
       currentTaskId: currentTask.id,
     );
     if (selected == null || !mounted) return;
