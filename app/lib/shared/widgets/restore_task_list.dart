@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:todo_app/core/models/task.dart';
+import 'package:todo_app/core/models/task_schedule.dart';
 import 'package:todo_app/core/repositories/task_repository.dart';
 import 'package:todo_app/core/settings/restore_sound_settings.dart';
 import 'package:todo_app/core/sync/sync_engine.dart';
@@ -155,6 +156,161 @@ class _RestoreTaskListViewState extends ConsumerState<RestoreTaskListView> {
               return const SizedBox.shrink();
             }
             return _buildRow(_tasks[index], index);
+          },
+        );
+      },
+    );
+  }
+}
+
+class CompletedTaskListView extends ConsumerStatefulWidget {
+  const CompletedTaskListView({
+    super.key,
+    required this.emptyMessage,
+  });
+
+  final String emptyMessage;
+
+  @override
+  ConsumerState<CompletedTaskListView> createState() =>
+      _CompletedTaskListViewState();
+}
+
+class _CompletedTaskListViewState extends ConsumerState<CompletedTaskListView> {
+  static const _separatorHeight = 8.0;
+  static const _defaultRowHeight = 72.0;
+  static const _collapseDuration = Duration(milliseconds: 260);
+
+  final _listKey = GlobalKey<AnimatedListState>();
+  final _rowKeys = <String, GlobalKey>{};
+
+  List<CompletedTaskEntry> _entries = [];
+  bool _removing = false;
+
+  void _syncEntries(List<CompletedTaskEntry> entries) {
+    if (_removing) return;
+    setState(() => _entries = List.from(entries));
+  }
+
+  double _measureRowHeight(int index) {
+    final entry = _entries[index];
+    final key = _rowKeys[entry.task.id];
+    final box = key?.currentContext?.findRenderObject() as RenderBox?;
+    if (box != null && box.hasSize) {
+      return box.size.height;
+    }
+    return _defaultRowHeight;
+  }
+
+  Future<void> _handleRestore(int index) async {
+    if (_removing || index < 0 || index >= _entries.length) return;
+
+    final entry = _entries[index];
+    final rowHeight = _measureRowHeight(index);
+    final slotHeight = rowHeight +
+        (index < _entries.length - 1 ? _separatorHeight : 0);
+
+    setState(() {
+      _removing = true;
+      _entries.removeAt(index);
+    });
+
+    _listKey.currentState!.removeItem(
+      index,
+      (context, animation) => _buildCollapseSlot(slotHeight, animation),
+      duration: _collapseDuration,
+    );
+
+    await Future<void>.delayed(_collapseDuration);
+
+    if (!mounted) return;
+
+    setState(() => _removing = false);
+    _rowKeys.remove(entry.task.id);
+
+    final repo = await ref.read(taskRepositoryProvider.future);
+    if (entry.isPeriodCompletion) {
+      await repo.undoDailyCompletion(entry.task.id);
+    } else {
+      await repo.restoreToInbox(entry.task.id);
+    }
+    unawaited(triggerSyncIfSignedIn(ref));
+    unawaited(_playRestoreFeedback());
+
+    if (!mounted) return;
+    showAppSnackBar(
+      context,
+      message: entry.isPeriodCompletion ? '已撤销本周期完成' : '已恢复',
+      icon: Icons.check_circle_outline,
+      type: AppSnackType.success,
+    );
+  }
+
+  Future<void> _playRestoreFeedback() async {
+    final preference = await ref.read(restoreSoundProvider.future);
+    await AppSounds.play(preference);
+  }
+
+  Widget _buildCollapseSlot(double height, Animation<double> animation) {
+    return SizeTransition(
+      sizeFactor: animation,
+      axisAlignment: -1,
+      child: SizedBox(height: height),
+    );
+  }
+
+  Widget _buildRow(CompletedTaskEntry entry, int index) {
+    _rowKeys.putIfAbsent(entry.task.id, GlobalKey.new);
+    final scheduleSubtitle = completedScheduleLabel(entry.task);
+
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: index < _entries.length - 1 ? _separatorHeight : 0,
+      ),
+      child: SwipeableRestoreTile(
+        key: _rowKeys[entry.task.id],
+        task: entry.task,
+        subtitle: scheduleSubtitle,
+        restoreIcon: Icons.undo,
+        restoreTooltip: entry.isPeriodCompletion
+            ? '撤销本周期完成'
+            : '恢复到收集箱',
+        onRestore: () => _handleRestore(
+          _entries.indexWhere((e) => e.task.id == entry.task.id),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final entriesAsync = ref.watch(completedTasksProvider);
+
+    ref.listen(completedTasksProvider, (previous, next) {
+      next.whenData(_syncEntries);
+    });
+
+    return entriesAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(child: Text('加载失败: $e')),
+      data: (entries) {
+        if (_entries.isEmpty && entries.isNotEmpty && !_removing) {
+          _entries = List.from(entries);
+        }
+
+        if (_entries.isEmpty) {
+          return Center(child: Text(widget.emptyMessage));
+        }
+
+        return AnimatedList(
+          key: _listKey,
+          padding: const EdgeInsets.all(16),
+          initialItemCount: _entries.length,
+          itemBuilder: (context, index, animation) {
+            if (index >= _entries.length) {
+              return const SizedBox.shrink();
+            }
+            return _buildRow(_entries[index], index);
           },
         );
       },

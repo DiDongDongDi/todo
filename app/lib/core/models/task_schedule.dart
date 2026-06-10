@@ -100,6 +100,13 @@ bool isOverdue(Task task, {DateTime? now}) {
   return overdueDays(task, today) != null;
 }
 
+bool shouldIncludeInSearch(Task task, {DateTime? now}) {
+  if (task.status != TaskStatus.inbox) return false;
+  final today = now ?? DateTime.now();
+  if (isRecurring(task) && isPeriodCompleted(task, today)) return false;
+  return true;
+}
+
 bool shouldShowInProcess(
   Task task, {
   required bool todayOnly,
@@ -145,8 +152,26 @@ String scheduleEditorSummary({
   }
 }
 
+String? completedScheduleLabel(Task task) {
+  switch (task.recurrence) {
+    case TaskRecurrence.daily:
+      return '每日 · 今日已完成';
+    case TaskRecurrence.monthly:
+      return '每月 · 本月已完成';
+    case TaskRecurrence.yearly:
+      return '每年 · 今年已完成';
+    case TaskRecurrence.none:
+      if (task.dueDate != null) {
+        final due = localDate(task.dueDate!);
+        return '计划 · ${due.month}/${due.day}';
+      }
+      return null;
+  }
+}
+
 String? scheduleLabel(Task task, {DateTime? now}) {
   final today = localDate(now ?? DateTime.now());
+  if (isRecurring(task) && isPeriodCompleted(task, today)) return null;
   final overdue = overdueDays(task, today);
   if (overdue != null) return '已逾期 $overdue 天';
 
