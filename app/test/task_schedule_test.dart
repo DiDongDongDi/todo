@@ -167,6 +167,39 @@ void main() {
       );
     });
 
+    test('expired monthly task is not due', () {
+      final task = _task(
+        recurrence: TaskRecurrence.monthly,
+        dueDate: DateTime(2026, 1, 15),
+        dailyUntil: yesterday,
+      );
+      expect(isDueToday(task, today), isFalse);
+    });
+
+    test('monthly task on expiry day is still due', () {
+      final task = _task(
+        recurrence: TaskRecurrence.monthly,
+        dueDate: DateTime(2026, 1, 15),
+        dailyUntil: DateTime(2026, 6, 20),
+      );
+      expect(isDueToday(task, DateTime(2026, 6, 20)), isTrue);
+    });
+
+    test('hides expired monthly in default mode', () {
+      expect(
+        shouldShowInProcess(
+          _task(
+            recurrence: TaskRecurrence.monthly,
+            dueDate: DateTime(2026, 1, 15),
+            dailyUntil: yesterday,
+          ),
+          todayOnly: false,
+          now: today,
+        ),
+        isFalse,
+      );
+    });
+
     test('anchor day 31 clamps in February', () {
       final task = _task(
         recurrence: TaskRecurrence.monthly,
@@ -216,6 +249,39 @@ void main() {
       expect(
         shouldShowInProcess(task, todayOnly: false, now: DateTime(2027, 6, 9)),
         isTrue,
+      );
+    });
+
+    test('expired yearly task is not due', () {
+      final task = _task(
+        recurrence: TaskRecurrence.yearly,
+        dueDate: DateTime(2020, 6, 9),
+        dailyUntil: yesterday,
+      );
+      expect(isDueToday(task, today), isFalse);
+    });
+
+    test('yearly task on expiry day is still due', () {
+      final task = _task(
+        recurrence: TaskRecurrence.yearly,
+        dueDate: DateTime(2020, 6, 9),
+        dailyUntil: DateTime(2026, 6, 9),
+      );
+      expect(isDueToday(task, DateTime(2026, 6, 9)), isTrue);
+    });
+
+    test('hides expired yearly in default mode', () {
+      expect(
+        shouldShowInProcess(
+          _task(
+            recurrence: TaskRecurrence.yearly,
+            dueDate: DateTime(2020, 6, 9),
+            dailyUntil: yesterday,
+          ),
+          todayOnly: false,
+          now: today,
+        ),
+        isFalse,
       );
     });
   });
@@ -442,6 +508,20 @@ void main() {
       );
     });
 
+    test('monthly label with expiry', () {
+      expect(
+        scheduleLabel(
+          _task(
+            recurrence: TaskRecurrence.monthly,
+            dueDate: DateTime(2026, 1, 15),
+            dailyUntil: DateTime(2026, 12, 31),
+          ),
+          now: today,
+        ),
+        '每月 · 15日 · 至 12/31',
+      );
+    });
+
     test('monthly overdue label', () {
       expect(
         scheduleLabel(
@@ -468,6 +548,20 @@ void main() {
       );
     });
 
+    test('yearly label with expiry', () {
+      expect(
+        scheduleLabel(
+          _task(
+            recurrence: TaskRecurrence.yearly,
+            dueDate: DateTime(2020, 6, 9),
+            dailyUntil: DateTime(2026, 12, 31),
+          ),
+          now: today,
+        ),
+        '每年 · 6/9 · 至 12/31',
+      );
+    });
+
     test('period-completed monthly overdue returns null not overdue label', () {
       expect(
         scheduleLabel(
@@ -479,6 +573,52 @@ void main() {
           now: DateTime(2026, 6, 20),
         ),
         isNull,
+      );
+    });
+  });
+
+  group('scheduleEditorSummary', () {
+    test('monthly without expiry', () {
+      expect(
+        scheduleEditorSummary(
+          recurrence: TaskRecurrence.monthly,
+          dailyUntil: null,
+          dueDate: DateTime(2026, 1, 15),
+        ),
+        '每月 · 15日',
+      );
+    });
+
+    test('monthly with expiry', () {
+      expect(
+        scheduleEditorSummary(
+          recurrence: TaskRecurrence.monthly,
+          dailyUntil: DateTime(2026, 12, 31),
+          dueDate: DateTime(2026, 1, 15),
+        ),
+        '每月 · 15日 · 至 12/31',
+      );
+    });
+
+    test('yearly without expiry', () {
+      expect(
+        scheduleEditorSummary(
+          recurrence: TaskRecurrence.yearly,
+          dailyUntil: null,
+          dueDate: DateTime(2020, 6, 9),
+        ),
+        '每年 · 6/9',
+      );
+    });
+
+    test('yearly with expiry', () {
+      expect(
+        scheduleEditorSummary(
+          recurrence: TaskRecurrence.yearly,
+          dailyUntil: DateTime(2026, 12, 31),
+          dueDate: DateTime(2020, 6, 9),
+        ),
+        '每年 · 6/9 · 至 12/31',
       );
     });
   });

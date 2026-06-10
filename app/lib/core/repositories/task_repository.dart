@@ -141,7 +141,7 @@ class TaskRepository {
       updatedAt: now,
       syncVersion: 1,
       recurrence: recurrence,
-      dailyUntil: recurrence == TaskRecurrence.daily ? dailyUntil : null,
+      dailyUntil: recurrence != TaskRecurrence.none ? dailyUntil : null,
       dueDate: recurrence == TaskRecurrence.daily ? null : dueDate,
       parentId: parentId,
     );

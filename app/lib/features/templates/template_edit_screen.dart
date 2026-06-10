@@ -103,11 +103,11 @@ class _TemplateEditScreenState extends ConsumerState<TemplateEditScreen> {
             ? null
             : _noteController.text.trim(),
         recurrence: _recurrence,
-        dailyUntil: _dailyUntil,
+        dailyUntil: _recurrence != TaskRecurrence.none ? _dailyUntil : null,
         dueDate: _recurrence == TaskRecurrence.daily ? null : _dueDate,
         clearNote: _noteController.text.trim().isEmpty,
         clearDailyUntil:
-            _recurrence == TaskRecurrence.daily && _dailyUntil == null,
+            _recurrence == TaskRecurrence.none || _dailyUntil == null,
         clearDueDate: _recurrence == TaskRecurrence.daily || _dueDate == null,
         subtaskTitles: _subtaskControllers
             .map((c) => c.text.trim())

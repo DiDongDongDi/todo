@@ -14,9 +14,15 @@ bool isRecurring(Task task) =>
     task.recurrence == TaskRecurrence.monthly ||
     task.recurrence == TaskRecurrence.yearly;
 
-bool isDailyExpired(Task task, DateTime today) =>
+bool isRecurrenceExpired(Task task, DateTime today) =>
     task.dailyUntil != null &&
     localDate(task.dailyUntil!).isBefore(localDate(today));
+
+String? _untilSuffix(DateTime? dailyUntil) {
+  if (dailyUntil == null) return null;
+  final until = localDate(dailyUntil);
+  return ' · 至 ${until.month}/${until.day}';
+}
 
 bool isDailyCompletedToday(Task task, DateTime today) {
   if (task.lastDailyCompletedAt == null) return false;
@@ -60,9 +66,11 @@ bool isDueToday(Task task, DateTime today) {
   final t = localDate(today);
   switch (task.recurrence) {
     case TaskRecurrence.daily:
-      return !isDailyExpired(task, today) && !isDailyCompletedToday(task, today);
+      return !isRecurrenceExpired(task, today) &&
+          !isDailyCompletedToday(task, today);
     case TaskRecurrence.monthly:
     case TaskRecurrence.yearly:
+      if (isRecurrenceExpired(task, today)) return false;
       final due = periodDueDate(task, today);
       if (due == null) return false;
       return !t.isBefore(due) && !isPeriodCompleted(task, today);
@@ -114,7 +122,7 @@ bool shouldShowInProcess(
 }) {
   if (task.status != TaskStatus.inbox) return false;
   final today = now ?? DateTime.now();
-  if (task.recurrence == TaskRecurrence.daily && isDailyExpired(task, today)) {
+  if (isRecurring(task) && isRecurrenceExpired(task, today)) {
     return false;
   }
   if (isRecurring(task) && isPeriodCompleted(task, today)) return false;
@@ -131,18 +139,14 @@ String scheduleEditorSummary({
 }) {
   switch (recurrence) {
     case TaskRecurrence.daily:
-      if (dailyUntil != null) {
-        final until = localDate(dailyUntil);
-        return '每日 · 至 ${until.month}/${until.day}';
-      }
-      return '每日';
+      return '每日${_untilSuffix(dailyUntil) ?? ''}';
     case TaskRecurrence.monthly:
-      if (dueDate == null) return '每月';
-      return '每月 · ${localDate(dueDate).day}日';
+      if (dueDate == null) return '每月${_untilSuffix(dailyUntil) ?? ''}';
+      return '每月 · ${localDate(dueDate).day}日${_untilSuffix(dailyUntil) ?? ''}';
     case TaskRecurrence.yearly:
-      if (dueDate == null) return '每年';
+      if (dueDate == null) return '每年${_untilSuffix(dailyUntil) ?? ''}';
       final anchor = localDate(dueDate);
-      return '每年 · ${anchor.month}/${anchor.day}';
+      return '每年 · ${anchor.month}/${anchor.day}${_untilSuffix(dailyUntil) ?? ''}';
     case TaskRecurrence.none:
       if (dueDate != null) {
         final due = localDate(dueDate);
@@ -177,20 +181,18 @@ String? scheduleLabel(Task task, {DateTime? now}) {
 
   switch (task.recurrence) {
     case TaskRecurrence.daily:
-      if (isDailyExpired(task, today)) return null;
-      if (task.dailyUntil != null) {
-        final until = localDate(task.dailyUntil!);
-        return '每日 · 至 ${until.month}/${until.day}';
-      }
-      return '每日';
+      if (isRecurrenceExpired(task, today)) return null;
+      return '每日${_untilSuffix(task.dailyUntil) ?? ''}';
     case TaskRecurrence.monthly:
+      if (isRecurrenceExpired(task, today)) return null;
       if (task.dueDate == null) return null;
-      final anchor = localDate(task.dueDate!);
-      return '每月 · ${anchor.day}日';
+      final monthlyAnchor = localDate(task.dueDate!);
+      return '每月 · ${monthlyAnchor.day}日${_untilSuffix(task.dailyUntil) ?? ''}';
     case TaskRecurrence.yearly:
+      if (isRecurrenceExpired(task, today)) return null;
       if (task.dueDate == null) return null;
-      final anchor = localDate(task.dueDate!);
-      return '每年 · ${anchor.month}/${anchor.day}';
+      final yearlyAnchor = localDate(task.dueDate!);
+      return '每年 · ${yearlyAnchor.month}/${yearlyAnchor.day}${_untilSuffix(task.dailyUntil) ?? ''}';
     case TaskRecurrence.none:
       if (task.dueDate != null) {
         final due = localDate(task.dueDate!);
