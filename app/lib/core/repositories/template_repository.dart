@@ -40,7 +40,6 @@ class TemplateRepository {
 
   Future<TaskTemplate> create({
     required String title,
-    String? note,
     List<TaskAttachment> attachments = const [],
     TaskRecurrence recurrence = TaskRecurrence.none,
     DateTime? dailyUntil,
@@ -51,7 +50,6 @@ class TemplateRepository {
     final template = TaskTemplate(
       id: _uuid.v4(),
       title: title.trim(),
-      note: note?.trim(),
       attachments: attachments,
       recurrence: recurrence,
       dailyUntil: recurrence == TaskRecurrence.daily ? dailyUntil : null,
@@ -93,7 +91,6 @@ class TemplateRepository {
 
     return create(
       title: titleOverride ?? task.title,
-      note: task.note,
       attachments: task.attachments,
       recurrence: task.recurrence,
       dailyUntil: task.dailyUntil,
@@ -104,7 +101,6 @@ class TemplateRepository {
 
   Future<TaskTemplate> saveFromDraft({
     required String title,
-    String? note,
     List<TaskAttachment> attachments = const [],
     TaskRecurrence recurrence = TaskRecurrence.none,
     DateTime? dailyUntil,
@@ -114,7 +110,6 @@ class TemplateRepository {
   }) async {
     return create(
       title: titleOverride ?? title,
-      note: note,
       attachments: attachments,
       recurrence: recurrence,
       dailyUntil: dailyUntil,
@@ -129,7 +124,6 @@ class TemplateRepository {
 
     final parent = await _taskRepo.createInbox(
       title: template.title,
-      note: template.note,
       attachments: List<TaskAttachment>.from(template.attachments),
       recurrence: template.recurrence,
       dailyUntil: template.dailyUntil,

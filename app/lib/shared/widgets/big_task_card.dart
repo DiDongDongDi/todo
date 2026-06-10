@@ -328,10 +328,6 @@ class BigTaskCard extends StatelessWidget {
                 ),
               ),
             ],
-            if (displayTask.note != null && displayTask.note!.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              Text(displayTask.note!, style: theme.textTheme.bodyLarge),
-            ],
             if (displayTask.attachments.isNotEmpty) ...[
               const SizedBox(height: 20),
               Wrap(

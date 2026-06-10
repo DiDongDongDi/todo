@@ -7,7 +7,6 @@ class TaskTemplate {
     required this.createdAt,
     required this.updatedAt,
     this.userId,
-    this.note,
     this.attachments = const [],
     this.recurrence = TaskRecurrence.none,
     this.dailyUntil,
@@ -19,7 +18,6 @@ class TaskTemplate {
   final String id;
   final String? userId;
   final String title;
-  final String? note;
   final List<TaskAttachment> attachments;
   final TaskRecurrence recurrence;
   final DateTime? dailyUntil;
@@ -33,7 +31,6 @@ class TaskTemplate {
 
   bool get hasContent =>
       title.trim().isNotEmpty ||
-      note?.trim().isNotEmpty == true ||
       attachments.isNotEmpty ||
       subtaskTitles.any((t) => t.trim().isNotEmpty);
 
@@ -41,7 +38,6 @@ class TaskTemplate {
     String? id,
     String? userId,
     String? title,
-    String? note,
     List<TaskAttachment>? attachments,
     TaskRecurrence? recurrence,
     DateTime? dailyUntil,
@@ -50,7 +46,6 @@ class TaskTemplate {
     DateTime? createdAt,
     DateTime? updatedAt,
     int? syncVersion,
-    bool clearNote = false,
     bool clearDailyUntil = false,
     bool clearDueDate = false,
   }) {
@@ -58,7 +53,6 @@ class TaskTemplate {
       id: id ?? this.id,
       userId: userId ?? this.userId,
       title: title ?? this.title,
-      note: clearNote ? null : (note ?? this.note),
       attachments: attachments ?? this.attachments,
       recurrence: recurrence ?? this.recurrence,
       dailyUntil: clearDailyUntil ? null : (dailyUntil ?? this.dailyUntil),
@@ -74,7 +68,6 @@ class TaskTemplate {
         'id': id,
         'user_id': userId,
         'title': title,
-        'note': note,
         'attachments': attachments.map((e) => e.toJson()).toList(),
         'is_daily': isDaily,
         'recurrence_type': recurrence.name,
@@ -108,7 +101,6 @@ class TaskTemplate {
       id: json['id'] as String,
       userId: json['user_id'] as String?,
       title: json['title'] as String? ?? '',
-      note: json['note'] as String?,
       attachments: attachments,
       recurrence: Task.parseRecurrence(json),
       dailyUntil: _parseDateOnly(json['daily_until']),

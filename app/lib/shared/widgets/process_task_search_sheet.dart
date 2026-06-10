@@ -9,10 +9,7 @@ List<Task> filterTasksForSearch(List<Task> tasks, String query) {
 
   final lower = trimmed.toLowerCase();
   return tasks.where((task) {
-    if (task.displayTitle.toLowerCase().contains(lower)) return true;
-    final note = task.note;
-    if (note != null && note.toLowerCase().contains(lower)) return true;
-    return false;
+    return task.displayTitle.toLowerCase().contains(lower);
   }).toList();
 }
 

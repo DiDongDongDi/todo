@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:todo_app/core/models/legacy_note_migration.dart';
 import 'package:todo_app/core/models/task.dart';
 
 abstract class TaskStore {
@@ -32,11 +33,22 @@ class JsonTaskStore implements TaskStore {
     final raw = await _load();
     if (raw != null && raw.isNotEmpty) {
       final list = jsonDecode(raw) as List<dynamic>;
+      var migrated = false;
       _tasks
         ..clear()
         ..addAll(
-          list.map((e) => Task.fromJson(Map<String, dynamic>.from(e as Map))),
+          list.map((e) {
+            final map = Map<String, dynamic>.from(e as Map);
+            if (map.containsKey('note')) {
+              migrated = true;
+              migrateLegacyNoteInMap(map);
+            }
+            return Task.fromJson(map);
+          }),
         );
+      if (migrated) {
+        await _save();
+      }
     }
   }
 

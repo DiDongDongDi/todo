@@ -6,7 +6,6 @@ class Tasks extends Table {
   TextColumn get id => text()();
   TextColumn get userId => text().nullable()();
   TextColumn get title => text().withDefault(const Constant(''))();
-  TextColumn get note => text().nullable()();
   TextColumn get status => text().withDefault(const Constant('inbox'))();
   RealColumn get sortOrder => real().withDefault(const Constant(0))();
   TextColumn get attachments => text().withDefault(const Constant('[]'))();

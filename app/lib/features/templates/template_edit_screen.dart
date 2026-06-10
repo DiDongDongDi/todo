@@ -20,7 +20,6 @@ class TemplateEditScreen extends ConsumerStatefulWidget {
 
 class _TemplateEditScreenState extends ConsumerState<TemplateEditScreen> {
   final _titleController = TextEditingController();
-  final _noteController = TextEditingController();
   final _subtaskControllers = <TextEditingController>[];
 
   bool _loading = true;
@@ -33,7 +32,6 @@ class _TemplateEditScreenState extends ConsumerState<TemplateEditScreen> {
   @override
   void dispose() {
     _titleController.dispose();
-    _noteController.dispose();
     for (final c in _subtaskControllers) {
       c.dispose();
     }
@@ -53,7 +51,6 @@ class _TemplateEditScreenState extends ConsumerState<TemplateEditScreen> {
 
     if (template != null) {
       _titleController.text = template.title;
-      _noteController.text = template.note ?? '';
       _recurrence = template.recurrence;
       _dailyUntil = template.dailyUntil;
       _dueDate = template.dueDate;
@@ -99,13 +96,9 @@ class _TemplateEditScreenState extends ConsumerState<TemplateEditScreen> {
     await repo.update(
       template.copyWith(
         title: title,
-        note: _noteController.text.trim().isEmpty
-            ? null
-            : _noteController.text.trim(),
         recurrence: _recurrence,
         dailyUntil: _dailyUntil,
         dueDate: _recurrence == TaskRecurrence.daily ? null : _dueDate,
-        clearNote: _noteController.text.trim().isEmpty,
         clearDailyUntil:
             _recurrence == TaskRecurrence.daily && _dailyUntil == null,
         clearDueDate: _recurrence == TaskRecurrence.daily || _dueDate == null,
@@ -174,15 +167,6 @@ class _TemplateEditScreenState extends ConsumerState<TemplateEditScreen> {
               labelText: '标题',
               border: OutlineInputBorder(),
             ),
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _noteController,
-            decoration: const InputDecoration(
-              labelText: '备注',
-              border: OutlineInputBorder(),
-            ),
-            maxLines: 3,
           ),
           const SizedBox(height: 16),
           TaskScheduleEditor(

@@ -149,10 +149,6 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                   ),
             ),
           ],
-          if (task.note != null && task.note!.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            Text(task.note!),
-          ],
           if (_subtasks.isNotEmpty) ...[
             const SizedBox(height: 24),
             Text(

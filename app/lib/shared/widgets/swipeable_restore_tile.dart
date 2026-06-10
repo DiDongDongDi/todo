@@ -219,11 +219,7 @@ class SwipeableRestoreTileState extends State<SwipeableRestoreTile>
     final tileChild = Card(
       child: ListTile(
         title: Text(task.title),
-        subtitle: widget.subtitle != null
-            ? Text(widget.subtitle!)
-            : task.note != null
-                ? Text(task.note!)
-                : null,
+        subtitle: widget.subtitle != null ? Text(widget.subtitle!) : null,
         trailing: SuppressTapHaptic(
           child: IconButton(
             icon: Icon(widget.restoreIcon),

@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:todo_app/core/models/legacy_note_migration.dart';
 import 'package:todo_app/core/models/task.dart';
 import 'package:todo_app/core/models/task_template.dart';
 
@@ -75,45 +76,45 @@ class SyncRepository {
   }
 
   Map<String, dynamic> _normalizeTaskRemote(Map<String, dynamic> row) {
+    final migrated = migrateLegacyNoteInMap(Map<String, dynamic>.from(row));
     return {
-      'id': row['id'],
-      'user_id': row['user_id'],
-      'title': row['title'] ?? '',
-      'note': row['note'],
-      'status': row['status'] ?? 'inbox',
-      'sort_order': row['sort_order'] ?? 0,
-      'attachments': row['attachments'] is List ? row['attachments'] : [],
-      'transcription_status': row['transcription_status'] ?? 'none',
-      'archived_at': row['archived_at'],
-      'trashed_at': row['trashed_at'],
-      'created_at': row['created_at'],
-      'updated_at': row['updated_at'],
-      'deleted_at': row['deleted_at'],
-      'sync_version': row['sync_version'] ?? 0,
-      'is_daily': row['is_daily'] ?? false,
-      'recurrence_type': row['recurrence_type'] ?? 'none',
-      'daily_until': row['daily_until'],
-      'last_daily_completed_at': row['last_daily_completed_at'],
-      'due_date': row['due_date'],
-      'parent_id': row['parent_id'],
+      'id': migrated['id'],
+      'user_id': migrated['user_id'],
+      'title': migrated['title'] ?? '',
+      'status': migrated['status'] ?? 'inbox',
+      'sort_order': migrated['sort_order'] ?? 0,
+      'attachments': migrated['attachments'] is List ? migrated['attachments'] : [],
+      'transcription_status': migrated['transcription_status'] ?? 'none',
+      'archived_at': migrated['archived_at'],
+      'trashed_at': migrated['trashed_at'],
+      'created_at': migrated['created_at'],
+      'updated_at': migrated['updated_at'],
+      'deleted_at': migrated['deleted_at'],
+      'sync_version': migrated['sync_version'] ?? 0,
+      'is_daily': migrated['is_daily'] ?? false,
+      'recurrence_type': migrated['recurrence_type'] ?? 'none',
+      'daily_until': migrated['daily_until'],
+      'last_daily_completed_at': migrated['last_daily_completed_at'],
+      'due_date': migrated['due_date'],
+      'parent_id': migrated['parent_id'],
     };
   }
 
   Map<String, dynamic> _normalizeTemplateRemote(Map<String, dynamic> row) {
+    final migrated = migrateLegacyNoteInMap(Map<String, dynamic>.from(row));
     return {
-      'id': row['id'],
-      'user_id': row['user_id'],
-      'title': row['title'] ?? '',
-      'note': row['note'],
-      'attachments': row['attachments'] is List ? row['attachments'] : [],
-      'is_daily': row['is_daily'] ?? false,
-      'recurrence_type': row['recurrence_type'] ?? 'none',
-      'daily_until': row['daily_until'],
-      'due_date': row['due_date'],
-      'subtask_titles': row['subtask_titles'] is List ? row['subtask_titles'] : [],
-      'created_at': row['created_at'],
-      'updated_at': row['updated_at'],
-      'sync_version': row['sync_version'] ?? 0,
+      'id': migrated['id'],
+      'user_id': migrated['user_id'],
+      'title': migrated['title'] ?? '',
+      'attachments': migrated['attachments'] is List ? migrated['attachments'] : [],
+      'is_daily': migrated['is_daily'] ?? false,
+      'recurrence_type': migrated['recurrence_type'] ?? 'none',
+      'daily_until': migrated['daily_until'],
+      'due_date': migrated['due_date'],
+      'subtask_titles': migrated['subtask_titles'] is List ? migrated['subtask_titles'] : [],
+      'created_at': migrated['created_at'],
+      'updated_at': migrated['updated_at'],
+      'sync_version': migrated['sync_version'] ?? 0,
     };
   }
 
