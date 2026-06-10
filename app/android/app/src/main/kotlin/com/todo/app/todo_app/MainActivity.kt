@@ -5,17 +5,49 @@ import android.media.Ringtone
 import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Build
+import android.view.KeyEvent
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
     private val channelName = "com.todo.app/notification_sound"
+    private val volumeKeyChannelName = "com.todo.app/volume_key"
+    private val volumeKeyEventChannelName = "com.todo.app/volume_key_events"
     private var pendingPickResult: MethodChannel.Result? = null
     private var playingRingtone: Ringtone? = null
+    private var volumeKeyInterceptEnabled = false
+    private var volumeKeyEventSink: EventChannel.EventSink? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, volumeKeyChannelName)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "isSupported" -> result.success(true)
+                    "setInterceptEnabled" -> {
+                        volumeKeyInterceptEnabled =
+                            call.argument<Boolean>("enabled") ?: false
+                        result.success(null)
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+
+        EventChannel(flutterEngine.dartExecutor.binaryMessenger, volumeKeyEventChannelName)
+            .setStreamHandler(
+                object : EventChannel.StreamHandler {
+                    override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
+                        volumeKeyEventSink = events
+                    }
+
+                    override fun onCancel(arguments: Any?) {
+                        volumeKeyEventSink = null
+                    }
+                },
+            )
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, channelName)
             .setMethodCallHandler { call, result ->
@@ -135,6 +167,22 @@ class MainActivity : FlutterActivity() {
     private fun stopRingtone() {
         playingRingtone?.stop()
         playingRingtone = null
+    }
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (volumeKeyInterceptEnabled && event.action == KeyEvent.ACTION_DOWN) {
+            when (event.keyCode) {
+                KeyEvent.KEYCODE_VOLUME_UP -> {
+                    volumeKeyEventSink?.success("up")
+                    return true
+                }
+                KeyEvent.KEYCODE_VOLUME_DOWN -> {
+                    volumeKeyEventSink?.success("down")
+                    return true
+                }
+            }
+        }
+        return super.dispatchKeyEvent(event)
     }
 
     companion object {

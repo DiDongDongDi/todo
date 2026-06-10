@@ -14,6 +14,8 @@ import 'package:todo_app/core/repositories/task_repository.dart';
 import 'package:todo_app/core/repositories/template_repository.dart';
 import 'package:todo_app/core/settings/process_sound_settings.dart';
 import 'package:todo_app/core/settings/process_today_only_settings.dart';
+import 'package:todo_app/core/settings/volume_key_handler.dart';
+import 'package:todo_app/core/settings/volume_key_settings.dart';
 import 'package:todo_app/core/stats/stats_provider.dart';
 import 'package:todo_app/core/sync/sync_engine.dart';
 import 'package:todo_app/core/transcription/transcription_service.dart';
@@ -73,6 +75,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
   void initState() {
     super.initState();
     _editFocusNode.addListener(_onEditFocusChange);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _syncVolumeKeyHandler());
   }
 
   @override
@@ -80,6 +83,31 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.isActive && !widget.isActive) {
       _handleTabHidden();
+    }
+    if (oldWidget.isActive != widget.isActive) {
+      _syncVolumeKeyHandler();
+    }
+  }
+
+  void _syncVolumeKeyHandler() {
+    final enabled = ref.read(volumeKeyShortcutsProvider).value ?? false;
+    ref.read(volumeKeyHandlerProvider.notifier).setProcessBlocked(_editUiVisible);
+    if (widget.isActive && enabled && !_editUiVisible) {
+      ref.read(volumeKeyHandlerProvider.notifier).registerProcess(_handleVolumeKey);
+    } else {
+      ref.read(volumeKeyHandlerProvider.notifier).registerProcess(null);
+    }
+  }
+
+  void _handleVolumeKey(VolumeKeyDirection direction) {
+    final tasks = ref.read(processTasksProvider).value;
+    if (tasks == null || tasks.isEmpty) return;
+    final clampedIndex = _index.clamp(0, tasks.length - 1);
+    switch (direction) {
+      case VolumeKeyDirection.up:
+        unawaited(_setIndex(clampedIndex - 1, tasks.length, animated: true));
+      case VolumeKeyDirection.down:
+        unawaited(_setIndex(clampedIndex + 1, tasks.length, animated: true));
     }
   }
 
@@ -96,10 +124,13 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     if (task != null) {
       _syncDisplayFromTask(task);
     }
+    _syncVolumeKeyHandler();
   }
 
   @override
   void dispose() {
+    ref.read(volumeKeyHandlerProvider.notifier).registerProcess(null);
+    ref.read(volumeKeyHandlerProvider.notifier).setProcessBlocked(false);
     _editFocusNode.removeListener(_onEditFocusChange);
     _editController.dispose();
     _editFocusNode.dispose();
@@ -119,10 +150,12 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
       _editPendingFocus = false;
       _ensureEditCaretVisible();
       setState(() {});
+      _syncVolumeKeyHandler();
       return;
     }
     if (_editRecording || _transientUiDepth > 0) {
       setState(() {});
+      _syncVolumeKeyHandler();
       return;
     }
     // 延迟一帧再切换按钮，避免失焦后「保存/取消」被换掉导致 onPressed 丢失。
@@ -134,6 +167,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
         return;
       }
       setState(() {});
+      _syncVolumeKeyHandler();
       _scheduleEditSessionCleanup();
     });
   }
@@ -145,12 +179,14 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
 
   void _beginTransientEditUi() {
     _transientUiDepth++;
+    _syncVolumeKeyHandler();
   }
 
   void _endTransientEditUi() {
     if (_transientUiDepth > 0) _transientUiDepth--;
     if (!mounted) return;
     setState(() {});
+    _syncVolumeKeyHandler();
     _scheduleEditSessionCleanup();
   }
 
@@ -259,6 +295,8 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(volumeKeyShortcutsProvider, (_, __) => _syncVolumeKeyHandler());
+
     final tasksAsync = ref.watch(processTasksProvider);
     final todayOnlyAsync = ref.watch(processTodayOnlyProvider);
     final statsAsync = ref.watch(statsProvider);
@@ -538,6 +576,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     _editRecording = false;
     _editPendingFocus = true;
     setState(() => _editing = true);
+    _syncVolumeKeyHandler();
     unawaited(_requestEditFocus());
   }
 
@@ -549,6 +588,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     if (task != null) {
       _syncDisplayFromTask(task);
     }
+    _syncVolumeKeyHandler();
   }
 
   void _cancelEdit(Task task) {
@@ -636,6 +676,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
       final result = await _editAudioRecorder.stop();
       if (!mounted) return;
       setState(() => _editRecording = false);
+      _syncVolumeKeyHandler();
 
       if (result == null) {
         showAppSnackBar(
@@ -677,6 +718,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
       await _editAudioRecorder.start();
       if (!mounted) return;
       setState(() => _editRecording = true);
+      _syncVolumeKeyHandler();
     } catch (e) {
       debugPrint('Recording start failed: $e');
       if (!mounted) return;
