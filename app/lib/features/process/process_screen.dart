@@ -581,10 +581,11 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
         attachments: List.from(_editAttachments),
         transcriptionStatus: transcriptionStatus,
         recurrence: _editRecurrence,
-        dailyUntil: _editDailyUntil,
+        dailyUntil:
+            _editRecurrence != TaskRecurrence.none ? _editDailyUntil : null,
         dueDate: _editRecurrence == TaskRecurrence.daily ? null : _editDueDate,
         clearDailyUntil:
-            _editRecurrence == TaskRecurrence.daily && _editDailyUntil == null,
+            _editRecurrence == TaskRecurrence.none || _editDailyUntil == null,
         clearDueDate:
             _editRecurrence == TaskRecurrence.daily || _editDueDate == null,
       ),

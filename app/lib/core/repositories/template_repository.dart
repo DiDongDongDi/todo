@@ -54,7 +54,7 @@ class TemplateRepository {
       note: note?.trim(),
       attachments: attachments,
       recurrence: recurrence,
-      dailyUntil: recurrence == TaskRecurrence.daily ? dailyUntil : null,
+      dailyUntil: recurrence != TaskRecurrence.none ? dailyUntil : null,
       dueDate: recurrence == TaskRecurrence.daily ? null : dueDate,
       subtaskTitles: subtaskTitles.map((t) => t.trim()).where((t) => t.isNotEmpty).toList(),
       createdAt: now,

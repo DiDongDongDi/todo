@@ -267,7 +267,7 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
         transcriptionStatus:
             hasAudio ? TranscriptionStatus.pending : TranscriptionStatus.none,
         recurrence: _recurrence,
-        dailyUntil: _recurrence == TaskRecurrence.daily ? _dailyUntil : null,
+        dailyUntil: _recurrence != TaskRecurrence.none ? _dailyUntil : null,
         dueDate: _recurrence == TaskRecurrence.daily ? null : _dueDate,
       );
 

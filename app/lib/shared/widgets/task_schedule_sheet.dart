@@ -109,8 +109,9 @@ class _TaskScheduleSheetState extends State<_TaskScheduleSheet> {
       _recurrence = type;
       if (type == TaskRecurrence.daily) {
         _dueDate = null;
-      } else {
+      } else if (type == TaskRecurrence.none) {
         _dailyUntil = null;
+        _dueDate = null;
       }
     });
   }
@@ -126,6 +127,41 @@ class _TaskScheduleSheetState extends State<_TaskScheduleSheet> {
   void _commit() {
     widget.onCommit(_recurrence, _dailyUntil, _dueDate);
     Navigator.pop(context);
+  }
+
+  Widget _buildUnlimitedUntilSection() {
+    final unlimited = _dailyUntil == null;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('无限期'),
+          value: unlimited,
+          onChanged: (value) {
+            setState(() {
+              _dailyUntil = value ? null : localDate(DateTime.now());
+            });
+          },
+        ),
+        if (!unlimited)
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.event_outlined),
+            title: const Text('到期日'),
+            subtitle: Text(_formatShortDate(localDate(_dailyUntil!))),
+            trailing: IconButton(
+              icon: const Icon(Icons.close, size: 20),
+              tooltip: '改为无限期',
+              onPressed: () => setState(() => _dailyUntil = null),
+            ),
+            onTap: () => _pickDate(
+              initial: _dailyUntil,
+              onPicked: (value) => setState(() => _dailyUntil = value),
+            ),
+          ),
+      ],
+    );
   }
 
   Widget _buildDateSection(ThemeData theme) {
@@ -153,79 +189,60 @@ class _TaskScheduleSheetState extends State<_TaskScheduleSheet> {
           ),
         );
       case TaskRecurrence.daily:
-        final unlimited = _dailyUntil == null;
+        return _buildUnlimitedUntilSection();
+      case TaskRecurrence.monthly:
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            SwitchListTile(
+            ListTile(
               contentPadding: EdgeInsets.zero,
-              title: const Text('无限期'),
-              value: unlimited,
-              onChanged: (value) {
-                setState(() {
-                  _dailyUntil = value ? null : localDate(DateTime.now());
-                });
-              },
-            ),
-            if (!unlimited)
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.event_outlined),
-                title: const Text('到期日'),
-                subtitle: Text(_formatShortDate(localDate(_dailyUntil!))),
-                trailing: IconButton(
-                  icon: const Icon(Icons.close, size: 20),
-                  tooltip: '改为无限期',
-                  onPressed: () => setState(() => _dailyUntil = null),
-                ),
-                onTap: () => _pickDate(
-                  initial: _dailyUntil,
-                  onPicked: (value) => setState(() => _dailyUntil = value),
-                ),
+              leading: const Icon(Icons.calendar_month_outlined),
+              title: const Text('每月几号'),
+              subtitle: Text(
+                _dueDate == null ? '未选择' : '每月 ${localDate(_dueDate!).day} 日',
               ),
+              trailing: _dueDate != null
+                  ? IconButton(
+                      icon: const Icon(Icons.close, size: 20),
+                      tooltip: '清除日期',
+                      onPressed: () => setState(() => _dueDate = null),
+                    )
+                  : const Icon(Icons.chevron_right),
+              onTap: () => _pickDate(
+                initial: _dueDate,
+                onPicked: (value) => setState(() => _dueDate = value),
+              ),
+            ),
+            _buildUnlimitedUntilSection(),
           ],
         );
-      case TaskRecurrence.monthly:
-        return ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: const Icon(Icons.calendar_month_outlined),
-          title: const Text('每月几号'),
-          subtitle: Text(
-            _dueDate == null ? '未选择' : '每月 ${localDate(_dueDate!).day} 日',
-          ),
-          trailing: _dueDate != null
-              ? IconButton(
-                  icon: const Icon(Icons.close, size: 20),
-                  tooltip: '清除日期',
-                  onPressed: () => setState(() => _dueDate = null),
-                )
-              : const Icon(Icons.chevron_right),
-          onTap: () => _pickDate(
-            initial: _dueDate,
-            onPicked: (value) => setState(() => _dueDate = value),
-          ),
-        );
       case TaskRecurrence.yearly:
-        return ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: const Icon(Icons.calendar_today_outlined),
-          title: const Text('每年日期'),
-          subtitle: Text(
-            _dueDate == null
-                ? '未选择'
-                : _formatShortDate(localDate(_dueDate!)),
-          ),
-          trailing: _dueDate != null
-              ? IconButton(
-                  icon: const Icon(Icons.close, size: 20),
-                  tooltip: '清除日期',
-                  onPressed: () => setState(() => _dueDate = null),
-                )
-              : const Icon(Icons.chevron_right),
-          onTap: () => _pickDate(
-            initial: _dueDate,
-            onPicked: (value) => setState(() => _dueDate = value),
-          ),
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.calendar_today_outlined),
+              title: const Text('每年日期'),
+              subtitle: Text(
+                _dueDate == null
+                    ? '未选择'
+                    : _formatShortDate(localDate(_dueDate!)),
+              ),
+              trailing: _dueDate != null
+                  ? IconButton(
+                      icon: const Icon(Icons.close, size: 20),
+                      tooltip: '清除日期',
+                      onPressed: () => setState(() => _dueDate = null),
+                    )
+                  : const Icon(Icons.chevron_right),
+              onTap: () => _pickDate(
+                initial: _dueDate,
+                onPicked: (value) => setState(() => _dueDate = value),
+              ),
+            ),
+            _buildUnlimitedUntilSection(),
+          ],
         );
     }
   }
