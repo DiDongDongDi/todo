@@ -1,13 +1,32 @@
--- Merge legacy note into title, then drop note column from tasks and templates.
+-- Merge legacy note into title, then drop note column (idempotent).
 
-UPDATE tasks
-SET title = trim(both from title || E'\n' || note)
-WHERE note IS NOT NULL AND trim(note) <> '';
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'tasks'
+      AND column_name = 'note'
+  ) THEN
+    UPDATE public.tasks
+    SET title = trim(both from title || E'\n' || note)
+    WHERE note IS NOT NULL AND trim(note) <> '';
 
-ALTER TABLE tasks DROP COLUMN IF EXISTS note;
+    ALTER TABLE public.tasks DROP COLUMN note;
+  END IF;
 
-UPDATE task_templates
-SET title = trim(both from title || E'\n' || note)
-WHERE note IS NOT NULL AND trim(note) <> '';
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'task_templates'
+      AND column_name = 'note'
+  ) THEN
+    UPDATE public.task_templates
+    SET title = trim(both from title || E'\n' || note)
+    WHERE note IS NOT NULL AND trim(note) <> '';
 
-ALTER TABLE task_templates DROP COLUMN IF EXISTS note;
+    ALTER TABLE public.task_templates DROP COLUMN note;
+  END IF;
+END $$;
