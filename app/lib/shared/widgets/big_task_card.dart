@@ -47,6 +47,7 @@ class BigTaskCard extends StatelessWidget {
     this.onTapParent,
     this.subtaskEditor,
     this.subtaskSection,
+    this.onAddSubtask,
   });
 
   final BigTaskCardMode mode;
@@ -88,8 +89,11 @@ class BigTaskCard extends StatelessWidget {
   /// 收集页：保存前的子任务标题编辑区。
   final Widget? subtaskEditor;
 
-  /// 处理页：父任务的子任务列表与添加区。
+  /// 处理页：父任务的子任务只读列表。
   final Widget? subtaskSection;
+
+  /// 底部工具栏「添加子任务」按钮。
+  final VoidCallback? onAddSubtask;
 
   @override
   Widget build(BuildContext context) {
@@ -141,6 +145,14 @@ class BigTaskCard extends StatelessWidget {
                                 : null,
                           ),
                         ),
+                        if (onAddSubtask != null) ...[
+                          const SizedBox(width: 8),
+                          IconButton.filledTonal(
+                            onPressed: onAddSubtask,
+                            icon: const Icon(Icons.playlist_add_outlined),
+                            tooltip: '添加子任务',
+                          ),
+                        ],
                         const Spacer(),
                         if (editing) ...[
                           TextButton(
@@ -193,6 +205,15 @@ class BigTaskCard extends StatelessWidget {
                                       : null,
                                 ),
                               ),
+                              if (onAddSubtask != null) ...[
+                                const SizedBox(width: 8),
+                                IconButton.filledTonal(
+                                  onPressed: onAddSubtask,
+                                  icon: const Icon(Icons.playlist_add_outlined),
+                                  tooltip: '添加子任务',
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                              ],
                               const Spacer(),
                               TextButton(
                                 onPressed: onCancelEdit,
@@ -324,6 +345,10 @@ class BigTaskCard extends StatelessWidget {
           ],
           // 只读标题不参与命中测试，避免 TextField.onTap 抢走点击导致无法聚焦。
           if (editing) titleField else IgnorePointer(child: titleField),
+          if (editing && subtaskEditor != null) ...[
+            const SizedBox(height: 20),
+            subtaskEditor!,
+          ],
           if (!editing) ...[
             if (scheduleLabel != null) ...[
               const SizedBox(height: 8),

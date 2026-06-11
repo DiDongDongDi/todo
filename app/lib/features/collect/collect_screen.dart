@@ -555,6 +555,7 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
               onSave: () => _save(animated: true),
               onCancelEdit: _cancelInput,
               editing: _inputUiVisible,
+              onAddSubtask: _addSubtaskField,
               scheduleEditor: TaskScheduleEditor(
                 recurrence: _recurrence,
                 dailyUntil: _dailyUntil,
@@ -568,7 +569,6 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
               ),
               subtaskEditor: SubtaskTitleEditor(
                 controllers: _subtaskControllers,
-                onAdd: _addSubtaskField,
                 onRemove: _removeSubtaskField,
               ),
             ),

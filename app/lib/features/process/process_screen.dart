@@ -67,7 +67,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
 
   String? _subtasksTaskId;
   List<Task> _subtasks = const [];
-  bool _addingSubtask = false;
+  final List<TextEditingController> _editSubtaskControllers = [];
 
   /// 与收集页一致：底部按钮组由焦点驱动；tab 不可见时一律视为非编辑 UI。
   bool get _editUiVisible =>
@@ -130,6 +130,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
       unawaited(_editAudioRecorder.stop());
     }
     final task = _taskForBlurExit();
+    _clearEditSubtaskFields();
     setState(() => _editing = false);
     if (task != null) {
       _syncDisplayFromTask(task);
@@ -144,6 +145,9 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     _editFocusNode.removeListener(_onEditFocusChange);
     _editController.dispose();
     _editFocusNode.dispose();
+    for (final c in _editSubtaskControllers) {
+      c.dispose();
+    }
     unawaited(_editAudioRecorder.dispose());
     super.dispose();
   }
@@ -226,33 +230,38 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     setState(() => _subtasks = subtasks);
   }
 
-  Future<void> _addSubtask(String parentId, String title) async {
-    if (_addingSubtask) return;
-    setState(() => _addingSubtask = true);
-    try {
-      final repo = await ref.read(taskRepositoryProvider.future);
-      await repo.createSubtask(parentId: parentId, title: title);
-      unawaited(triggerSyncIfSignedIn(ref));
-      if (!mounted) return;
-      await _fetchSubtasks(parentId);
-      if (!mounted) return;
-      showAppSnackBar(
-        context,
-        message: '已添加子任务',
-        icon: Icons.check_circle_outline,
-        type: AppSnackType.success,
-      );
-    } catch (e) {
-      if (!mounted) return;
-      showAppSnackBar(
-        context,
-        message: '无法添加子任务',
-        icon: Icons.error_outline,
-        type: AppSnackType.error,
-      );
-    } finally {
-      if (mounted) setState(() => _addingSubtask = false);
+  void _addEditSubtaskField() {
+    setState(() => _editSubtaskControllers.add(TextEditingController()));
+  }
+
+  void _removeEditSubtaskField(int index) {
+    setState(() {
+      _editSubtaskControllers[index].dispose();
+      _editSubtaskControllers.removeAt(index);
+    });
+  }
+
+  void _clearEditSubtaskFields() {
+    for (final c in _editSubtaskControllers) {
+      c.dispose();
     }
+    _editSubtaskControllers.clear();
+  }
+
+  List<String> get _editSubtaskTitles =>
+      SubtaskTitleEditor.nonEmptyTitles(_editSubtaskControllers);
+
+  Future<void> _createEditSubtasks(String parentId) async {
+    final titles = _editSubtaskTitles;
+    if (titles.isEmpty) return;
+
+    final repo = await ref.read(taskRepositoryProvider.future);
+    for (final title in titles) {
+      await repo.createSubtask(parentId: parentId, title: title);
+    }
+    unawaited(triggerSyncIfSignedIn(ref));
+    if (!mounted) return;
+    await _fetchSubtasks(parentId);
   }
 
   Future<List<Task>> _waitForProcessTask(String taskId) async {
@@ -539,12 +548,19 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
                   onTapParent: task.parentId != null
                       ? () => context.push('/task/${task.parentId}')
                       : null,
-                  subtaskSection: !task.isSubtask && !_editUiVisible
-                      ? SubtaskListSection(
-                          subtasks: _subtasks,
-                          adding: _addingSubtask,
-                          onAdd: (title) => _addSubtask(task.id, title),
+                  subtaskSection: !task.isSubtask &&
+                          !_editUiVisible &&
+                          _subtasks.isNotEmpty
+                      ? SubtaskListSection(subtasks: _subtasks)
+                      : null,
+                  subtaskEditor: !task.isSubtask && _editUiVisible
+                      ? SubtaskTitleEditor(
+                          controllers: _editSubtaskControllers,
+                          onRemove: _removeEditSubtaskField,
                         )
+                      : null,
+                  onAddSubtask: !task.isSubtask && _editUiVisible
+                      ? _addEditSubtaskField
                       : null,
                 ),
               ),
@@ -655,6 +671,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
       ..clear()
       ..addAll(task.attachments);
     _editRecording = false;
+    _clearEditSubtaskFields();
     _editPendingFocus = true;
     setState(() => _editing = true);
     _syncVolumeKeyHandler();
@@ -664,6 +681,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
   void _exitEditMode([Task? task]) {
     if (!_editing && !_editUiVisible) return;
     _editPendingFocus = false;
+    _clearEditSubtaskFields();
     setState(() => _editing = false);
     _editFocusNode.unfocus();
     if (task != null) {
@@ -722,6 +740,21 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
       unawaited(ref.read(transcriptionServiceProvider).processTask(updated));
     }
     unawaited(triggerSyncIfSignedIn(ref));
+
+    if (!task.isSubtask && _editSubtaskTitles.isNotEmpty) {
+      try {
+        await _createEditSubtasks(task.id);
+      } catch (e) {
+        if (mounted) {
+          showAppSnackBar(
+            context,
+            message: '无法添加子任务',
+            icon: Icons.error_outline,
+            type: AppSnackType.error,
+          );
+        }
+      }
+    }
 
     _exitEditMode(task);
   }
