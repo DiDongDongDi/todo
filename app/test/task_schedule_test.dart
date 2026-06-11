@@ -736,4 +736,138 @@ void main() {
       expect(completedScheduleLabel(_task()), isNull);
     });
   });
+
+  group('skip overdue period on create', () {
+    final june30 = DateTime(2026, 6, 30);
+
+    test('nextPeriodDueDate monthly returns next month when anchor passed', () {
+      expect(
+        nextPeriodDueDate(
+          recurrence: TaskRecurrence.monthly,
+          dueDate: DateTime(2026, 7, 5),
+          today: june30,
+        ),
+        DateTime(2026, 7, 5),
+      );
+    });
+
+    test('nextPeriodDueDate monthly returns null when anchor not passed', () {
+      expect(
+        nextPeriodDueDate(
+          recurrence: TaskRecurrence.monthly,
+          dueDate: DateTime(2026, 6, 20),
+          today: today,
+        ),
+        isNull,
+      );
+    });
+
+    test('nextPeriodDueDate yearly returns next year when anchor passed', () {
+      expect(
+        nextPeriodDueDate(
+          recurrence: TaskRecurrence.yearly,
+          dueDate: DateTime(2027, 1, 15),
+          today: today,
+        ),
+        DateTime(2027, 1, 15),
+      );
+    });
+
+    test('nextPeriodDueDate yearly returns null when anchor not passed', () {
+      expect(
+        nextPeriodDueDate(
+          recurrence: TaskRecurrence.yearly,
+          dueDate: DateTime(2026, 12, 25),
+          today: today,
+        ),
+        isNull,
+      );
+    });
+
+    test('normalizeRecurringDueDate skips to next period when overdue', () {
+      expect(
+        normalizeRecurringDueDate(
+          recurrence: TaskRecurrence.monthly,
+          dueDate: DateTime(2026, 7, 5),
+          today: june30,
+        ),
+        DateTime(2026, 7, 5),
+      );
+      expect(
+        normalizeRecurringDueDate(
+          recurrence: TaskRecurrence.yearly,
+          dueDate: DateTime(2027, 1, 15),
+          today: today,
+        ),
+        DateTime(2027, 1, 15),
+      );
+    });
+
+    test('normalizeRecurringDueDate keeps date when not overdue', () {
+      expect(
+        normalizeRecurringDueDate(
+          recurrence: TaskRecurrence.monthly,
+          dueDate: DateTime(2026, 6, 20),
+          today: today,
+        ),
+        DateTime(2026, 6, 20),
+      );
+    });
+
+    test('not started task is hidden and not overdue', () {
+      final task = _task(
+        recurrence: TaskRecurrence.monthly,
+        dueDate: DateTime(2026, 7, 5),
+      );
+      expect(isRecurrenceStarted(task, june30), isFalse);
+      expect(isDueToday(task, june30), isFalse);
+      expect(isOverdue(task, now: june30), isFalse);
+      expect(
+        shouldShowInProcess(task, todayOnly: false, now: june30),
+        isFalse,
+      );
+      expect(scheduleLabel(task, now: june30), isNull);
+    });
+
+    test('first due date is due but not overdue', () {
+      final task = _task(
+        recurrence: TaskRecurrence.monthly,
+        dueDate: DateTime(2026, 7, 5),
+      );
+      final firstDue = DateTime(2026, 7, 5);
+      expect(isRecurrenceStarted(task, firstDue), isTrue);
+      expect(isDueToday(task, firstDue), isTrue);
+      expect(isOverdue(task, now: firstDue), isFalse);
+      expect(
+        shouldShowInProcess(task, todayOnly: false, now: firstDue),
+        isTrue,
+      );
+    });
+
+    test('yearly not started until first due date', () {
+      final task = _task(
+        recurrence: TaskRecurrence.yearly,
+        dueDate: DateTime(2027, 1, 15),
+      );
+      expect(isRecurrenceStarted(task, today), isFalse);
+      expect(
+        shouldShowInProcess(task, todayOnly: false, now: today),
+        isFalse,
+      );
+      final firstDue = DateTime(2027, 1, 15);
+      expect(isRecurrenceStarted(task, firstDue), isTrue);
+      expect(isDueToday(task, firstDue), isTrue);
+    });
+
+    test('monthly continues normal cycle after first due', () {
+      final task = _task(
+        recurrence: TaskRecurrence.monthly,
+        dueDate: DateTime(2026, 7, 5),
+      );
+      final august = DateTime(2026, 8, 10);
+      expect(isRecurrenceStarted(task, august), isTrue);
+      expect(isDueToday(task, august), isTrue);
+      expect(overdueDays(task, august), 5);
+    });
+  });
 }

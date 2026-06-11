@@ -128,6 +128,12 @@ class TaskRepository {
     String? parentId,
   }) async {
     final now = DateTime.now().toUtc();
+    final normalizedDue = recurrence == TaskRecurrence.daily
+        ? null
+        : normalizeRecurringDueDate(
+            recurrence: recurrence,
+            dueDate: dueDate,
+          );
     final task = Task(
       id: _uuid.v4(),
       title: title.trim(),
@@ -140,7 +146,7 @@ class TaskRepository {
       syncVersion: 1,
       recurrence: recurrence,
       dailyUntil: recurrence != TaskRecurrence.none ? dailyUntil : null,
-      dueDate: recurrence == TaskRecurrence.daily ? null : dueDate,
+      dueDate: normalizedDue,
       parentId: parentId,
     );
     await _store.upsert(task);
