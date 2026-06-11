@@ -179,7 +179,6 @@ class TaskRepository {
 
   Future<({Task parent, List<Task> subtasks})> createInboxWithSubtasks({
     required String title,
-    String? note,
     List<TaskAttachment> attachments = const [],
     TranscriptionStatus transcriptionStatus = TranscriptionStatus.none,
     TaskRecurrence recurrence = TaskRecurrence.none,
@@ -189,7 +188,6 @@ class TaskRepository {
   }) async {
     final parent = await createInbox(
       title: title,
-      note: note,
       attachments: attachments,
       transcriptionStatus: transcriptionStatus,
       recurrence: recurrence,
