@@ -23,6 +23,7 @@ import 'package:todo_app/shared/widgets/big_task_card.dart';
 import 'package:todo_app/shared/widgets/card_stage.dart';
 import 'package:todo_app/shared/widgets/save_template_dialog.dart';
 import 'package:todo_app/shared/widgets/swipeable_card.dart';
+import 'package:todo_app/shared/widgets/subtask_editor.dart';
 import 'package:todo_app/shared/widgets/tab_more_menu_button.dart';
 import 'package:todo_app/shared/widgets/tab_page_header.dart';
 import 'package:todo_app/shared/widgets/task_schedule_editor.dart';
@@ -54,6 +55,7 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
   TaskRecurrence _recurrence = TaskRecurrence.none;
   DateTime? _dailyUntil;
   DateTime? _dueDate;
+  final List<TextEditingController> _subtaskControllers = [];
 
   /// 拖拽/保存开始前输入法是否打开。
   bool? _keyboardWasOpenBeforeGesture;
@@ -175,9 +177,33 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
     _focusNode.removeListener(_onInputFocusChange);
     _controller.dispose();
     _focusNode.dispose();
+    for (final c in _subtaskControllers) {
+      c.dispose();
+    }
     unawaited(_audioRecorder.dispose());
     super.dispose();
   }
+
+  void _addSubtaskField() {
+    setState(() => _subtaskControllers.add(TextEditingController()));
+  }
+
+  void _removeSubtaskField(int index) {
+    setState(() {
+      _subtaskControllers[index].dispose();
+      _subtaskControllers.removeAt(index);
+    });
+  }
+
+  void _clearSubtaskFields() {
+    for (final c in _subtaskControllers) {
+      c.dispose();
+    }
+    _subtaskControllers.clear();
+  }
+
+  List<String> get _subtaskTitles =>
+      SubtaskTitleEditor.nonEmptyTitles(_subtaskControllers);
 
   bool get _hasContent =>
       _controller.text.trim().isNotEmpty || _attachments.isNotEmpty;
@@ -296,7 +322,7 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
       final repo = await ref.read(taskRepositoryProvider.future);
 
       final hasAudio = _attachments.any((a) => a.type == AttachmentType.audio);
-      final task = await repo.createInbox(
+      final result = await repo.createInboxWithSubtasks(
         title: _controller.text.trim(),
         attachments: List.from(_attachments),
         transcriptionStatus:
@@ -304,7 +330,9 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
         recurrence: _recurrence,
         dailyUntil: _recurrence != TaskRecurrence.none ? _dailyUntil : null,
         dueDate: _recurrence == TaskRecurrence.daily ? null : _dueDate,
+        subtaskTitles: _subtaskTitles,
       );
+      final task = result.parent;
 
       unawaited(triggerSyncIfSignedIn(ref));
 
@@ -320,6 +348,7 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
         _recurrence = TaskRecurrence.none;
         _dailyUntil = null;
         _dueDate = null;
+        _clearSubtaskFields();
         _lastUndoTask = task;
       });
       _ensureCaretVisible();
@@ -537,6 +566,11 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
                 onDueDateChanged: (value) =>
                     setState(() => _dueDate = value),
               ),
+              subtaskEditor: SubtaskTitleEditor(
+                controllers: _subtaskControllers,
+                onAdd: _addSubtaskField,
+                onRemove: _removeSubtaskField,
+              ),
             ),
           ),
         ),
@@ -579,6 +613,7 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
       recurrence: _recurrence,
       dailyUntil: _dailyUntil,
       dueDate: _dueDate,
+      subtaskTitles: _subtaskTitles,
       titleOverride: name,
     );
     unawaited(triggerSyncIfSignedIn(ref));

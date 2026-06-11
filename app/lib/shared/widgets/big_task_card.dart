@@ -45,6 +45,8 @@ class BigTaskCard extends StatelessWidget {
     this.onEnterEdit,
     this.parentTitle,
     this.onTapParent,
+    this.subtaskEditor,
+    this.subtaskSection,
   });
 
   final BigTaskCardMode mode;
@@ -82,6 +84,12 @@ class BigTaskCard extends StatelessWidget {
 
   final String? parentTitle;
   final VoidCallback? onTapParent;
+
+  /// 收集页：保存前的子任务标题编辑区。
+  final Widget? subtaskEditor;
+
+  /// 处理页：父任务的子任务列表与添加区。
+  final Widget? subtaskSection;
 
   @override
   Widget build(BuildContext context) {
@@ -342,6 +350,10 @@ class BigTaskCard extends StatelessWidget {
                 }).toList(),
               ),
             ],
+            if (subtaskSection != null) ...[
+              const SizedBox(height: 20),
+              subtaskSection!,
+            ],
           ],
         ],
       ),
@@ -413,74 +425,88 @@ class BigTaskCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Expanded(
-            // Listener 在 pointerDown 即聚焦，空白区也可点；附件区不在其内。
-            child: Listener(
-              behavior: HitTestBehavior.translucent,
-              onPointerDown: (_) => onActivateInput?.call(),
-              child: Stack(
-                fit: StackFit.expand,
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Opacity(
-                    opacity: feedback == CollectCardFeedback.emptyHint ||
-                            feedback == CollectCardFeedback.listening
-                        ? 0
-                        : 1,
-                    child: Align(
-                      alignment: Alignment.topLeft,
-                      child: _buildFlexibleTitleField(
-                        context,
-                        fieldController: controller!,
-                        readOnly: false,
-                        hintText: '记下一件事…',
+                  // Listener 在 pointerDown 即聚焦，空白区也可点；附件区不在其内。
+                  SizedBox(
+                    height: 120,
+                    child: Listener(
+                      behavior: HitTestBehavior.translucent,
+                      onPointerDown: (_) => onActivateInput?.call(),
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          Opacity(
+                            opacity: feedback == CollectCardFeedback.emptyHint ||
+                                    feedback == CollectCardFeedback.listening
+                                ? 0
+                                : 1,
+                            child: Align(
+                              alignment: Alignment.topLeft,
+                              child: _buildFlexibleTitleField(
+                                context,
+                                fieldController: controller!,
+                                readOnly: false,
+                                hintText: '记下一件事…',
+                              ),
+                            ),
+                          ),
+                          if (feedback == CollectCardFeedback.emptyHint)
+                            Positioned.fill(
+                              child: GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onTap: onDismissFeedback,
+                                child: _buildCollectCenterHint(
+                                  context,
+                                  _feedbackMessage(feedback),
+                                ),
+                              ),
+                            ),
+                          if (feedback == CollectCardFeedback.listening)
+                            Positioned.fill(
+                              child: _buildCollectCenterHint(
+                                context,
+                                _feedbackMessage(feedback),
+                              ),
+                            ),
+                        ],
                       ),
                     ),
                   ),
-                  if (feedback == CollectCardFeedback.emptyHint)
-                    Positioned.fill(
-                      child: GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onTap: onDismissFeedback,
-                        child: _buildCollectCenterHint(
-                          context,
-                          _feedbackMessage(feedback),
-                        ),
+                  if (attachments.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      height: 80,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: attachments.length,
+                        separatorBuilder: (_, __) => const SizedBox(width: 8),
+                        itemBuilder: (context, index) {
+                          final imageAttachments = _imageAttachments(attachments);
+                          final audioAttachments = _audioAttachments(attachments);
+                          final attachment = attachments[index];
+                          return _AttachmentThumbnail(
+                            attachment: attachment,
+                            imageAttachments: imageAttachments,
+                            audioAttachments: audioAttachments,
+                            onRemove: onRemoveAttachment == null
+                                ? null
+                                : () => onRemoveAttachment!(index),
+                          );
+                        },
                       ),
                     ),
-                  if (feedback == CollectCardFeedback.listening)
-                    Positioned.fill(
-                      child: _buildCollectCenterHint(
-                        context,
-                        _feedbackMessage(feedback),
-                      ),
-                    ),
+                  ],
+                  if (subtaskEditor != null) ...[
+                    const SizedBox(height: 12),
+                    subtaskEditor!,
+                  ],
                 ],
               ),
             ),
           ),
-          if (attachments.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            SizedBox(
-              height: 80,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: attachments.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 8),
-                itemBuilder: (context, index) {
-                  final imageAttachments = _imageAttachments(attachments);
-                  final audioAttachments = _audioAttachments(attachments);
-                  final attachment = attachments[index];
-                  return _AttachmentThumbnail(
-                    attachment: attachment,
-                    imageAttachments: imageAttachments,
-                    audioAttachments: audioAttachments,
-                    onRemove: onRemoveAttachment == null
-                        ? null
-                        : () => onRemoveAttachment!(index),
-                  );
-                },
-              ),
-            ),
-          ],
         ],
       );
     }

@@ -31,6 +31,7 @@ import 'package:todo_app/shared/widgets/card_stage.dart';
 import 'package:todo_app/shared/widgets/process_task_search_sheet.dart';
 import 'package:todo_app/shared/widgets/progress_widgets.dart';
 import 'package:todo_app/shared/widgets/save_template_dialog.dart';
+import 'package:todo_app/shared/widgets/subtask_editor.dart';
 import 'package:todo_app/shared/widgets/swipeable_card.dart';
 import 'package:todo_app/shared/widgets/tab_more_menu_button.dart';
 import 'package:todo_app/shared/widgets/task_schedule_editor.dart';
@@ -63,6 +64,10 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
   final _editAudioRecorder = AppAudioRecorder();
   bool _editPendingFocus = false;
   int _transientUiDepth = 0;
+
+  String? _subtasksTaskId;
+  List<Task> _subtasks = const [];
+  bool _addingSubtask = false;
 
   /// 与收集页一致：底部按钮组由焦点驱动；tab 不可见时一律视为非编辑 UI。
   bool get _editUiVisible =>
@@ -193,6 +198,61 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     setState(() {});
     _syncVolumeKeyHandler();
     _scheduleEditSessionCleanup();
+  }
+
+  void _loadSubtasksIfNeeded(Task task) {
+    if (task.isSubtask) {
+      if (_subtasksTaskId != null) {
+        setState(() {
+          _subtasksTaskId = null;
+          _subtasks = const [];
+        });
+      }
+      return;
+    }
+    if (_subtasksTaskId == task.id) return;
+    final parentId = task.id;
+    setState(() {
+      _subtasksTaskId = parentId;
+      _subtasks = const [];
+    });
+    unawaited(_fetchSubtasks(parentId));
+  }
+
+  Future<void> _fetchSubtasks(String parentId) async {
+    final repo = await ref.read(taskRepositoryProvider.future);
+    final subtasks = await repo.getSubtasks(parentId);
+    if (!mounted || _subtasksTaskId != parentId) return;
+    setState(() => _subtasks = subtasks);
+  }
+
+  Future<void> _addSubtask(String parentId, String title) async {
+    if (_addingSubtask) return;
+    setState(() => _addingSubtask = true);
+    try {
+      final repo = await ref.read(taskRepositoryProvider.future);
+      await repo.createSubtask(parentId: parentId, title: title);
+      unawaited(triggerSyncIfSignedIn(ref));
+      if (!mounted) return;
+      await _fetchSubtasks(parentId);
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: '已添加子任务',
+        icon: Icons.check_circle_outline,
+        type: AppSnackType.success,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: '无法添加子任务',
+        icon: Icons.error_outline,
+        type: AppSnackType.error,
+      );
+    } finally {
+      if (mounted) setState(() => _addingSubtask = false);
+    }
   }
 
   Future<List<Task>> _waitForProcessTask(String taskId) async {
@@ -350,6 +410,15 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
         if (!_editing) {
           _syncDisplayFromTask(task);
         }
+        final taskForSubtasks = task;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          final current = ref.read(processTasksProvider).value;
+          if (current == null || current.isEmpty) return;
+          final idx = _index.clamp(0, current.length - 1);
+          if (current[idx].id != taskForSubtasks.id) return;
+          _loadSubtasksIfNeeded(current[idx]);
+        });
         final archivedToday = statsAsync.value?.archivedToday ?? 0;
         final progress = inboxProgress(archivedToday, tasks.length);
         final allInbox = ref.watch(inboxTasksProvider).value ?? [];
@@ -469,6 +538,13 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
                   parentTitle: parentTitle,
                   onTapParent: task.parentId != null
                       ? () => context.push('/task/${task.parentId}')
+                      : null,
+                  subtaskSection: !task.isSubtask && !_editUiVisible
+                      ? SubtaskListSection(
+                          subtasks: _subtasks,
+                          adding: _addingSubtask,
+                          onAdd: (title) => _addSubtask(task.id, title),
+                        )
                       : null,
                 ),
               ),

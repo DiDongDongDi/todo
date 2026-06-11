@@ -177,6 +177,36 @@ class TaskRepository {
     );
   }
 
+  Future<({Task parent, List<Task> subtasks})> createInboxWithSubtasks({
+    required String title,
+    String? note,
+    List<TaskAttachment> attachments = const [],
+    TranscriptionStatus transcriptionStatus = TranscriptionStatus.none,
+    TaskRecurrence recurrence = TaskRecurrence.none,
+    DateTime? dailyUntil,
+    DateTime? dueDate,
+    List<String> subtaskTitles = const [],
+  }) async {
+    final parent = await createInbox(
+      title: title,
+      note: note,
+      attachments: attachments,
+      transcriptionStatus: transcriptionStatus,
+      recurrence: recurrence,
+      dailyUntil: dailyUntil,
+      dueDate: dueDate,
+    );
+
+    final subtasks = <Task>[];
+    for (final subTitle in subtaskTitles) {
+      if (subTitle.trim().isEmpty) continue;
+      subtasks.add(
+        await createSubtask(parentId: parent.id, title: subTitle),
+      );
+    }
+    return (parent: parent, subtasks: subtasks);
+  }
+
   Future<List<Task>> getSubtasks(String parentId) async {
     final all = await _store.getAll();
     return all
