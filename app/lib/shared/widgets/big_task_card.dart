@@ -125,51 +125,9 @@ class BigTaskCard extends StatelessWidget {
                       scheduleEditor!,
                     ],
                     const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        IconButton.filledTonal(
-                          onPressed: onPickImage,
-                          icon: const Icon(Icons.image_outlined),
-                          tooltip: '添加图片',
-                        ),
-                        const SizedBox(width: 8),
-                        IconButton.filledTonal(
-                          onPressed: onStartSpeech,
-                          icon: Icon(
-                            isListening ? Icons.stop : Icons.mic_none_outlined,
-                          ),
-                          tooltip: isListening ? '停止录音' : '录音',
-                          style: IconButton.styleFrom(
-                            backgroundColor: isListening
-                                ? colorScheme.errorContainer
-                                : null,
-                          ),
-                        ),
-                        if (onAddSubtask != null) ...[
-                          const SizedBox(width: 8),
-                          IconButton.filledTonal(
-                            onPressed: onAddSubtask,
-                            icon: const Icon(Icons.playlist_add_outlined),
-                            tooltip: '添加子任务',
-                          ),
-                        ],
-                        const Spacer(),
-                        if (editing) ...[
-                          TextButton(
-                            onPressed: onCancelEdit,
-                            child: const Text('取消'),
-                          ),
-                          const SizedBox(width: 8),
-                        ],
-                        Focus(
-                          canRequestFocus: false,
-                          child: FilledButton.icon(
-                            onPressed: onSave,
-                            icon: const Icon(Icons.check, size: 20),
-                            label: const Text('保存'),
-                          ),
-                        ),
-                      ],
+                    _buildToolbarRow(
+                      context,
+                      showCancel: editing,
                     ),
                   ],
                 )
@@ -181,50 +139,9 @@ class BigTaskCard extends StatelessWidget {
                           const SizedBox(height: 12),
                           if (scheduleEditor != null) scheduleEditor!,
                           const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              IconButton.filledTonal(
-                                onPressed: onPickImage,
-                                icon: const Icon(Icons.image_outlined),
-                                tooltip: '添加图片',
-                                visualDensity: VisualDensity.compact,
-                              ),
-                              const SizedBox(width: 8),
-                              IconButton.filledTonal(
-                                onPressed: onStartSpeech,
-                                icon: Icon(
-                                  isListening
-                                      ? Icons.stop
-                                      : Icons.mic_none_outlined,
-                                ),
-                                tooltip: isListening ? '停止录音' : '录音',
-                                visualDensity: VisualDensity.compact,
-                                style: IconButton.styleFrom(
-                                  backgroundColor: isListening
-                                      ? colorScheme.errorContainer
-                                      : null,
-                                ),
-                              ),
-                              if (onAddSubtask != null) ...[
-                                const SizedBox(width: 8),
-                                IconButton.filledTonal(
-                                  onPressed: onAddSubtask,
-                                  icon: const Icon(Icons.playlist_add_outlined),
-                                  tooltip: '添加子任务',
-                                  visualDensity: VisualDensity.compact,
-                                ),
-                              ],
-                              const Spacer(),
-                              TextButton(
-                                onPressed: onCancelEdit,
-                                child: const Text('取消'),
-                              ),
-                              const SizedBox(width: 8),
-                              FilledButton(
-                                onPressed: onSave,
-                                child: const Text('保存'),
-                              ),
-                            ],
+                          _buildToolbarRow(
+                            context,
+                            showCancel: true,
                           ),
                         ],
                       )
@@ -282,6 +199,78 @@ class BigTaskCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildToolbarRow(
+    BuildContext context, {
+    required bool showCancel,
+  }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    const compact = VisualDensity.compact;
+    const gap = SizedBox(width: 4);
+
+    return Row(
+      children: [
+        IconButton.filledTonal(
+          onPressed: onPickImage,
+          icon: const Icon(Icons.image_outlined),
+          tooltip: '添加图片',
+          visualDensity: compact,
+          style: IconButton.styleFrom(
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+        ),
+        gap,
+        IconButton.filledTonal(
+          onPressed: onStartSpeech,
+          icon: Icon(
+            isListening ? Icons.stop : Icons.mic_none_outlined,
+          ),
+          tooltip: isListening ? '停止录音' : '录音',
+          visualDensity: compact,
+          style: IconButton.styleFrom(
+            backgroundColor:
+                isListening ? colorScheme.errorContainer : null,
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+        ),
+        if (onAddSubtask != null) ...[
+          gap,
+          IconButton.filledTonal(
+            onPressed: onAddSubtask,
+            icon: const Icon(Icons.playlist_add_outlined),
+            tooltip: '添加子任务',
+            visualDensity: compact,
+            style: IconButton.styleFrom(
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+          ),
+        ],
+        const Spacer(),
+        if (showCancel) ...[
+          TextButton(
+            onPressed: onCancelEdit,
+            style: TextButton.styleFrom(
+              visualDensity: compact,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: const Text('取消'),
+          ),
+          gap,
+        ],
+        Focus(
+          canRequestFocus: false,
+          child: FilledButton(
+            onPressed: onSave,
+            style: FilledButton.styleFrom(
+              visualDensity: compact,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: const Text('保存'),
+          ),
+        ),
+      ],
     );
   }
 

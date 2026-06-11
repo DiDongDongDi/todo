@@ -26,48 +26,57 @@ class SubtaskTitleEditor extends StatelessWidget {
     }
 
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final fieldBorder = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(8),
+      borderSide: BorderSide(color: colorScheme.outlineVariant),
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          '子任务',
-          style: theme.textTheme.titleSmall,
-        ),
-        const SizedBox(height: 4),
-        ...List.generate(controllers.length, (index) {
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: controllers[index],
-                    decoration: InputDecoration(
-                      hintText: '子任务 ${index + 1}',
-                      isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 10,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+      children: List.generate(controllers.length, (index) {
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 6),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: controllers[index],
+                  style: theme.textTheme.bodyMedium,
+                  decoration: InputDecoration(
+                    hintText: '子任务',
+                    hintStyle: theme.textTheme.bodyMedium?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
                     ),
-                    textInputAction: TextInputAction.next,
+                    isDense: true,
+                    filled: true,
+                    fillColor: colorScheme.surfaceContainerHigh,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    border: fieldBorder,
+                    enabledBorder: fieldBorder,
+                    focusedBorder: fieldBorder.copyWith(
+                      borderSide: BorderSide(color: colorScheme.primary),
+                    ),
                   ),
+                  textInputAction: TextInputAction.next,
                 ),
-                IconButton(
-                  icon: const Icon(Icons.remove_circle_outline),
-                  onPressed: () => onRemove(index),
-                  tooltip: '移除',
-                ),
-              ],
-            ),
-          );
-        }),
-      ],
+              ),
+              IconButton(
+                icon: const Icon(Icons.remove_circle_outline, size: 20),
+                onPressed: () => onRemove(index),
+                tooltip: '移除',
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+              ),
+            ],
+          ),
+        );
+      }),
     );
   }
 }
