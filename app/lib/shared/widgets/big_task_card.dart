@@ -443,60 +443,74 @@ class BigTaskCard extends StatelessWidget {
     final colorScheme = theme.colorScheme;
 
     if (mode == BigTaskCardMode.collect) {
+      final scrollContent = Listener(
+        behavior: HitTestBehavior.translucent,
+        onPointerDown: (_) => onActivateInput?.call(),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Opacity(
+                      opacity: feedback == CollectCardFeedback.emptyHint ||
+                              feedback == CollectCardFeedback.listening
+                          ? 0
+                          : 1,
+                      child: _buildFlexibleTitleField(
+                        context,
+                        fieldController: controller!,
+                        readOnly: false,
+                        hintText: '记下一件事…',
+                      ),
+                    ),
+                    if (subtaskEditor != null) ...[
+                      const SizedBox(height: 12),
+                      subtaskEditor!,
+                    ],
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+      );
+
+      final hasFeedbackOverlay = feedback == CollectCardFeedback.emptyHint ||
+          feedback == CollectCardFeedback.listening;
+
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Expanded(
-            child: Stack(
-              children: [
-                // 与处理页编辑态一致：Listener 包裹 ScrollView，空白区也可点。
-                Listener(
-                  behavior: HitTestBehavior.translucent,
-                  onPointerDown: (_) => onActivateInput?.call(),
-                  child: SingleChildScrollView(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Opacity(
-                          opacity: feedback == CollectCardFeedback.emptyHint ||
-                                  feedback == CollectCardFeedback.listening
-                              ? 0
-                              : 1,
-                          child: _buildFlexibleTitleField(
-                            context,
-                            fieldController: controller!,
-                            readOnly: false,
-                            hintText: '记下一件事…',
+            child: hasFeedbackOverlay
+                ? Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      scrollContent,
+                      if (feedback == CollectCardFeedback.emptyHint)
+                        Positioned.fill(
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: onDismissFeedback,
+                            child: _buildCollectCenterHint(
+                              context,
+                              _feedbackMessage(feedback),
+                            ),
                           ),
                         ),
-                        if (subtaskEditor != null) ...[
-                          const SizedBox(height: 12),
-                          subtaskEditor!,
-                        ],
-                      ],
-                    ),
-                  ),
-                ),
-                if (feedback == CollectCardFeedback.emptyHint)
-                  Positioned.fill(
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: onDismissFeedback,
-                      child: _buildCollectCenterHint(
-                        context,
-                        _feedbackMessage(feedback),
-                      ),
-                    ),
-                  ),
-                if (feedback == CollectCardFeedback.listening)
-                  Positioned.fill(
-                    child: _buildCollectCenterHint(
-                      context,
-                      _feedbackMessage(feedback),
-                    ),
-                  ),
-              ],
-            ),
+                      if (feedback == CollectCardFeedback.listening)
+                        Positioned.fill(
+                          child: _buildCollectCenterHint(
+                            context,
+                            _feedbackMessage(feedback),
+                          ),
+                        ),
+                    ],
+                  )
+                : scrollContent,
           ),
           if (attachments.isNotEmpty) ...[
             const SizedBox(height: 12),
