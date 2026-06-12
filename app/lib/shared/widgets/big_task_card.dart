@@ -439,88 +439,81 @@ class BigTaskCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Expanded(
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Listener 在 pointerDown 即聚焦，空白区也可点；附件区不在其内。
-                  SizedBox(
-                    height: 120,
-                    child: Listener(
-                      behavior: HitTestBehavior.translucent,
-                      onPointerDown: (_) => onActivateInput?.call(),
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          Opacity(
-                            opacity: feedback == CollectCardFeedback.emptyHint ||
-                                    feedback == CollectCardFeedback.listening
-                                ? 0
-                                : 1,
-                            child: Align(
-                              alignment: Alignment.topLeft,
-                              child: _buildFlexibleTitleField(
-                                context,
-                                fieldController: controller!,
-                                readOnly: false,
-                                hintText: '记下一件事…',
-                              ),
-                            ),
+            child: Stack(
+              children: [
+                // 与处理页编辑态一致：Listener 包裹 ScrollView，空白区也可点。
+                Listener(
+                  behavior: HitTestBehavior.translucent,
+                  onPointerDown: (_) => onActivateInput?.call(),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Opacity(
+                          opacity: feedback == CollectCardFeedback.emptyHint ||
+                                  feedback == CollectCardFeedback.listening
+                              ? 0
+                              : 1,
+                          child: _buildFlexibleTitleField(
+                            context,
+                            fieldController: controller!,
+                            readOnly: false,
+                            hintText: '记下一件事…',
                           ),
-                          if (feedback == CollectCardFeedback.emptyHint)
-                            Positioned.fill(
-                              child: GestureDetector(
-                                behavior: HitTestBehavior.opaque,
-                                onTap: onDismissFeedback,
-                                child: _buildCollectCenterHint(
-                                  context,
-                                  _feedbackMessage(feedback),
-                                ),
-                              ),
-                            ),
-                          if (feedback == CollectCardFeedback.listening)
-                            Positioned.fill(
-                              child: _buildCollectCenterHint(
-                                context,
-                                _feedbackMessage(feedback),
-                              ),
-                            ),
+                        ),
+                        if (subtaskEditor != null) ...[
+                          const SizedBox(height: 12),
+                          subtaskEditor!,
                         ],
+                      ],
+                    ),
+                  ),
+                ),
+                if (feedback == CollectCardFeedback.emptyHint)
+                  Positioned.fill(
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: onDismissFeedback,
+                      child: _buildCollectCenterHint(
+                        context,
+                        _feedbackMessage(feedback),
                       ),
                     ),
                   ),
-                  if (attachments.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      height: 80,
-                      child: ListView.separated(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: attachments.length,
-                        separatorBuilder: (_, __) => const SizedBox(width: 8),
-                        itemBuilder: (context, index) {
-                          final imageAttachments = _imageAttachments(attachments);
-                          final audioAttachments = _audioAttachments(attachments);
-                          final attachment = attachments[index];
-                          return _AttachmentThumbnail(
-                            attachment: attachment,
-                            imageAttachments: imageAttachments,
-                            audioAttachments: audioAttachments,
-                            onRemove: onRemoveAttachment == null
-                                ? null
-                                : () => onRemoveAttachment!(index),
-                          );
-                        },
-                      ),
+                if (feedback == CollectCardFeedback.listening)
+                  Positioned.fill(
+                    child: _buildCollectCenterHint(
+                      context,
+                      _feedbackMessage(feedback),
                     ),
-                  ],
-                  if (subtaskEditor != null) ...[
-                    const SizedBox(height: 12),
-                    subtaskEditor!,
-                  ],
-                ],
-              ),
+                  ),
+              ],
             ),
           ),
+          if (attachments.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 80,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: attachments.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                itemBuilder: (context, index) {
+                  final imageAttachments = _imageAttachments(attachments);
+                  final audioAttachments = _audioAttachments(attachments);
+                  final attachment = attachments[index];
+                  return _AttachmentThumbnail(
+                    attachment: attachment,
+                    imageAttachments: imageAttachments,
+                    audioAttachments: audioAttachments,
+                    onRemove: onRemoveAttachment == null
+                        ? null
+                        : () => onRemoveAttachment!(index),
+                  );
+                },
+              ),
+            ),
+          ],
         ],
       );
     }
