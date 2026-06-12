@@ -9,6 +9,7 @@ import 'package:todo_app/core/repositories/template_repository.dart';
 import 'package:todo_app/core/sync/sync_engine.dart';
 import 'package:todo_app/shared/widgets/app_snackbar.dart';
 import 'package:todo_app/shared/widgets/save_template_dialog.dart';
+import 'package:todo_app/shared/widgets/subtask_editor.dart';
 
 class TaskDetailScreen extends ConsumerStatefulWidget {
   const TaskDetailScreen({super.key, required this.taskId});
@@ -117,9 +118,6 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
       );
     }
 
-    final completedCount =
-        _subtasks.where((t) => t.status == TaskStatus.archived).length;
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('父任务'),
@@ -151,60 +149,32 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
           ],
           if (_subtasks.isNotEmpty) ...[
             const SizedBox(height: 24),
-            Text(
-              '子任务 $completedCount/${_subtasks.length} 已完成',
-              style: Theme.of(context).textTheme.titleSmall,
-            ),
-            const SizedBox(height: 8),
-            ..._subtasks.map((sub) {
-              final done = sub.status == TaskStatus.archived;
-              return ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Icon(
-                  done ? Icons.check_circle : Icons.radio_button_unchecked,
-                  color: done
-                      ? Theme.of(context).colorScheme.primary
-                      : Theme.of(context).colorScheme.outline,
-                ),
-                title: Text(
-                  sub.title,
-                  style: done
-                      ? TextStyle(
-                          decoration: TextDecoration.lineThrough,
-                          color: Theme.of(context)
-                              .colorScheme
-                              .onSurface
-                              .withValues(alpha: 0.5),
-                        )
-                      : null,
-                ),
-              );
-            }),
+            SubtaskListSection(subtasks: _subtasks),
           ],
           const SizedBox(height: 24),
-          Text(
-            '添加子任务',
-            style: Theme.of(context).textTheme.titleSmall,
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _subtaskController,
-                  decoration: const InputDecoration(
-                    hintText: '子任务标题',
-                    border: OutlineInputBorder(),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _subtaskController,
+                    style: subtaskTitleInputStyle(context),
+                    decoration: subtaskTitleInputDecoration(context),
+                    onSubmitted: (_) => _addSubtask(),
+                    textInputAction: TextInputAction.done,
                   ),
-                  onSubmitted: (_) => _addSubtask(),
                 ),
-              ),
-              const SizedBox(width: 8),
-              FilledButton(
-                onPressed: _addSubtask,
-                child: const Text('添加'),
-              ),
-            ],
+                IconButton(
+                  icon: const Icon(Icons.playlist_add_outlined, size: 20),
+                  onPressed: _addSubtask,
+                  tooltip: '添加子任务',
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                ),
+              ],
+            ),
           ),
         ],
       ),

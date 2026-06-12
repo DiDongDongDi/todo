@@ -3,6 +3,31 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:todo_app/shared/widgets/subtask_editor.dart';
 
 void main() {
+  testWidgets('subtaskTitleInputDecoration uses compact subtask styling',
+      (tester) async {
+    InputDecoration? decoration;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) {
+            decoration = subtaskTitleInputDecoration(context);
+            return const SizedBox.shrink();
+          },
+        ),
+      ),
+    );
+
+    expect(decoration, isNotNull);
+    expect(decoration!.hintText, '子任务');
+    expect(decoration!.isDense, isTrue);
+    expect(decoration!.filled, isTrue);
+    expect(
+      decoration!.contentPadding,
+      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+    );
+  });
+
   testWidgets('SubtaskTitleEditor reports focus changes', (tester) async {
     final controllers = [TextEditingController()];
     bool? lastFocused;
