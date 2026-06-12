@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:todo_app/core/models/task.dart';
 import 'package:todo_app/core/models/task_check_in.dart';
@@ -495,6 +496,56 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
     );
   }
 
+  Future<void> _deleteParentTask() async {
+    final task = _task;
+    if (task == null || _editingTask || _editingSubtasks) return;
+
+    final subtaskCount = _subtasks.length;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        final theme = Theme.of(context);
+        final colorScheme = theme.colorScheme;
+        return AlertDialog(
+          title: const Text('删除父任务'),
+          content: Text(
+            subtaskCount > 0
+                ? '确定删除「${task.displayTitle}」？其 $subtaskCount 条子任务也将一并删除。'
+                : '确定删除「${task.displayTitle}」？',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: FilledButton.styleFrom(
+                backgroundColor: colorScheme.error,
+                foregroundColor: colorScheme.onError,
+              ),
+              child: const Text('删除'),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed != true || !mounted) return;
+
+    final repo = await ref.read(taskRepositoryProvider.future);
+    await repo.trash(task.id);
+    unawaited(triggerSyncIfSignedIn(ref));
+    await AppHaptics.medium();
+    if (!mounted) return;
+    showAppSnackBar(
+      context,
+      message: '已删除',
+      icon: Icons.delete_outline,
+      type: AppSnackType.error,
+    );
+    context.pop();
+  }
+
   Widget _buildSubtaskToolbar(BuildContext context) {
     const compact = VisualDensity.compact;
     const gap = SizedBox(width: 4);
@@ -838,12 +889,18 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
       appBar: AppBar(
         title: const Text('父任务'),
         actions: [
-          if (!_editingTask)
+          if (!_editingTask && !_editingSubtasks) ...[
+            IconButton(
+              icon: const Icon(Icons.delete_outline),
+              tooltip: '删除',
+              onPressed: _deleteParentTask,
+            ),
             IconButton(
               icon: const Icon(Icons.bookmark_outline),
               tooltip: '保存为模板',
               onPressed: _saveAsTemplate,
             ),
+          ],
         ],
       ),
       body: Column(
