@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:todo_app/core/models/task.dart';
+import 'package:todo_app/core/models/task_check_in.dart';
 import 'package:todo_app/core/models/task_display.dart';
 import 'package:todo_app/core/models/task_hierarchy.dart';
 import 'package:todo_app/core/models/task_schedule.dart';
@@ -34,6 +35,7 @@ import 'package:todo_app/shared/widgets/save_template_dialog.dart';
 import 'package:todo_app/shared/widgets/subtask_editor.dart';
 import 'package:todo_app/shared/widgets/swipeable_card.dart';
 import 'package:todo_app/shared/widgets/tab_more_menu_button.dart';
+import 'package:todo_app/shared/widgets/task_check_in_editor.dart';
 import 'package:todo_app/shared/widgets/task_schedule_editor.dart';
 
 class ProcessScreen extends ConsumerStatefulWidget {
@@ -55,10 +57,12 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
   Task? _lastUndoTask;
   TaskStatus? _lastUndoFrom;
   bool _lastUndoWasPeriodCompletion = false;
+  bool _lastUndoWasPartialCheckIn = false;
 
   TaskRecurrence _editRecurrence = TaskRecurrence.none;
   DateTime? _editDailyUntil;
   DateTime? _editDueDate;
+  int _editCheckInTarget = 1;
   final List<TaskAttachment> _editAttachments = [];
   bool _editRecording = false;
   final _editAudioRecorder = AppAudioRecorder();
@@ -297,16 +301,26 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     final task = _lastUndoTask;
     final from = _lastUndoFrom;
     final wasPeriod = _lastUndoWasPeriodCompletion;
+    final wasPartialCheckIn = _lastUndoWasPartialCheckIn;
     if (task == null || from == null) return;
 
     final enterFromLeft = from == TaskStatus.trashed;
-    final enterFromRight = from == TaskStatus.archived || wasPeriod;
+    final enterFromRight =
+        from == TaskStatus.archived || wasPeriod || wasPartialCheckIn;
     if (!enterFromLeft && !enterFromRight) return;
 
     Future<void> restoreAndSwitch() async {
       final repo = await ref.read(taskRepositoryProvider.future);
-      if (wasPeriod) {
-        await repo.undoDailyCompletion(task.id);
+      if (wasPartialCheckIn) {
+        await repo.undoCheckIn(task.id, wasFinalCompletion: false);
+      } else if (wasPeriod) {
+        if (hasCheckInGoal(task)) {
+          await repo.undoCheckIn(task.id, wasFinalCompletion: true);
+        } else {
+          await repo.undoDailyCompletion(task.id);
+        }
+      } else if (hasCheckInGoal(task)) {
+        await repo.undoCheckIn(task.id, wasFinalCompletion: true);
       } else {
         await repo.restoreToInbox(task.id);
       }
@@ -320,6 +334,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
       _lastUndoTask = null;
       _lastUndoFrom = null;
       _lastUndoWasPeriodCompletion = false;
+      _lastUndoWasPartialCheckIn = false;
 
       _editFocusNode.unfocus();
       setState(() {
@@ -542,6 +557,15 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
                           onTransientUiClosed: _endTransientEditUi,
                         )
                       : null,
+                  checkInEditor: _editUiVisible
+                      ? TaskCheckInEditor(
+                          checkInTarget: _editCheckInTarget,
+                          onCheckInTargetChanged: (value) =>
+                              setState(() => _editCheckInTarget = value),
+                          onTransientUiOpening: _beginTransientEditUi,
+                          onTransientUiClosed: _endTransientEditUi,
+                        )
+                      : null,
                   onTrash: () => _trash(task, animated: true),
                   onComplete: () => _archive(task, animated: true),
                   onPrevious: () => _setIndex(
@@ -561,7 +585,8 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
                       : null,
                   scheduleLabel: scheduleLabel(task),
                   scheduleOverdue: isOverdue(task),
-                  completeLabel: completeLabelFor(task),
+                  checkInLabel: checkInLabel(task),
+                  completeLabel: completeLabelForCheckIn(task),
                   parentTitle: parentTitle,
                   onTapParent: task.parentId != null
                       ? () => context.push('/task/${task.parentId}')
@@ -686,6 +711,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     _editRecurrence = task.recurrence;
     _editDailyUntil = task.dailyUntil;
     _editDueDate = task.dueDate;
+    _editCheckInTarget = task.checkInTarget;
     _editAttachments
       ..clear()
       ..addAll(task.attachments);
@@ -753,6 +779,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
             _editRecurrence == TaskRecurrence.none || _editDailyUntil == null,
         clearDueDate:
             _editRecurrence == TaskRecurrence.daily || editDue == null,
+        checkInTarget: _editCheckInTarget.clamp(1, 99),
       ),
     );
 
@@ -888,29 +915,41 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
 
   Future<void> _performArchive(Task task) async {
     final repo = await ref.read(taskRepositoryProvider.future);
+    final result = await repo.checkIn(task.id);
+    final updated = result.task;
     final recurring = isRecurring(task);
-
-    if (recurring) {
-      await repo.completeRecurringPeriod(task.id);
-    } else {
-      await repo.archive(task.id);
-    }
+    final partial = result.result == CheckInResult.partial;
 
     _lastUndoTask = task;
-    _lastUndoFrom = recurring ? TaskStatus.inbox : TaskStatus.archived;
-    _lastUndoWasPeriodCompletion = recurring;
+    _lastUndoWasPartialCheckIn = partial;
+    if (partial) {
+      _lastUndoFrom = TaskStatus.inbox;
+      _lastUndoWasPeriodCompletion = false;
+    } else if (recurring) {
+      _lastUndoFrom = TaskStatus.inbox;
+      _lastUndoWasPeriodCompletion = true;
+    } else {
+      _lastUndoFrom = TaskStatus.archived;
+      _lastUndoWasPeriodCompletion = false;
+    }
+
+    final message = partial
+        ? checkInSnackbar(task, updated.checkInCount)
+        : completeSnackbarFor(task);
     _showUndoSnackbar(
-      message: completeSnackbarFor(task),
+      message: message,
       icon: Icons.check_circle_outline,
       type: AppSnackType.success,
     );
-    if (mounted) {
+    if (mounted && !partial) {
       final remaining = (ref.read(processTasksProvider).value?.length ?? 1) - 1;
       if (remaining <= 0) showCelebrateOverlay(context);
     }
 
     unawaited(triggerSyncIfSignedIn(ref));
-    unawaited(ref.read(statsProvider.notifier).recordArchive());
+    if (!partial) {
+      unawaited(ref.read(statsProvider.notifier).recordArchive());
+    }
     unawaited(_playCompleteFeedback());
   }
 

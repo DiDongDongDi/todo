@@ -97,6 +97,9 @@ class SyncRepository {
       'last_daily_completed_at': migrated['last_daily_completed_at'],
       'due_date': migrated['due_date'],
       'parent_id': migrated['parent_id'],
+      'check_in_target': migrated['check_in_target'] ?? 1,
+      'check_in_count': migrated['check_in_count'] ?? 0,
+      'last_check_in_at': migrated['last_check_in_at'],
     };
   }
 
@@ -115,6 +118,7 @@ class SyncRepository {
       'created_at': migrated['created_at'],
       'updated_at': migrated['updated_at'],
       'sync_version': migrated['sync_version'] ?? 0,
+      'check_in_target': migrated['check_in_target'] ?? 1,
     };
   }
 

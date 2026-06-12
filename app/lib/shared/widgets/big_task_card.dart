@@ -40,6 +40,8 @@ class BigTaskCard extends StatelessWidget {
     this.scheduleOverdue = false,
     this.completeLabel = '完成',
     this.scheduleEditor,
+    this.checkInEditor,
+    this.checkInLabel,
     this.onCancelEdit,
     this.editing = false,
     this.onEnterEdit,
@@ -75,6 +77,8 @@ class BigTaskCard extends StatelessWidget {
   final bool scheduleOverdue;
   final String completeLabel;
   final Widget? scheduleEditor;
+  final Widget? checkInEditor;
+  final String? checkInLabel;
   final VoidCallback? onCancelEdit;
 
   /// 处理 tab：false 时标题为只读 [TextField]，true 时可编辑。
@@ -124,6 +128,10 @@ class BigTaskCard extends StatelessWidget {
                       const SizedBox(height: 8),
                       scheduleEditor!,
                     ],
+                    if (checkInEditor != null) ...[
+                      const SizedBox(height: 4),
+                      checkInEditor!,
+                    ],
                     const SizedBox(height: 16),
                     _buildToolbarRow(
                       context,
@@ -138,6 +146,10 @@ class BigTaskCard extends StatelessWidget {
                         [
                           const SizedBox(height: 12),
                           if (scheduleEditor != null) scheduleEditor!,
+                          if (checkInEditor != null) ...[
+                            const SizedBox(height: 4),
+                            checkInEditor!,
+                          ],
                           const SizedBox(height: 8),
                           _buildToolbarRow(
                             context,
@@ -359,6 +371,15 @@ class BigTaskCard extends StatelessWidget {
                   color: scheduleOverdue
                       ? colorScheme.error
                       : colorScheme.primary,
+                ),
+              ),
+            ],
+            if (checkInLabel != null) ...[
+              const SizedBox(height: 4),
+              Text(
+                checkInLabel!,
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: colorScheme.primary,
                 ),
               ),
             ],

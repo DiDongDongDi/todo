@@ -7,6 +7,7 @@ import 'package:todo_app/core/models/task_template.dart';
 import 'package:todo_app/core/repositories/template_repository.dart';
 import 'package:todo_app/core/sync/sync_engine.dart';
 import 'package:todo_app/shared/widgets/app_snackbar.dart';
+import 'package:todo_app/shared/widgets/task_check_in_editor.dart';
 import 'package:todo_app/shared/widgets/task_schedule_editor.dart';
 
 class TemplateEditScreen extends ConsumerStatefulWidget {
@@ -27,6 +28,7 @@ class _TemplateEditScreenState extends ConsumerState<TemplateEditScreen> {
   TaskRecurrence _recurrence = TaskRecurrence.none;
   DateTime? _dailyUntil;
   DateTime? _dueDate;
+  int _checkInTarget = 1;
   bool _saving = false;
 
   @override
@@ -54,6 +56,7 @@ class _TemplateEditScreenState extends ConsumerState<TemplateEditScreen> {
       _recurrence = template.recurrence;
       _dailyUntil = template.dailyUntil;
       _dueDate = template.dueDate;
+      _checkInTarget = template.checkInTarget;
       for (final title in template.subtaskTitles) {
         _subtaskControllers.add(TextEditingController(text: title));
       }
@@ -106,6 +109,7 @@ class _TemplateEditScreenState extends ConsumerState<TemplateEditScreen> {
             .map((c) => c.text.trim())
             .where((t) => t.isNotEmpty)
             .toList(),
+        checkInTarget: _checkInTarget.clamp(1, 99),
       ),
     );
     unawaited(triggerSyncIfSignedIn(ref));
@@ -178,6 +182,12 @@ class _TemplateEditScreenState extends ConsumerState<TemplateEditScreen> {
             onDailyUntilChanged: (value) =>
                 setState(() => _dailyUntil = value),
             onDueDateChanged: (value) => setState(() => _dueDate = value),
+          ),
+          const SizedBox(height: 8),
+          TaskCheckInEditor(
+            checkInTarget: _checkInTarget,
+            onCheckInTargetChanged: (value) =>
+                setState(() => _checkInTarget = value),
           ),
           const SizedBox(height: 24),
           Row(

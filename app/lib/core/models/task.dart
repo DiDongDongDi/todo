@@ -56,6 +56,9 @@ class Task {
     this.lastDailyCompletedAt,
     this.dueDate,
     this.parentId,
+    this.checkInTarget = 1,
+    this.checkInCount = 0,
+    this.lastCheckInAt,
   });
 
   final String id;
@@ -76,6 +79,9 @@ class Task {
   final DateTime? lastDailyCompletedAt;
   final DateTime? dueDate;
   final String? parentId;
+  final int checkInTarget;
+  final int checkInCount;
+  final DateTime? lastCheckInAt;
 
   bool get isSubtask => parentId != null;
 
@@ -103,12 +109,16 @@ class Task {
     DateTime? lastDailyCompletedAt,
     DateTime? dueDate,
     String? parentId,
+    int? checkInTarget,
+    int? checkInCount,
+    DateTime? lastCheckInAt,
     bool clearParentId = false,
     bool clearArchivedAt = false,
     bool clearTrashedAt = false,
     bool clearDailyUntil = false,
     bool clearLastDailyCompletedAt = false,
     bool clearDueDate = false,
+    bool clearLastCheckInAt = false,
   }) {
     return Task(
       id: id ?? this.id,
@@ -131,6 +141,11 @@ class Task {
           : (lastDailyCompletedAt ?? this.lastDailyCompletedAt),
       dueDate: clearDueDate ? null : (dueDate ?? this.dueDate),
       parentId: clearParentId ? null : (parentId ?? this.parentId),
+      checkInTarget: checkInTarget ?? this.checkInTarget,
+      checkInCount: checkInCount ?? this.checkInCount,
+      lastCheckInAt: clearLastCheckInAt
+          ? null
+          : (lastCheckInAt ?? this.lastCheckInAt),
     );
   }
 
@@ -155,6 +170,10 @@ class Task {
           'last_daily_completed_at': _dateOnlyString(lastDailyCompletedAt!),
         if (dueDate != null) 'due_date': _dateOnlyString(dueDate!),
         if (parentId != null) 'parent_id': parentId,
+        'check_in_target': checkInTarget,
+        'check_in_count': checkInCount,
+        if (lastCheckInAt != null)
+          'last_check_in_at': _dateOnlyString(lastCheckInAt!),
       };
 
   static String _dateOnlyString(DateTime d) =>
@@ -195,6 +214,9 @@ class Task {
       lastDailyCompletedAt: _parseDateOnly(json['last_daily_completed_at']),
       dueDate: _parseDateOnly(json['due_date']),
       parentId: json['parent_id'] as String?,
+      checkInTarget: (json['check_in_target'] as num?)?.toInt() ?? 1,
+      checkInCount: (json['check_in_count'] as num?)?.toInt() ?? 0,
+      lastCheckInAt: _parseDateOnly(json['last_check_in_at']),
     );
   }
 

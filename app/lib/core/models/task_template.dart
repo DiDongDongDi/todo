@@ -13,6 +13,7 @@ class TaskTemplate {
     this.dueDate,
     this.subtaskTitles = const [],
     this.syncVersion = 0,
+    this.checkInTarget = 1,
   });
 
   final String id;
@@ -26,6 +27,7 @@ class TaskTemplate {
   final DateTime createdAt;
   final DateTime updatedAt;
   final int syncVersion;
+  final int checkInTarget;
 
   bool get isDaily => recurrence == TaskRecurrence.daily;
 
@@ -46,6 +48,7 @@ class TaskTemplate {
     DateTime? createdAt,
     DateTime? updatedAt,
     int? syncVersion,
+    int? checkInTarget,
     bool clearDailyUntil = false,
     bool clearDueDate = false,
   }) {
@@ -61,6 +64,7 @@ class TaskTemplate {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       syncVersion: syncVersion ?? this.syncVersion,
+      checkInTarget: checkInTarget ?? this.checkInTarget,
     );
   }
 
@@ -77,6 +81,7 @@ class TaskTemplate {
         'created_at': createdAt.toIso8601String(),
         'updated_at': updatedAt.toIso8601String(),
         'sync_version': syncVersion,
+        'check_in_target': checkInTarget,
       };
 
   static String _dateOnlyString(DateTime d) =>
@@ -109,6 +114,7 @@ class TaskTemplate {
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
       syncVersion: json['sync_version'] as int? ?? 0,
+      checkInTarget: (json['check_in_target'] as num?)?.toInt() ?? 1,
     );
   }
 
