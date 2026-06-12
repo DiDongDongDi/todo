@@ -124,14 +124,11 @@ class BigTaskCard extends StatelessWidget {
                 _keyboardLiftedFooter(
                   context,
                   [
-                    if (scheduleEditor != null) ...[
-                      const SizedBox(height: 8),
-                      scheduleEditor!,
-                    ],
-                    if (checkInEditor != null) ...[
-                      const SizedBox(height: 4),
-                      checkInEditor!,
-                    ],
+                    const SizedBox(height: 8),
+                    _buildScheduleCheckInEditorsRow(
+                      scheduleEditor: scheduleEditor,
+                      checkInEditor: checkInEditor,
+                    ),
                     const SizedBox(height: 16),
                     _buildToolbarRow(
                       context,
@@ -145,11 +142,10 @@ class BigTaskCard extends StatelessWidget {
                         context,
                         [
                           const SizedBox(height: 12),
-                          if (scheduleEditor != null) scheduleEditor!,
-                          if (checkInEditor != null) ...[
-                            const SizedBox(height: 4),
-                            checkInEditor!,
-                          ],
+                          _buildScheduleCheckInEditorsRow(
+                            scheduleEditor: scheduleEditor,
+                            checkInEditor: checkInEditor,
+                          ),
                           const SizedBox(height: 8),
                           _buildToolbarRow(
                             context,
@@ -211,6 +207,23 @@ class BigTaskCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildScheduleCheckInEditorsRow({
+    required Widget? scheduleEditor,
+    required Widget? checkInEditor,
+  }) {
+    if (scheduleEditor == null && checkInEditor == null) {
+      return const SizedBox.shrink();
+    }
+    return Row(
+      children: [
+        if (scheduleEditor != null) scheduleEditor,
+        if (scheduleEditor != null && checkInEditor != null)
+          const SizedBox(width: 8),
+        if (checkInEditor != null) checkInEditor,
+      ],
     );
   }
 
