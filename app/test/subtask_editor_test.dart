@@ -112,4 +112,85 @@ void main() {
     await tester.enterText(find.byType(TextField), '洗袜子');
     expect(controllers.first.text, '洗袜子');
   });
+
+  testWidgets('SubtaskTitleEditor ignores empty submit', (tester) async {
+    final controllers = [TextEditingController()];
+    var submitCount = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SubtaskTitleEditor(
+            controllers: controllers,
+            onRemove: (_) {},
+            onSubmitRow: (index) async {
+              submitCount++;
+              return index + 1;
+            },
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byType(TextField));
+    await tester.pump();
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pump();
+
+    expect(submitCount, 0);
+    expect(controllers.length, 1);
+  });
+
+  testWidgets('SubtaskTitleEditor inserts row and focuses on submit',
+      (tester) async {
+    final controllers = [TextEditingController()];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: _SubtaskEditorHarness(controllers: controllers),
+      ),
+    );
+
+    await tester.tap(find.byType(TextField).first);
+    await tester.pump();
+    await tester.enterText(find.byType(TextField).first, '第一项');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pump();
+    await tester.pump();
+
+    expect(controllers.length, 2);
+    expect(controllers.first.text, '第一项');
+    expect(controllers[1].text, isEmpty);
+    expect(find.byType(TextField), findsNWidgets(2));
+    expect(FocusManager.instance.primaryFocus?.hasFocus, isTrue);
+  });
+}
+
+class _SubtaskEditorHarness extends StatefulWidget {
+  const _SubtaskEditorHarness({required this.controllers});
+
+  final List<TextEditingController> controllers;
+
+  @override
+  State<_SubtaskEditorHarness> createState() => _SubtaskEditorHarnessState();
+}
+
+class _SubtaskEditorHarnessState extends State<_SubtaskEditorHarness> {
+  Future<int> _submitRow(int index) async {
+    setState(() {
+      widget.controllers.insert(index + 1, TextEditingController());
+    });
+    return index + 1;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: SubtaskTitleEditor(
+        controllers: widget.controllers,
+        onRemove: (_) {},
+        onSubmitRow: _submitRow,
+      ),
+    );
+  }
 }

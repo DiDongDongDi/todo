@@ -21,10 +21,17 @@ class TaskDetailScreen extends ConsumerStatefulWidget {
 }
 
 class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
-  final _subtaskController = TextEditingController();
+  final List<TextEditingController> _subtaskControllers = [];
+  bool _subtaskFocused = false;
   bool _loading = true;
   Task? _task;
   List<Task> _subtasks = const [];
+
+  bool get _subtaskUiVisible =>
+      _subtaskFocused || _subtaskControllers.isNotEmpty;
+
+  List<String> get _subtaskTitles =>
+      SubtaskTitleEditor.nonEmptyTitles(_subtaskControllers);
 
   @override
   void initState() {
@@ -34,14 +41,17 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
 
   @override
   void dispose() {
-    _subtaskController.dispose();
+    for (final c in _subtaskControllers) {
+      c.dispose();
+    }
     super.dispose();
   }
 
   Future<void> _load() async {
     final repo = await ref.read(taskRepositoryProvider.future);
     final task = await repo.getById(widget.taskId);
-    final subtasks = task != null ? await repo.getSubtasks(widget.taskId) : <Task>[];
+    final subtasks =
+        task != null ? await repo.getSubtasks(widget.taskId) : <Task>[];
     if (!mounted) return;
     setState(() {
       _task = task;
@@ -50,13 +60,51 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
     });
   }
 
-  Future<void> _addSubtask() async {
-    final title = _subtaskController.text.trim();
-    if (title.isEmpty) return;
+  void _addSubtaskField() {
+    setState(() => _subtaskControllers.add(TextEditingController()));
+  }
+
+  Future<int> _submitSubtaskRow(int index) async {
+    setState(() {
+      _subtaskControllers.insert(index + 1, TextEditingController());
+    });
+    return index + 1;
+  }
+
+  void _removeSubtaskField(int index) {
+    setState(() {
+      _subtaskControllers[index].dispose();
+      _subtaskControllers.removeAt(index);
+    });
+  }
+
+  void _clearSubtaskFields() {
+    for (final c in _subtaskControllers) {
+      c.dispose();
+    }
+    _subtaskControllers.clear();
+  }
+
+  void _onSubtaskFocusChanged(bool focused) {
+    if (_subtaskFocused == focused) return;
+    setState(() => _subtaskFocused = focused);
+  }
+
+  void _cancelSubtaskEdit() {
+    _clearSubtaskFields();
+    FocusManager.instance.primaryFocus?.unfocus();
+    setState(() => _subtaskFocused = false);
+  }
+
+  Future<void> _saveDraftSubtasks() async {
+    final titles = _subtaskTitles;
+    if (titles.isEmpty) return;
 
     final repo = await ref.read(taskRepositoryProvider.future);
     try {
-      await repo.createSubtask(parentId: widget.taskId, title: title);
+      for (final title in titles) {
+        await repo.createSubtask(parentId: widget.taskId, title: title);
+      }
     } catch (e) {
       if (!mounted) return;
       showAppSnackBar(
@@ -68,16 +116,12 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
       return;
     }
 
-    _subtaskController.clear();
+    _clearSubtaskFields();
+    FocusManager.instance.primaryFocus?.unfocus();
     await _load();
     unawaited(triggerSyncIfSignedIn(ref));
     if (!mounted) return;
-    showAppSnackBar(
-      context,
-      message: '已添加子任务',
-      icon: Icons.check_circle_outline,
-      type: AppSnackType.success,
-    );
+    setState(() => _subtaskFocused = false);
   }
 
   Future<void> _saveAsTemplate() async {
@@ -129,53 +173,76 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            task.title,
-            style: Theme.of(context).textTheme.headlineSmall,
-          ),
-          if (scheduleLabel(task) != null) ...[
-            const SizedBox(height: 8),
-            Text(
-              scheduleLabel(task)!,
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: isOverdue(task)
-                        ? Theme.of(context).colorScheme.error
-                        : Theme.of(context).colorScheme.primary,
-                  ),
-            ),
-          ],
-          if (_subtasks.isNotEmpty) ...[
-            const SizedBox(height: 24),
-            SubtaskListSection(subtasks: _subtasks),
-          ],
-          const SizedBox(height: 24),
-          Padding(
-            padding: const EdgeInsets.only(bottom: 6),
-            child: Row(
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
               children: [
-                Expanded(
-                  child: TextField(
-                    controller: _subtaskController,
-                    style: subtaskTitleInputStyle(context),
-                    decoration: subtaskTitleInputDecoration(context),
-                    onSubmitted: (_) => _addSubtask(),
-                    textInputAction: TextInputAction.done,
-                  ),
+                Text(
+                  task.title,
+                  style: Theme.of(context).textTheme.headlineSmall,
                 ),
-                IconButton(
-                  icon: const Icon(Icons.playlist_add_outlined, size: 20),
-                  onPressed: _addSubtask,
-                  tooltip: '添加子任务',
-                  visualDensity: VisualDensity.compact,
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                if (scheduleLabel(task) != null) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    scheduleLabel(task)!,
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                          color: isOverdue(task)
+                              ? Theme.of(context).colorScheme.error
+                              : Theme.of(context).colorScheme.primary,
+                        ),
+                  ),
+                ],
+                if (_subtasks.isNotEmpty) ...[
+                  const SizedBox(height: 24),
+                  SubtaskListSection(subtasks: _subtasks),
+                ],
+                const SizedBox(height: 24),
+                SubtaskTitleEditor(
+                  controllers: _subtaskControllers,
+                  onRemove: _removeSubtaskField,
+                  onAnyFieldFocusChanged: _onSubtaskFocusChanged,
+                  onSubmitRow: _submitSubtaskRow,
+                ),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: IconButton(
+                    icon: const Icon(Icons.playlist_add_outlined, size: 20),
+                    onPressed: _addSubtaskField,
+                    tooltip: '添加子任务',
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints:
+                        const BoxConstraints(minWidth: 32, minHeight: 32),
+                  ),
                 ),
               ],
             ),
           ),
+          if (_subtaskUiVisible)
+            SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+                child: Row(
+                  children: [
+                    const Spacer(),
+                    TextButton(
+                      onPressed: _cancelSubtaskEdit,
+                      child: const Text('取消'),
+                    ),
+                    const SizedBox(width: 8),
+                    FilledButton(
+                      onPressed:
+                          _subtaskTitles.isEmpty ? null : _saveDraftSubtasks,
+                      child: const Text('保存'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
         ],
       ),
     );

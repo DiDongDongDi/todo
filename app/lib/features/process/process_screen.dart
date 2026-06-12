@@ -241,6 +241,13 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     setState(() => _editSubtaskControllers.add(TextEditingController()));
   }
 
+  Future<int> _submitEditSubtaskRow(int index) async {
+    setState(() {
+      _editSubtaskControllers.insert(index + 1, TextEditingController());
+    });
+    return index + 1;
+  }
+
   void _removeEditSubtaskField(int index) {
     setState(() {
       _editSubtaskControllers[index].dispose();
@@ -576,6 +583,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
                           controllers: _editSubtaskControllers,
                           onRemove: _removeEditSubtaskField,
                           onAnyFieldFocusChanged: _onEditSubtaskFocusChanged,
+                          onSubmitRow: _submitEditSubtaskRow,
                         )
                       : null,
                   onAddSubtask: !task.isSubtask && _editUiVisible
