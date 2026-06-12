@@ -208,7 +208,12 @@ class TaskRepository {
   Future<List<Task>> getSubtasks(String parentId) async {
     final all = await _store.getAll();
     return all
-        .where((t) => t.parentId == parentId && t.deletedAt == null)
+        .where(
+          (t) =>
+              t.parentId == parentId &&
+              t.deletedAt == null &&
+              t.status != TaskStatus.trashed,
+        )
         .toList()
       ..sort((a, b) => b.sortOrder.compareTo(a.sortOrder));
   }

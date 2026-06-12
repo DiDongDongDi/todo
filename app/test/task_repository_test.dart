@@ -82,4 +82,25 @@ void main() {
       throwsStateError,
     );
   });
+
+  test('getSubtasks returns inbox and archived subtasks', () async {
+    final parent = await repo.createInbox(title: 'Parent');
+    final open = await repo.createSubtask(parentId: parent.id, title: 'Open');
+    final done = await repo.createSubtask(parentId: parent.id, title: 'Done');
+    await repo.archive(done.id);
+
+    final loaded = await repo.getSubtasks(parent.id);
+
+    expect(loaded.map((t) => t.id), containsAll([open.id, done.id]));
+  });
+
+  test('getSubtasks excludes trashed subtasks', () async {
+    final parent = await repo.createInbox(title: 'Parent');
+    final sub = await repo.createSubtask(parentId: parent.id, title: 'Sub');
+    await repo.trash(sub.id);
+
+    final loaded = await repo.getSubtasks(parent.id);
+
+    expect(loaded, isEmpty);
+  });
 }
