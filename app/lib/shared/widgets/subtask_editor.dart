@@ -37,9 +37,8 @@ class _SubtaskTitleEditorState extends State<SubtaskTitleEditor> {
   @override
   void didUpdateWidget(SubtaskTitleEditor oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.controllers.length != widget.controllers.length) {
-      _syncFocusNodes();
-    }
+    // 父级可能就地 mutate 同一 List，old/new widget 的 length 会相同。
+    _syncFocusNodes();
   }
 
   @override
@@ -53,17 +52,25 @@ class _SubtaskTitleEditorState extends State<SubtaskTitleEditor> {
   }
 
   void _syncFocusNodes() {
+    var changed = false;
     while (_focusNodes.length < widget.controllers.length) {
       final node = FocusNode();
       node.addListener(_notifyFocusChanged);
       _focusNodes.add(node);
+      changed = true;
     }
     while (_focusNodes.length > widget.controllers.length) {
       final node = _focusNodes.removeLast();
       node.removeListener(_notifyFocusChanged);
       node.dispose();
+      changed = true;
     }
-    _notifyFocusChanged();
+    if (changed) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _notifyFocusChanged();
+      });
+    }
   }
 
   void _notifyFocusChanged() {
@@ -74,6 +81,7 @@ class _SubtaskTitleEditorState extends State<SubtaskTitleEditor> {
 
   @override
   Widget build(BuildContext context) {
+    _syncFocusNodes();
     if (widget.controllers.isEmpty) {
       return const SizedBox.shrink();
     }
