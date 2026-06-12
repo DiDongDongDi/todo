@@ -2,15 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:todo_app/core/models/task.dart';
 
 /// 草稿态子任务标题编辑（收集页保存前、处理页编辑态使用）。
-class SubtaskTitleEditor extends StatelessWidget {
+class SubtaskTitleEditor extends StatefulWidget {
   const SubtaskTitleEditor({
     super.key,
     required this.controllers,
     required this.onRemove,
+    this.onAnyFieldFocusChanged,
   });
 
   final List<TextEditingController> controllers;
   final ValueChanged<int> onRemove;
+  final ValueChanged<bool>? onAnyFieldFocusChanged;
 
   static List<String> nonEmptyTitles(Iterable<TextEditingController> controllers) {
     return controllers
@@ -20,8 +22,67 @@ class SubtaskTitleEditor extends StatelessWidget {
   }
 
   @override
+  State<SubtaskTitleEditor> createState() => _SubtaskTitleEditorState();
+}
+
+class _SubtaskTitleEditorState extends State<SubtaskTitleEditor> {
+  final List<FocusNode> _focusNodes = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _syncFocusNodes();
+  }
+
+  @override
+  void didUpdateWidget(SubtaskTitleEditor oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // 父级可能就地 mutate 同一 List，old/new widget 的 length 会相同。
+    _syncFocusNodes();
+  }
+
+  @override
+  void dispose() {
+    for (final node in _focusNodes) {
+      node.removeListener(_notifyFocusChanged);
+      node.dispose();
+    }
+    _focusNodes.clear();
+    super.dispose();
+  }
+
+  void _syncFocusNodes() {
+    var changed = false;
+    while (_focusNodes.length < widget.controllers.length) {
+      final node = FocusNode();
+      node.addListener(_notifyFocusChanged);
+      _focusNodes.add(node);
+      changed = true;
+    }
+    while (_focusNodes.length > widget.controllers.length) {
+      final node = _focusNodes.removeLast();
+      node.removeListener(_notifyFocusChanged);
+      node.dispose();
+      changed = true;
+    }
+    if (changed) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _notifyFocusChanged();
+      });
+    }
+  }
+
+  void _notifyFocusChanged() {
+    if (!mounted) return;
+    final anyFocused = _focusNodes.any((node) => node.hasFocus);
+    widget.onAnyFieldFocusChanged?.call(anyFocused);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (controllers.isEmpty) {
+    _syncFocusNodes();
+    if (widget.controllers.isEmpty) {
       return const SizedBox.shrink();
     }
 
@@ -35,14 +96,15 @@ class SubtaskTitleEditor extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
-      children: List.generate(controllers.length, (index) {
+      children: List.generate(widget.controllers.length, (index) {
         return Padding(
           padding: const EdgeInsets.only(bottom: 6),
           child: Row(
             children: [
               Expanded(
                 child: TextField(
-                  controller: controllers[index],
+                  controller: widget.controllers[index],
+                  focusNode: _focusNodes[index],
                   style: theme.textTheme.bodyMedium,
                   decoration: InputDecoration(
                     hintText: '子任务',
@@ -67,7 +129,7 @@ class SubtaskTitleEditor extends StatelessWidget {
               ),
               IconButton(
                 icon: const Icon(Icons.remove_circle_outline, size: 20),
-                onPressed: () => onRemove(index),
+                onPressed: () => widget.onRemove(index),
                 tooltip: '移除',
                 visualDensity: VisualDensity.compact,
                 padding: EdgeInsets.zero,

@@ -310,6 +310,19 @@ class BigTaskCard extends StatelessWidget {
           : null,
     );
 
+    final titleWidget = editing
+        ? Listener(
+            behavior: HitTestBehavior.translucent,
+            onPointerDown: (_) {
+              if (focusNode != null && !focusNode!.hasFocus) {
+                focusNode!.requestFocus();
+              }
+            },
+            child: titleField,
+          )
+        // 只读标题不参与命中测试，避免 TextField.onTap 抢走点击导致无法聚焦。
+        : IgnorePointer(child: titleField);
+
     final content = SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -332,8 +345,7 @@ class BigTaskCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
           ],
-          // 只读标题不参与命中测试，避免 TextField.onTap 抢走点击导致无法聚焦。
-          if (editing) titleField else IgnorePointer(child: titleField),
+          titleWidget,
           if (editing && subtaskEditor != null) ...[
             const SizedBox(height: 20),
             subtaskEditor!,
@@ -374,11 +386,7 @@ class BigTaskCard extends StatelessWidget {
     );
 
     if (editing) {
-      return Listener(
-        behavior: HitTestBehavior.translucent,
-        onPointerDown: (_) => focusNode?.requestFocus(),
-        child: content,
-      );
+      return content;
     }
 
     return GestureDetector(
