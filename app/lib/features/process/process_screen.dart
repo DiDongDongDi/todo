@@ -1007,6 +1007,16 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
       }
     }
 
+    if (target.parentId == null) {
+      final inbox = ref.read(inboxTasksProvider).value ?? [];
+      final todayOnly = ref.read(processTodayOnlyProvider).value ?? false;
+      if (hasOpenSubtasks(target, inbox, todayOnly: todayOnly)) {
+        if (!mounted) return;
+        context.push('/task/${target.id}');
+        return;
+      }
+    }
+
     if (!mounted) return;
     showAppSnackBar(
       context,
