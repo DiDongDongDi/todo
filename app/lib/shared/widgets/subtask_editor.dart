@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:todo_app/core/import/subtask_batch_import_parser.dart';
 import 'package:todo_app/core/models/task.dart';
 
@@ -78,15 +81,13 @@ class SubtaskTitleEditor extends StatefulWidget {
 
 class _SubtaskTitleEditorState extends State<SubtaskTitleEditor> {
   final List<FocusNode> _focusNodes = [];
-  final List<VoidCallback> _controllerListeners = [];
   int? _pendingFocusIndex;
-  bool _importing = false;
+  bool _pasteHandling = false;
 
   @override
   void initState() {
     super.initState();
     _syncFocusNodes();
-    _syncControllerListeners();
   }
 
   @override
@@ -94,12 +95,10 @@ class _SubtaskTitleEditorState extends State<SubtaskTitleEditor> {
     super.didUpdateWidget(oldWidget);
     // 父级可能就地 mutate 同一 List，old/new widget 的 length 会相同。
     _syncFocusNodes();
-    _syncControllerListeners();
   }
 
   @override
   void dispose() {
-    _detachAllControllerListeners();
     for (final node in _focusNodes) {
       node.removeListener(_notifyFocusChanged);
       node.dispose();
@@ -108,57 +107,153 @@ class _SubtaskTitleEditorState extends State<SubtaskTitleEditor> {
     super.dispose();
   }
 
-  void _syncControllerListeners() {
-    while (_controllerListeners.length < widget.controllers.length) {
-      final index = _controllerListeners.length;
-      void listener() => _handleControllerChanged(index);
-      widget.controllers[index].addListener(listener);
-      _controllerListeners.add(listener);
-    }
-    while (_controllerListeners.length > widget.controllers.length) {
-      final index = _controllerListeners.length - 1;
-      widget.controllers[index].removeListener(_controllerListeners.removeLast());
-    }
+  bool _isPasteKeyEvent(KeyEvent event) {
+    if (event is! KeyDownEvent) return false;
+
+    final keyboard = HardwareKeyboard.instance;
+    final isModifierPaste = event.logicalKey == LogicalKeyboardKey.keyV &&
+        (keyboard.isControlPressed || keyboard.isMetaPressed);
+    final isShiftInsert = event.logicalKey == LogicalKeyboardKey.insert &&
+        keyboard.isShiftPressed;
+
+    return isModifierPaste || isShiftInsert;
   }
 
-  void _detachAllControllerListeners() {
-    while (_controllerListeners.isNotEmpty) {
-      final index = _controllerListeners.length - 1;
-      widget.controllers[index].removeListener(_controllerListeners.removeLast());
-    }
+  KeyEventResult _handlePasteKey(int index, FocusNode node, KeyEvent event) {
+    if (!_isPasteKeyEvent(event)) return KeyEventResult.ignored;
+    unawaited(_handlePaste(index));
+    return KeyEventResult.handled;
   }
 
-  void _handleControllerChanged(int index) {
-    if (_importing) return;
+  void _pasteSingleLine(int index, String text) {
+    final controller = widget.controllers[index];
+    final selection = controller.selection;
+    final value = controller.text;
+    final start = selection.start.clamp(0, value.length);
+    final end = selection.end.clamp(0, value.length);
+    final updated = value.replaceRange(start, end, text);
+    controller.value = TextEditingValue(
+      text: updated,
+      selection: TextSelection.collapsed(offset: start + text.length),
+    );
+  }
+
+  Future<void> _handlePaste(int index) async {
+    if (_pasteHandling) return;
+    if (!mounted) return;
     if (index < 0 || index >= widget.controllers.length) return;
 
-    final text = widget.controllers[index].text;
-    if (!text.contains('\n') && !text.contains('\r')) return;
+    _pasteHandling = true;
+    try {
+      final data = await Clipboard.getData(Clipboard.kTextPlain);
+      final raw = data?.text;
+      if (raw == null || raw.isEmpty) return;
 
-    final lines = parseSubtaskBatchImport(text);
-    if (lines.isEmpty) {
-      _importing = true;
-      widget.controllers[index].text = '';
-      _importing = false;
+      final normalized = raw.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+      if (!normalized.contains('\n')) {
+        _pasteSingleLine(index, normalized);
+        return;
+      }
+
+      final controller = widget.controllers[index];
+      final selection = controller.selection;
+      final value = controller.text;
+      final start = selection.start.clamp(0, value.length);
+      final end = selection.end.clamp(0, value.length);
+      final before = value.substring(0, start);
+      final after = value.substring(end);
+
+      var lines = parseSubtaskBatchImport(normalized);
+      if (lines.isEmpty) return;
+
+      if (before.isNotEmpty || after.isNotEmpty) {
+        lines = [before + lines.first, ...lines.skip(1)];
+        if (after.isNotEmpty) {
+          lines[lines.length - 1] = lines.last + after;
+        }
+      }
+
+      if (lines.length == 1) {
+        controller.text = lines.first;
+        controller.selection =
+            TextSelection.collapsed(offset: lines.first.length);
+        return;
+      }
+
+      widget.onImportLines?.call(index, lines);
+    } finally {
+      _pasteHandling = false;
+    }
+  }
+
+  TextInputFormatter _pasteFallbackFormatter(int index) {
+    return _SubtaskPasteFallbackFormatter(
+      onMultilinePaste: () => _handlePaste(index),
+      onRecoverCollapsedPaste: (oldValue, newValue) =>
+          _recoverCollapsedMultilinePaste(index, oldValue, newValue),
+    );
+  }
+
+  Future<void> _recoverCollapsedMultilinePaste(
+    int index,
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) async {
+    if (!mounted) return;
+
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    final raw = data?.text;
+    if (raw == null || (!raw.contains('\n') && !raw.contains('\r'))) {
       return;
     }
 
-    if (lines.length == 1) {
-      _importing = true;
-      widget.controllers[index].text = lines.first;
-      _importing = false;
+    final inserted = _extractInsertedText(oldValue, newValue);
+    if (inserted.isEmpty) return;
+
+    final collapsed = raw
+        .replaceAll('\r\n', '\n')
+        .replaceAll('\r', '\n')
+        .replaceAll('\n', ' ')
+        .replaceAll(RegExp(r' +'), ' ')
+        .trim();
+    final insertedTrimmed = inserted.replaceAll(RegExp(r' +'), ' ').trim();
+
+    if (insertedTrimmed != collapsed && !collapsed.contains(insertedTrimmed)) {
       return;
     }
 
-    _importing = true;
-    widget.onImportLines?.call(index, lines);
-    _importing = false;
+    widget.controllers[index].value = oldValue;
+    await _handlePaste(index);
+  }
+
+  String _extractInsertedText(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final oldText = oldValue.text;
+    final newText = newValue.text;
+    if (newText.length <= oldText.length) return '';
+
+    final selection = oldValue.selection;
+    final start = selection.start.clamp(0, oldText.length);
+    final end = selection.end.clamp(0, oldText.length);
+    final prefix = oldText.substring(0, start);
+    final suffix = oldText.substring(end);
+
+    if (!newText.startsWith(prefix) || !newText.endsWith(suffix)) {
+      return newText.substring(start, newText.length - suffix.length);
+    }
+
+    return newText.substring(start, newText.length - suffix.length);
   }
 
   void _syncFocusNodes() {
     var changed = false;
     while (_focusNodes.length < widget.controllers.length) {
-      final node = FocusNode();
+      final index = _focusNodes.length;
+      final node = FocusNode(
+        onKeyEvent: (node, event) => _handlePasteKey(index, node, event),
+      );
       node.addListener(_notifyFocusChanged);
       _focusNodes.add(node);
       changed = true;
@@ -168,6 +263,11 @@ class _SubtaskTitleEditorState extends State<SubtaskTitleEditor> {
       node.removeListener(_notifyFocusChanged);
       node.dispose();
       changed = true;
+    }
+    for (var i = 0; i < _focusNodes.length; i++) {
+      final index = i;
+      _focusNodes[i].onKeyEvent =
+          (node, event) => _handlePasteKey(index, node, event);
     }
     if (changed) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -210,10 +310,31 @@ class _SubtaskTitleEditorState extends State<SubtaskTitleEditor> {
     widget.onAnyFieldFocusChanged?.call(anyFocused);
   }
 
+  Widget _buildContextMenu(
+    BuildContext context,
+    EditableTextState editableTextState,
+    int index,
+  ) {
+    final buttonItems = editableTextState.contextMenuButtonItems.map((item) {
+      if (item.type != ContextMenuButtonType.paste) return item;
+      return ContextMenuButtonItem(
+        onPressed: () {
+          ContextMenuController.removeAny();
+          unawaited(_handlePaste(index));
+        },
+        type: ContextMenuButtonType.paste,
+      );
+    }).toList();
+
+    return AdaptiveTextSelectionToolbar.buttonItems(
+      anchors: editableTextState.contextMenuAnchors,
+      buttonItems: buttonItems,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     _syncFocusNodes();
-    _syncControllerListeners();
     if (widget.controllers.isEmpty) {
       return const SizedBox.shrink();
     }
@@ -233,6 +354,10 @@ class _SubtaskTitleEditorState extends State<SubtaskTitleEditor> {
                   style: subtaskTitleInputStyle(context),
                   decoration: subtaskTitleInputDecoration(context),
                   textInputAction: TextInputAction.next,
+                  maxLines: 1,
+                  inputFormatters: [_pasteFallbackFormatter(index)],
+                  contextMenuBuilder: (context, editableTextState) =>
+                      _buildContextMenu(context, editableTextState, index),
                   onSubmitted: (_) => _handleSubmitted(index),
                 ),
               ),
@@ -249,6 +374,38 @@ class _SubtaskTitleEditorState extends State<SubtaskTitleEditor> {
         );
       }),
     );
+  }
+}
+
+/// 单行 [TextField] 粘贴时会把换行压成空格；在 formatter 层拦截并改读剪贴板。
+class _SubtaskPasteFallbackFormatter extends TextInputFormatter {
+  const _SubtaskPasteFallbackFormatter({
+    required this.onMultilinePaste,
+    required this.onRecoverCollapsedPaste,
+  });
+
+  final Future<void> Function() onMultilinePaste;
+  final Future<void> Function(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) onRecoverCollapsedPaste;
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    if (newValue.text.contains('\n') || newValue.text.contains('\r')) {
+      unawaited(onMultilinePaste());
+      return oldValue;
+    }
+
+    final insertedLen = newValue.text.length - oldValue.text.length;
+    if (insertedLen > 1) {
+      unawaited(onRecoverCollapsedPaste(oldValue, newValue));
+    }
+
+    return newValue;
   }
 }
 
