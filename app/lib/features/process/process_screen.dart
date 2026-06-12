@@ -68,11 +68,13 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
   String? _subtasksTaskId;
   List<Task> _subtasks = const [];
   final List<TextEditingController> _editSubtaskControllers = [];
+  bool _editSubtaskFocused = false;
 
   /// 与收集页一致：底部按钮组由焦点驱动；tab 不可见时一律视为非编辑 UI。
   bool get _editUiVisible =>
       widget.isActive &&
       (_editFocusNode.hasFocus ||
+          _editSubtaskFocused ||
           _editRecording ||
           _editPendingFocus ||
           _transientUiDepth > 0);
@@ -124,6 +126,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
   void _handleTabHidden() {
     _editPendingFocus = false;
     _transientUiDepth = 0;
+    _editSubtaskFocused = false;
     _editFocusNode.unfocus();
     if (_editRecording) {
       _editRecording = false;
@@ -167,7 +170,9 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
       _syncVolumeKeyHandler();
       return;
     }
-    if (_editRecording || _transientUiDepth > 0) {
+    if (_editRecording ||
+        _editSubtaskFocused ||
+        _transientUiDepth > 0) {
       setState(() {});
       _syncVolumeKeyHandler();
       return;
@@ -176,6 +181,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       if (_editFocusNode.hasFocus ||
+          _editSubtaskFocused ||
           _editRecording ||
           _transientUiDepth > 0) {
         return;
@@ -238,6 +244,17 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     setState(() {
       _editSubtaskControllers[index].dispose();
       _editSubtaskControllers.removeAt(index);
+    });
+  }
+
+  void _onEditSubtaskFocusChanged(bool focused) {
+    if (_editSubtaskFocused == focused) return;
+    setState(() => _editSubtaskFocused = focused);
+    _syncVolumeKeyHandler();
+    if (focused) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _scheduleEditSessionCleanup();
     });
   }
 
@@ -557,6 +574,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
                       ? SubtaskTitleEditor(
                           controllers: _editSubtaskControllers,
                           onRemove: _removeEditSubtaskField,
+                          onAnyFieldFocusChanged: _onEditSubtaskFocusChanged,
                         )
                       : null,
                   onAddSubtask: !task.isSubtask && _editUiVisible
@@ -574,7 +592,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
         return CallbackShortcuts(
           bindings: shortcuts,
           child: Focus(
-            autofocus: !_editUiVisible,
+            autofocus: !_editUiVisible && !_editing,
             child: content,
           ),
         );
@@ -681,6 +699,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
   void _exitEditMode([Task? task]) {
     if (!_editing && !_editUiVisible) return;
     _editPendingFocus = false;
+    _editSubtaskFocused = false;
     _clearEditSubtaskFields();
     setState(() => _editing = false);
     _editFocusNode.unfocus();
