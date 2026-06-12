@@ -4,14 +4,43 @@ import 'package:todo_app/shared/widgets/app_snackbar.dart';
 Future<String?> showSaveTemplateDialog(
   BuildContext context, {
   required String defaultTitle,
-}) async {
-  final controller = TextEditingController(text: defaultTitle.trim());
-  final result = await showDialog<String>(
+}) {
+  return showDialog<String>(
     context: context,
-    builder: (context) => AlertDialog(
+    builder: (context) => _SaveTemplateDialog(defaultTitle: defaultTitle),
+  );
+}
+
+class _SaveTemplateDialog extends StatefulWidget {
+  const _SaveTemplateDialog({required this.defaultTitle});
+
+  final String defaultTitle;
+
+  @override
+  State<_SaveTemplateDialog> createState() => _SaveTemplateDialogState();
+}
+
+class _SaveTemplateDialogState extends State<_SaveTemplateDialog> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.defaultTitle.trim());
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
       title: const Text('保存为模板'),
       content: TextField(
-        controller: controller,
+        controller: _controller,
         autofocus: true,
         decoration: const InputDecoration(
           labelText: '模板名称',
@@ -25,7 +54,7 @@ Future<String?> showSaveTemplateDialog(
         ),
         FilledButton(
           onPressed: () {
-            final title = controller.text.trim();
+            final title = _controller.text.trim();
             if (title.isEmpty) {
               showAppSnackBar(
                 context,
@@ -40,8 +69,6 @@ Future<String?> showSaveTemplateDialog(
           child: const Text('保存'),
         ),
       ],
-    ),
-  );
-  controller.dispose();
-  return result;
+    );
+  }
 }
