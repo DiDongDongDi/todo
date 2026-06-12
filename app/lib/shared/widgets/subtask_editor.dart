@@ -107,24 +107,6 @@ class _SubtaskTitleEditorState extends State<SubtaskTitleEditor> {
     super.dispose();
   }
 
-  bool _isPasteKeyEvent(KeyEvent event) {
-    if (event is! KeyDownEvent) return false;
-
-    final keyboard = HardwareKeyboard.instance;
-    final isModifierPaste = event.logicalKey == LogicalKeyboardKey.keyV &&
-        (keyboard.isControlPressed || keyboard.isMetaPressed);
-    final isShiftInsert = event.logicalKey == LogicalKeyboardKey.insert &&
-        keyboard.isShiftPressed;
-
-    return isModifierPaste || isShiftInsert;
-  }
-
-  KeyEventResult _handlePasteKey(int index, FocusNode node, KeyEvent event) {
-    if (!_isPasteKeyEvent(event)) return KeyEventResult.ignored;
-    unawaited(_handlePaste(index));
-    return KeyEventResult.handled;
-  }
-
   void _pasteSingleLine(int index, String text) {
     final controller = widget.controllers[index];
     final selection = controller.selection;
@@ -188,42 +170,117 @@ class _SubtaskTitleEditorState extends State<SubtaskTitleEditor> {
 
   TextInputFormatter _pasteFallbackFormatter(int index) {
     return _SubtaskPasteFallbackFormatter(
-      onMultilinePaste: () => _handlePaste(index),
-      onRecoverCollapsedPaste: (oldValue, newValue) =>
-          _recoverCollapsedMultilinePaste(index, oldValue, newValue),
+      onPossiblePaste: (oldValue, newValue) =>
+          _tryRecoverMultilinePaste(index, oldValue, newValue),
     );
   }
 
-  Future<void> _recoverCollapsedMultilinePaste(
+  Future<void> _tryRecoverMultilinePaste(
     int index,
     TextEditingValue oldValue,
     TextEditingValue newValue,
   ) async {
+    if (_pasteHandling) return;
     if (!mounted) return;
+
+    final insertedLen = newValue.text.length - oldValue.text.length;
+    if (insertedLen < 1) return;
+
+    if (newValue.text.contains('\n') || newValue.text.contains('\r')) {
+      await _importFromMultilineText(index, oldValue, newValue);
+      return;
+    }
 
     final data = await Clipboard.getData(Clipboard.kTextPlain);
     final raw = data?.text;
     if (raw == null || (!raw.contains('\n') && !raw.contains('\r'))) {
+      if (mounted && insertedLen > 1) {
+        widget.controllers[index].value = newValue;
+      }
       return;
     }
 
-    final inserted = _extractInsertedText(oldValue, newValue);
-    if (inserted.isEmpty) return;
-
-    final collapsed = raw
-        .replaceAll('\r\n', '\n')
-        .replaceAll('\r', '\n')
-        .replaceAll('\n', ' ')
-        .replaceAll(RegExp(r' +'), ' ')
-        .trim();
-    final insertedTrimmed = inserted.replaceAll(RegExp(r' +'), ' ').trim();
-
-    if (insertedTrimmed != collapsed && !collapsed.contains(insertedTrimmed)) {
+    final lines = parseSubtaskBatchImport(raw);
+    if (lines.length <= 1) {
+      if (mounted && insertedLen > 1) {
+        widget.controllers[index].value = newValue;
+      }
       return;
     }
 
+    final shouldImport = insertedLen > 1 ||
+        _isFirstLineOnlyPaste(oldValue, newValue, lines);
+
+    if (!shouldImport) return;
+
+    if (!mounted) return;
     widget.controllers[index].value = oldValue;
     await _handlePaste(index);
+  }
+
+  bool _isFirstLineOnlyPaste(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+    List<String> lines,
+  ) {
+    if (lines.length <= 1) return false;
+
+    final newTrim = newValue.text.trim();
+    final firstLine = lines.first.trim();
+    if (newTrim.isEmpty || newTrim != firstLine) return false;
+
+    return oldValue.text.isEmpty ||
+        newValue.text.length - oldValue.text.length == firstLine.length;
+  }
+
+  Future<void> _importFromMultilineText(
+    int index,
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) async {
+    if (_pasteHandling) return;
+    if (!mounted) return;
+    if (index < 0 || index >= widget.controllers.length) return;
+
+    _pasteHandling = true;
+    try {
+      final inserted = _extractInsertedText(oldValue, newValue);
+      final source =
+          inserted.contains('\n') || inserted.contains('\r')
+              ? inserted
+              : newValue.text;
+
+      var lines = parseSubtaskBatchImport(source);
+      if (lines.isEmpty) {
+        await _handlePaste(index);
+        return;
+      }
+
+      final oldText = oldValue.text;
+      final start = oldValue.selection.start.clamp(0, oldText.length);
+      final end = oldValue.selection.end.clamp(0, oldText.length);
+      final before = oldText.substring(0, start);
+      final after = oldText.substring(end);
+
+      if (before.isNotEmpty || after.isNotEmpty) {
+        lines = [before + lines.first, ...lines.skip(1)];
+        if (after.isNotEmpty) {
+          lines[lines.length - 1] = lines.last + after;
+        }
+      }
+
+      if (lines.length == 1) {
+        widget.controllers[index].text = lines.first;
+        widget.controllers[index].selection =
+            TextSelection.collapsed(offset: lines.first.length);
+        return;
+      }
+
+      widget.controllers[index].value = oldValue;
+      widget.onImportLines?.call(index, lines);
+    } finally {
+      _pasteHandling = false;
+    }
   }
 
   String _extractInsertedText(
@@ -250,10 +307,7 @@ class _SubtaskTitleEditorState extends State<SubtaskTitleEditor> {
   void _syncFocusNodes() {
     var changed = false;
     while (_focusNodes.length < widget.controllers.length) {
-      final index = _focusNodes.length;
-      final node = FocusNode(
-        onKeyEvent: (node, event) => _handlePasteKey(index, node, event),
-      );
+      final node = FocusNode();
       node.addListener(_notifyFocusChanged);
       _focusNodes.add(node);
       changed = true;
@@ -263,11 +317,6 @@ class _SubtaskTitleEditorState extends State<SubtaskTitleEditor> {
       node.removeListener(_notifyFocusChanged);
       node.dispose();
       changed = true;
-    }
-    for (var i = 0; i < _focusNodes.length; i++) {
-      final index = i;
-      _focusNodes[i].onKeyEvent =
-          (node, event) => _handlePasteKey(index, node, event);
     }
     if (changed) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -310,28 +359,6 @@ class _SubtaskTitleEditorState extends State<SubtaskTitleEditor> {
     widget.onAnyFieldFocusChanged?.call(anyFocused);
   }
 
-  Widget _buildContextMenu(
-    BuildContext context,
-    EditableTextState editableTextState,
-    int index,
-  ) {
-    final buttonItems = editableTextState.contextMenuButtonItems.map((item) {
-      if (item.type != ContextMenuButtonType.paste) return item;
-      return ContextMenuButtonItem(
-        onPressed: () {
-          ContextMenuController.removeAny();
-          unawaited(_handlePaste(index));
-        },
-        type: ContextMenuButtonType.paste,
-      );
-    }).toList();
-
-    return AdaptiveTextSelectionToolbar.buttonItems(
-      anchors: editableTextState.contextMenuAnchors,
-      buttonItems: buttonItems,
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     _syncFocusNodes();
@@ -356,8 +383,6 @@ class _SubtaskTitleEditorState extends State<SubtaskTitleEditor> {
                   textInputAction: TextInputAction.next,
                   maxLines: 1,
                   inputFormatters: [_pasteFallbackFormatter(index)],
-                  contextMenuBuilder: (context, editableTextState) =>
-                      _buildContextMenu(context, editableTextState, index),
                   onSubmitted: (_) => _handleSubmitted(index),
                 ),
               ),
@@ -377,18 +402,21 @@ class _SubtaskTitleEditorState extends State<SubtaskTitleEditor> {
   }
 }
 
-/// 单行 [TextField] 粘贴时会把换行压成空格；在 formatter 层拦截并改读剪贴板。
+/// 移动端单行 [TextField] 粘贴时可能只保留首行或把换行压成空格；拦截后读剪贴板拆分。
 class _SubtaskPasteFallbackFormatter extends TextInputFormatter {
   const _SubtaskPasteFallbackFormatter({
-    required this.onMultilinePaste,
-    required this.onRecoverCollapsedPaste,
+    required this.onMultilineText,
+    required this.onPossiblePaste,
   });
 
-  final Future<void> Function() onMultilinePaste;
   final Future<void> Function(
     TextEditingValue oldValue,
     TextEditingValue newValue,
-  ) onRecoverCollapsedPaste;
+  ) onMultilineText;
+  final Future<void> Function(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) onPossiblePaste;
 
   @override
   TextEditingValue formatEditUpdate(
@@ -396,13 +424,14 @@ class _SubtaskPasteFallbackFormatter extends TextInputFormatter {
     TextEditingValue newValue,
   ) {
     if (newValue.text.contains('\n') || newValue.text.contains('\r')) {
-      unawaited(onMultilinePaste());
+      unawaited(onMultilineText(oldValue, newValue));
       return oldValue;
     }
 
     final insertedLen = newValue.text.length - oldValue.text.length;
     if (insertedLen > 1) {
-      unawaited(onRecoverCollapsedPaste(oldValue, newValue));
+      unawaited(onPossiblePaste(oldValue, newValue));
+      return oldValue;
     }
 
     return newValue;
