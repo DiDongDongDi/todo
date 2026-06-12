@@ -1,15 +1,31 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:todo_app/core/models/task.dart';
+import 'package:todo_app/core/models/task_check_in.dart';
+import 'package:todo_app/core/models/task_display.dart';
 import 'package:todo_app/core/models/task_schedule.dart';
 import 'package:todo_app/core/repositories/task_repository.dart';
 import 'package:todo_app/core/repositories/template_repository.dart';
 import 'package:todo_app/core/sync/sync_engine.dart';
+import 'package:todo_app/core/transcription/transcription_service.dart';
+import 'package:todo_app/shared/utils/app_audio_recorder.dart';
+import 'package:todo_app/shared/utils/attachment_storage.dart';
+import 'package:todo_app/shared/utils/audio_storage.dart';
+import 'package:todo_app/shared/utils/haptics.dart';
 import 'package:todo_app/shared/widgets/app_snackbar.dart';
+import 'package:todo_app/shared/widgets/attachment_image.dart';
+import 'package:todo_app/shared/widgets/audio_preview.dart';
+import 'package:todo_app/shared/widgets/haptic_tap_scope.dart';
+import 'package:todo_app/shared/widgets/image_preview.dart';
+import 'package:todo_app/shared/widgets/keyboard_lift.dart';
 import 'package:todo_app/shared/widgets/save_template_dialog.dart';
 import 'package:todo_app/shared/widgets/subtask_editor.dart';
+import 'package:todo_app/shared/widgets/task_check_in_editor.dart';
+import 'package:todo_app/shared/widgets/task_schedule_editor.dart';
 
 class TaskDetailScreen extends ConsumerStatefulWidget {
   const TaskDetailScreen({super.key, required this.taskId});
@@ -23,21 +39,45 @@ class TaskDetailScreen extends ConsumerStatefulWidget {
 class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
   bool _loading = true;
   bool _editingSubtasks = false;
+  bool _editingTask = false;
   Task? _task;
   List<Task> _subtasks = const [];
   List<Task> _subtaskSnapshot = const [];
   final List<TextEditingController> _editSubtaskControllers = [];
   final List<String?> _editSubtaskIds = [];
 
+  final _editController = TextEditingController();
+  final _editFocusNode = FocusNode();
+  TaskRecurrence _editRecurrence = TaskRecurrence.none;
+  DateTime? _editDailyUntil;
+  DateTime? _editDueDate;
+  int _editCheckInTarget = 1;
+  final List<TaskAttachment> _editAttachments = [];
+  bool _editRecording = false;
+  final _editAudioRecorder = AppAudioRecorder();
+  bool _editPendingFocus = false;
+  int _transientUiDepth = 0;
+
+  bool get _editTaskUiVisible =>
+      _editFocusNode.hasFocus ||
+      _editRecording ||
+      _editPendingFocus ||
+      _transientUiDepth > 0;
+
   @override
   void initState() {
     super.initState();
+    _editFocusNode.addListener(_onEditFocusChange);
     _load();
   }
 
   @override
   void dispose() {
+    _editFocusNode.removeListener(_onEditFocusChange);
+    _editController.dispose();
+    _editFocusNode.dispose();
     _clearEditSubtaskFields();
+    unawaited(_editAudioRecorder.dispose());
     super.dispose();
   }
 
@@ -54,6 +94,256 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
     });
   }
 
+  void _onEditFocusChange() {
+    if (!mounted) return;
+    if (_editFocusNode.hasFocus) {
+      _editPendingFocus = false;
+      _ensureEditCaretVisible();
+    }
+    setState(() {});
+  }
+
+  void _beginTransientEditUi() {
+    _transientUiDepth++;
+  }
+
+  void _endTransientEditUi() {
+    if (_transientUiDepth > 0) _transientUiDepth--;
+    if (!mounted) return;
+    setState(() {});
+  }
+
+  void _ensureEditCaretVisible() {
+    final text = _editController.text;
+    _editController.value = TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+      composing: TextRange.empty,
+    );
+  }
+
+  Future<void> _requestEditFocus() async {
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted || !_editingTask) return;
+
+    _ensureEditCaretVisible();
+    FocusScope.of(context).requestFocus(_editFocusNode);
+
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted || !_editingTask) return;
+    _ensureEditCaretVisible();
+  }
+
+  void _syncEditFieldsFromTask(Task task) {
+    _editController.text = task.displayTitle;
+    _editRecurrence = task.recurrence;
+    _editDailyUntil = task.dailyUntil;
+    _editDueDate = task.dueDate;
+    _editCheckInTarget = task.checkInTarget;
+    _editAttachments
+      ..clear()
+      ..addAll(task.attachments);
+  }
+
+  void _startTaskEdit() {
+    final task = _task;
+    if (task == null || _editTaskUiVisible) return;
+    if (_editingSubtasks) {
+      _cancelSubtaskEdit();
+    }
+    _syncEditFieldsFromTask(task);
+    _editRecording = false;
+    _editPendingFocus = true;
+    setState(() => _editingTask = true);
+    unawaited(_requestEditFocus());
+  }
+
+  void _exitTaskEditMode([Task? task]) {
+    if (!_editingTask && !_editTaskUiVisible) return;
+    _editPendingFocus = false;
+    setState(() => _editingTask = false);
+    _editFocusNode.unfocus();
+    if (task != null) {
+      _syncEditFieldsFromTask(task);
+    }
+    if (_editRecording) {
+      _editRecording = false;
+      unawaited(_editAudioRecorder.stop());
+    }
+  }
+
+  void _cancelTaskEdit() {
+    final task = _task;
+    if (task == null) return;
+    unawaited(AppHaptics.light());
+    _exitTaskEditMode(task);
+  }
+
+  Future<void> _saveTaskEdit() async {
+    final task = _task;
+    if (task == null) return;
+    await AppHaptics.light();
+
+    final repo = await ref.read(taskRepositoryProvider.future);
+    final hasAudio =
+        _editAttachments.any((a) => a.type == AttachmentType.audio);
+    final audioChanged = hasAudio &&
+        _editAttachments.any(
+          (a) =>
+              a.type == AttachmentType.audio &&
+              !task.attachments.any((o) => o.localPath == a.localPath),
+        );
+
+    var transcriptionStatus = task.transcriptionStatus;
+    if (!hasAudio) {
+      transcriptionStatus = TranscriptionStatus.none;
+    } else if (audioChanged) {
+      transcriptionStatus = TranscriptionStatus.pending;
+    }
+
+    final editDue =
+        _editRecurrence == TaskRecurrence.daily ? null : _editDueDate;
+    final normalizedDue = normalizeRecurringDueDate(
+      recurrence: _editRecurrence,
+      dueDate: editDue,
+    );
+
+    try {
+      final updated = await repo.update(
+        task.copyWith(
+          title: _editController.text.trim(),
+          attachments: List.from(_editAttachments),
+          transcriptionStatus: transcriptionStatus,
+          recurrence: _editRecurrence,
+          dailyUntil:
+              _editRecurrence != TaskRecurrence.none ? _editDailyUntil : null,
+          dueDate: normalizedDue,
+          clearDailyUntil:
+              _editRecurrence == TaskRecurrence.none || _editDailyUntil == null,
+          clearDueDate:
+              _editRecurrence == TaskRecurrence.daily || editDue == null,
+          checkInTarget: _editCheckInTarget.clamp(1, 99),
+        ),
+      );
+
+      if (hasAudio && transcriptionStatus == TranscriptionStatus.pending) {
+        unawaited(ref.read(transcriptionServiceProvider).processTask(updated));
+      }
+      unawaited(triggerSyncIfSignedIn(ref));
+
+      setState(() => _task = updated);
+      _exitTaskEditMode(updated);
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: '已保存',
+        icon: Icons.check_circle_outline,
+        type: AppSnackType.success,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: '无法保存',
+        icon: Icons.error_outline,
+        type: AppSnackType.error,
+      );
+    }
+  }
+
+  void _removeEditAttachment(int index) {
+    setState(() => _editAttachments.removeAt(index));
+  }
+
+  Future<void> _pickEditImage() async {
+    _beginTransientEditUi();
+    final picker = ImagePicker();
+    try {
+      final file = await picker.pickImage(source: ImageSource.gallery);
+      if (file == null) return;
+
+      final localPath = await persistImageAttachment(file);
+      if (localPath == null) {
+        if (!mounted) return;
+        showAppSnackBar(
+          context,
+          message: '无法读取所选图片',
+          icon: Icons.error_outline,
+          type: AppSnackType.error,
+        );
+        return;
+      }
+
+      setState(() {
+        _editAttachments.add(
+          TaskAttachment(type: AttachmentType.image, localPath: localPath),
+        );
+      });
+    } finally {
+      if (mounted) _endTransientEditUi();
+    }
+  }
+
+  Future<void> _toggleEditRecording() async {
+    if (_editRecording) {
+      final result = await _editAudioRecorder.stop();
+      if (!mounted) return;
+      setState(() => _editRecording = false);
+
+      if (result == null) {
+        showAppSnackBar(
+          context,
+          message: '录音失败，请检查麦克风权限',
+          icon: Icons.mic_off_outlined,
+          type: AppSnackType.error,
+        );
+        return;
+      }
+
+      setState(() {
+        _editAttachments.add(
+          TaskAttachment(
+            type: AttachmentType.audio,
+            localPath: result.path,
+            duration: result.durationSeconds,
+          ),
+        );
+      });
+      return;
+    }
+
+    final permitted = await _editAudioRecorder.hasPermission();
+    if (!permitted) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: '需要麦克风权限才能录音',
+        icon: Icons.mic_off_outlined,
+        type: AppSnackType.error,
+      );
+      return;
+    }
+
+    _beginTransientEditUi();
+    _editFocusNode.unfocus();
+    try {
+      await _editAudioRecorder.start();
+      if (!mounted) return;
+      setState(() => _editRecording = true);
+    } catch (e) {
+      debugPrint('Recording start failed: $e');
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: '无法开始录音',
+        icon: Icons.mic_off_outlined,
+        type: AppSnackType.error,
+      );
+    } finally {
+      if (mounted) _endTransientEditUi();
+    }
+  }
+
   void _clearEditSubtaskFields() {
     for (final c in _editSubtaskControllers) {
       c.dispose();
@@ -63,6 +353,9 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
   }
 
   void _enterSubtaskEdit({bool addEmptyRow = false}) {
+    if (_editingTask) {
+      _cancelTaskEdit();
+    }
     _clearEditSubtaskFields();
     _subtaskSnapshot = List.from(_subtasks);
     for (final sub in _subtasks) {
@@ -252,15 +545,17 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
         children: [
           const SizedBox(height: 20),
           SubtaskListSection(subtasks: _subtasks),
-          const SizedBox(height: 12),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              onPressed: _enterSubtaskEdit,
-              icon: const Icon(Icons.edit_outlined, size: 18),
-              label: const Text('编辑子任务'),
+          if (!_editingTask) ...[
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: _enterSubtaskEdit,
+                icon: const Icon(Icons.edit_outlined, size: 18),
+                label: const Text('编辑子任务'),
+              ),
             ),
-          ),
+          ],
         ],
       );
     }
@@ -275,16 +570,237 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
         ),
-        const SizedBox(height: 12),
+        if (!_editingTask) ...[
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: () => _enterSubtaskEdit(addEmptyRow: true),
+              icon: const Icon(Icons.playlist_add_outlined, size: 18),
+              label: const Text('添加子任务'),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildAttachmentWrap(
+    BuildContext context, {
+    required List<TaskAttachment> attachments,
+    ValueChanged<int>? onRemove,
+  }) {
+    if (attachments.isEmpty) return const SizedBox.shrink();
+
+    final imageAttachments =
+        attachments.where((a) => a.type == AttachmentType.image).toList();
+    final audioAttachments =
+        attachments.where((a) => a.type == AttachmentType.audio).toList();
+
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        for (var i = 0; i < attachments.length; i++)
+          _TaskAttachmentThumbnail(
+            attachment: attachments[i],
+            imageAttachments: imageAttachments,
+            audioAttachments: audioAttachments,
+            onRemove: onRemove == null ? null : () => onRemove(i),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildTaskHeader(BuildContext context, Task task) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    if (_editingTask) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TextField(
+            controller: _editController,
+            focusNode: _editFocusNode,
+            minLines: 1,
+            maxLines: null,
+            keyboardType: TextInputType.multiline,
+            textInputAction: TextInputAction.newline,
+            style: theme.textTheme.headlineSmall,
+            decoration: const InputDecoration(border: InputBorder.none),
+          ),
+          if (_editTaskUiVisible && _editAttachments.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            SizedBox(
+              height: 80,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: _editAttachments.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                itemBuilder: (context, index) {
+                  final imageAttachments = _editAttachments
+                      .where((a) => a.type == AttachmentType.image)
+                      .toList();
+                  final audioAttachments = _editAttachments
+                      .where((a) => a.type == AttachmentType.audio)
+                      .toList();
+                  return _TaskAttachmentThumbnail(
+                    attachment: _editAttachments[index],
+                    imageAttachments: imageAttachments,
+                    audioAttachments: audioAttachments,
+                    onRemove: () => _removeEditAttachment(index),
+                  );
+                },
+              ),
+            ),
+          ],
+        ],
+      );
+    }
+
+    final readOnlyContent = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          task.displayTitle,
+          style: theme.textTheme.headlineSmall,
+        ),
+        if (scheduleLabel(task) != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            scheduleLabel(task)!,
+            style: theme.textTheme.labelLarge?.copyWith(
+              color: isOverdue(task)
+                  ? colorScheme.error
+                  : colorScheme.primary,
+            ),
+          ),
+        ],
+        if (checkInLabel(task) != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            checkInLabel(task)!,
+            style: theme.textTheme.labelLarge?.copyWith(
+              color: colorScheme.primary,
+            ),
+          ),
+        ],
+        if (task.attachments.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          _buildAttachmentWrap(context, attachments: task.attachments),
+        ],
+        const SizedBox(height: 8),
         Align(
           alignment: Alignment.centerLeft,
           child: TextButton.icon(
-            onPressed: () => _enterSubtaskEdit(addEmptyRow: true),
-            icon: const Icon(Icons.playlist_add_outlined, size: 18),
-            label: const Text('添加子任务'),
+            onPressed: _startTaskEdit,
+            icon: const Icon(Icons.edit_outlined, size: 18),
+            label: const Text('编辑任务'),
           ),
         ),
       ],
+    );
+
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onTap: _startTaskEdit,
+      child: readOnlyContent,
+    );
+  }
+
+  Widget _buildTaskEditFooter(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    const compact = VisualDensity.compact;
+    const gap = SizedBox(width: 4);
+
+    return KeyboardLift(
+      bottomObstruction: shellBottomObstruction(context),
+      child: SuppressTapHaptic(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  TaskScheduleEditor(
+                    recurrence: _editRecurrence,
+                    dailyUntil: _editDailyUntil,
+                    dueDate: _editDueDate,
+                    onRecurrenceChanged: (value) =>
+                        setState(() => _editRecurrence = value),
+                    onDailyUntilChanged: (value) =>
+                        setState(() => _editDailyUntil = value),
+                    onDueDateChanged: (value) =>
+                        setState(() => _editDueDate = value),
+                    onTransientUiOpening: _beginTransientEditUi,
+                    onTransientUiClosed: _endTransientEditUi,
+                  ),
+                  const SizedBox(width: 8),
+                  TaskCheckInEditor(
+                    checkInTarget: _editCheckInTarget,
+                    onCheckInTargetChanged: (value) =>
+                        setState(() => _editCheckInTarget = value),
+                    onTransientUiOpening: _beginTransientEditUi,
+                    onTransientUiClosed: _endTransientEditUi,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  IconButton.filledTonal(
+                    onPressed: _pickEditImage,
+                    icon: const Icon(Icons.image_outlined),
+                    tooltip: '添加图片',
+                    visualDensity: compact,
+                    style: IconButton.styleFrom(
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  ),
+                  gap,
+                  IconButton.filledTonal(
+                    onPressed: !kIsWeb ? _toggleEditRecording : null,
+                    icon: Icon(
+                      _editRecording ? Icons.stop : Icons.mic_none_outlined,
+                    ),
+                    tooltip: _editRecording ? '停止录音' : '录音',
+                    visualDensity: compact,
+                    style: IconButton.styleFrom(
+                      backgroundColor:
+                          _editRecording ? colorScheme.errorContainer : null,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  ),
+                  const Spacer(),
+                  TextButton(
+                    onPressed: _cancelTaskEdit,
+                    style: TextButton.styleFrom(
+                      visualDensity: compact,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: const Text('取消'),
+                  ),
+                  gap,
+                  Focus(
+                    canRequestFocus: false,
+                    child: FilledButton(
+                      onPressed: _saveTaskEdit,
+                      style: FilledButton.styleFrom(
+                        visualDensity: compact,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: const Text('保存'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -308,34 +824,156 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
       appBar: AppBar(
         title: const Text('父任务'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.bookmark_outline),
-            tooltip: '保存为模板',
-            onPressed: _saveAsTemplate,
-          ),
-        ],
-      ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
-        children: [
-          Text(
-            task.title,
-            style: Theme.of(context).textTheme.headlineSmall,
-          ),
-          if (scheduleLabel(task) != null) ...[
-            const SizedBox(height: 8),
-            Text(
-              scheduleLabel(task)!,
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: isOverdue(task)
-                        ? Theme.of(context).colorScheme.error
-                        : Theme.of(context).colorScheme.primary,
-                  ),
+          if (!_editingTask)
+            IconButton(
+              icon: const Icon(Icons.bookmark_outline),
+              tooltip: '保存为模板',
+              onPressed: _saveAsTemplate,
             ),
-          ],
-          _buildSubtaskSection(context),
         ],
       ),
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+              children: [
+                _buildTaskHeader(context, task),
+                _buildSubtaskSection(context),
+              ],
+            ),
+          ),
+          if (_editingTask) _buildTaskEditFooter(context),
+        ],
+      ),
+    );
+  }
+}
+
+class _TaskAttachmentThumbnail extends StatelessWidget {
+  const _TaskAttachmentThumbnail({
+    required this.attachment,
+    this.imageAttachments = const [],
+    this.audioAttachments = const [],
+    this.onRemove,
+  });
+
+  final TaskAttachment attachment;
+  final List<TaskAttachment> imageAttachments;
+  final List<TaskAttachment> audioAttachments;
+  final VoidCallback? onRemove;
+
+  bool get _isPreviewable =>
+      attachment.type == AttachmentType.image ||
+      attachment.type == AttachmentType.audio;
+
+  void _openPreview(BuildContext context) {
+    if (!_isPreviewable) return;
+
+    FocusManager.instance.primaryFocus?.unfocus();
+
+    if (attachment.type == AttachmentType.image) {
+      final images =
+          imageAttachments.isNotEmpty ? imageAttachments : [attachment];
+      final index = images.indexWhere(
+        (a) =>
+            a.localPath == attachment.localPath &&
+            a.remoteUrl == attachment.remoteUrl,
+      );
+
+      showAttachmentImagePreview(
+        context,
+        attachments: images,
+        initialIndex: index >= 0 ? index : 0,
+      );
+      return;
+    }
+
+    final audios =
+        audioAttachments.isNotEmpty ? audioAttachments : [attachment];
+    final index = audios.indexWhere(
+      (a) =>
+          a.localPath == attachment.localPath &&
+          a.remoteUrl == attachment.remoteUrl,
+    );
+
+    showAttachmentAudioPreview(
+      context,
+      attachments: audios,
+      initialIndex: index >= 0 ? index : 0,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isImage = attachment.type == AttachmentType.image;
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        GestureDetector(
+          onTap: _isPreviewable ? () => _openPreview(context) : null,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: SizedBox(
+              width: 80,
+              height: 80,
+              child: isImage
+                  ? AttachmentImage(
+                      attachment,
+                      fit: BoxFit.cover,
+                    )
+                  : ColoredBox(
+                      color: colorScheme.secondaryContainer,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.mic_none_outlined,
+                            color: colorScheme.onSecondaryContainer,
+                          ),
+                          if (attachment.duration != null &&
+                              attachment.duration! > 0) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              formatAudioDuration(attachment.duration),
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: colorScheme.onSecondaryContainer,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+            ),
+          ),
+        ),
+        if (onRemove != null)
+          Positioned(
+            top: -6,
+            right: -6,
+            child: Material(
+              color: colorScheme.surfaceContainerHighest,
+              shape: const CircleBorder(),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                onTap: onRemove,
+                customBorder: const CircleBorder(),
+                child: Padding(
+                  padding: const EdgeInsets.all(2),
+                  child: Icon(
+                    Icons.close,
+                    size: 16,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
