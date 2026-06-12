@@ -81,6 +81,7 @@ class SubtaskTitleEditor extends StatefulWidget {
 
 class _SubtaskTitleEditorState extends State<SubtaskTitleEditor> {
   final List<FocusNode> _focusNodes = [];
+  final List<_SubtaskPasteFallbackFormatter> _pasteFormatters = [];
   int? _pendingFocusIndex;
   bool _pasteHandling = false;
 
@@ -120,59 +121,23 @@ class _SubtaskTitleEditorState extends State<SubtaskTitleEditor> {
     );
   }
 
-  Future<void> _handlePaste(int index) async {
-    if (_pasteHandling) return;
-    if (!mounted) return;
-    if (index < 0 || index >= widget.controllers.length) return;
-
-    _pasteHandling = true;
-    try {
-      final data = await Clipboard.getData(Clipboard.kTextPlain);
-      final raw = data?.text;
-      if (raw == null || raw.isEmpty) return;
-
-      final normalized = raw.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
-      if (!normalized.contains('\n')) {
-        _pasteSingleLine(index, normalized);
-        return;
-      }
-
-      final controller = widget.controllers[index];
-      final selection = controller.selection;
-      final value = controller.text;
-      final start = selection.start.clamp(0, value.length);
-      final end = selection.end.clamp(0, value.length);
-      final before = value.substring(0, start);
-      final after = value.substring(end);
-
-      var lines = parseSubtaskBatchImport(normalized);
-      if (lines.isEmpty) return;
-
-      if (before.isNotEmpty || after.isNotEmpty) {
-        lines = [before + lines.first, ...lines.skip(1)];
-        if (after.isNotEmpty) {
-          lines[lines.length - 1] = lines.last + after;
-        }
-      }
-
-      if (lines.length == 1) {
-        controller.text = lines.first;
-        controller.selection =
-            TextSelection.collapsed(offset: lines.first.length);
-        return;
-      }
-
-      widget.onImportLines?.call(index, lines);
-    } finally {
-      _pasteHandling = false;
-    }
+  TextInputFormatter _pasteFallbackFormatter(int index) {
+    return _pasteFormatters[index];
   }
 
-  TextInputFormatter _pasteFallbackFormatter(int index) {
-    return _SubtaskPasteFallbackFormatter(
-      onPossiblePaste: (oldValue, newValue) =>
-          _tryRecoverMultilinePaste(index, oldValue, newValue),
-    );
+  void _syncPasteFormatters() {
+    while (_pasteFormatters.length < widget.controllers.length) {
+      final index = _pasteFormatters.length;
+      _pasteFormatters.add(
+        _SubtaskPasteFallbackFormatter(
+          onPossiblePaste: (oldValue, newValue) =>
+              _tryRecoverMultilinePaste(index, oldValue, newValue),
+        ),
+      );
+    }
+    while (_pasteFormatters.length > widget.controllers.length) {
+      _pasteFormatters.removeLast();
+    }
   }
 
   Future<void> _tryRecoverMultilinePaste(
@@ -182,56 +147,78 @@ class _SubtaskTitleEditorState extends State<SubtaskTitleEditor> {
   ) async {
     if (_pasteHandling) return;
     if (!mounted) return;
+    if (index < 0 || index >= widget.controllers.length) return;
 
     final insertedLen = newValue.text.length - oldValue.text.length;
-    if (insertedLen < 1) return;
-
-    if (newValue.text.contains('\n') || newValue.text.contains('\r')) {
-      await _importFromMultilineText(index, oldValue, newValue);
+    if (insertedLen < 2 &&
+        !newValue.text.contains('\n') &&
+        !newValue.text.contains('\r')) {
       return;
     }
 
-    final data = await Clipboard.getData(Clipboard.kTextPlain);
-    final raw = data?.text;
-    if (raw == null || (!raw.contains('\n') && !raw.contains('\r'))) {
-      if (mounted && insertedLen > 1) {
-        widget.controllers[index].value = newValue;
+    _pasteHandling = true;
+    try {
+      if (newValue.text.contains('\n') || newValue.text.contains('\r')) {
+        await _importFromMultilineText(index, oldValue, newValue);
+        return;
       }
-      return;
-    }
 
-    final lines = parseSubtaskBatchImport(raw);
-    if (lines.length <= 1) {
-      if (mounted && insertedLen > 1) {
-        widget.controllers[index].value = newValue;
+      final data = await Clipboard.getData(Clipboard.kTextPlain);
+      final raw = data?.text;
+      if (raw == null || (!raw.contains('\n') && !raw.contains('\r'))) {
+        if (mounted) widget.controllers[index].value = newValue;
+        return;
       }
-      return;
+
+      final lines = parseSubtaskBatchImport(raw);
+      if (lines.length <= 1) {
+        if (mounted) widget.controllers[index].value = newValue;
+        return;
+      }
+
+      if (!mounted) return;
+      widget.controllers[index].value = oldValue;
+      await _importLinesFromClipboard(index, raw, oldValue);
+    } finally {
+      _pasteHandling = false;
     }
-
-    final shouldImport = insertedLen > 1 ||
-        _isFirstLineOnlyPaste(oldValue, newValue, lines);
-
-    if (!shouldImport) return;
-
-    if (!mounted) return;
-    widget.controllers[index].value = oldValue;
-    await _handlePaste(index);
   }
 
-  bool _isFirstLineOnlyPaste(
-    TextEditingValue oldValue,
-    TextEditingValue newValue,
-    List<String> lines,
-  ) {
-    if (lines.length <= 1) return false;
+  Future<void> _importLinesFromClipboard(
+    int index,
+    String raw,
+    TextEditingValue baseValue,
+  ) async {
+    final normalized = raw.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+    if (!normalized.contains('\n')) {
+      _pasteSingleLine(index, normalized);
+      return;
+    }
 
-    final insertedLen = newValue.text.length - oldValue.text.length;
-    final newTrim = newValue.text.trim();
-    final firstLine = lines.first.trim();
-    if (newTrim != firstLine) return false;
+    final oldText = baseValue.text;
+    final start = baseValue.selection.start.clamp(0, oldText.length);
+    final end = baseValue.selection.end.clamp(0, oldText.length);
+    final before = oldText.substring(0, start);
+    final after = oldText.substring(end);
 
-    // 一次性插入整行首行（Android 只保留首行时），排除逐字输入。
-    return insertedLen == firstLine.length;
+    var lines = parseSubtaskBatchImport(normalized);
+    if (lines.isEmpty) return;
+
+    if (before.isNotEmpty || after.isNotEmpty) {
+      lines = [before + lines.first, ...lines.skip(1)];
+      if (after.isNotEmpty) {
+        lines[lines.length - 1] = lines.last + after;
+      }
+    }
+
+    if (lines.length == 1) {
+      widget.controllers[index].text = lines.first;
+      widget.controllers[index].selection =
+          TextSelection.collapsed(offset: lines.first.length);
+      return;
+    }
+
+    widget.onImportLines?.call(index, lines);
   }
 
   Future<void> _importFromMultilineText(
@@ -239,49 +226,46 @@ class _SubtaskTitleEditorState extends State<SubtaskTitleEditor> {
     TextEditingValue oldValue,
     TextEditingValue newValue,
   ) async {
-    if (_pasteHandling) return;
     if (!mounted) return;
     if (index < 0 || index >= widget.controllers.length) return;
 
-    _pasteHandling = true;
-    try {
-      final inserted = _extractInsertedText(oldValue, newValue);
-      final source =
-          inserted.contains('\n') || inserted.contains('\r')
-              ? inserted
-              : newValue.text;
+    final inserted = _extractInsertedText(oldValue, newValue);
+    final source =
+        inserted.contains('\n') || inserted.contains('\r')
+            ? inserted
+            : newValue.text;
 
-      var lines = parseSubtaskBatchImport(source);
-      if (lines.isEmpty) {
-        await _handlePaste(index);
-        return;
-      }
-
-      final oldText = oldValue.text;
-      final start = oldValue.selection.start.clamp(0, oldText.length);
-      final end = oldValue.selection.end.clamp(0, oldText.length);
-      final before = oldText.substring(0, start);
-      final after = oldText.substring(end);
-
-      if (before.isNotEmpty || after.isNotEmpty) {
-        lines = [before + lines.first, ...lines.skip(1)];
-        if (after.isNotEmpty) {
-          lines[lines.length - 1] = lines.last + after;
-        }
-      }
-
-      if (lines.length == 1) {
-        widget.controllers[index].text = lines.first;
-        widget.controllers[index].selection =
-            TextSelection.collapsed(offset: lines.first.length);
-        return;
-      }
-
-      widget.controllers[index].value = oldValue;
-      widget.onImportLines?.call(index, lines);
-    } finally {
-      _pasteHandling = false;
+    var lines = parseSubtaskBatchImport(source);
+    if (lines.isEmpty) {
+      final data = await Clipboard.getData(Clipboard.kTextPlain);
+      final raw = data?.text;
+      if (raw == null || raw.isEmpty) return;
+      await _importLinesFromClipboard(index, raw, oldValue);
+      return;
     }
+
+    final oldText = oldValue.text;
+    final start = oldValue.selection.start.clamp(0, oldText.length);
+    final end = oldValue.selection.end.clamp(0, oldText.length);
+    final before = oldText.substring(0, start);
+    final after = oldText.substring(end);
+
+    if (before.isNotEmpty || after.isNotEmpty) {
+      lines = [before + lines.first, ...lines.skip(1)];
+      if (after.isNotEmpty) {
+        lines[lines.length - 1] = lines.last + after;
+      }
+    }
+
+    if (lines.length == 1) {
+      widget.controllers[index].text = lines.first;
+      widget.controllers[index].selection =
+          TextSelection.collapsed(offset: lines.first.length);
+      return;
+    }
+
+    widget.controllers[index].value = oldValue;
+    widget.onImportLines?.call(index, lines);
   }
 
   String _extractInsertedText(
@@ -363,6 +347,7 @@ class _SubtaskTitleEditorState extends State<SubtaskTitleEditor> {
   @override
   Widget build(BuildContext context) {
     _syncFocusNodes();
+    _syncPasteFormatters();
     if (widget.controllers.isEmpty) {
       return const SizedBox.shrink();
     }
@@ -422,18 +407,14 @@ class _SubtaskPasteFallbackFormatter extends TextInputFormatter {
     if (newValue.text == oldValue.text) return newValue;
 
     final insertedLen = newValue.text.length - oldValue.text.length;
-    if (insertedLen < 1) return newValue;
-
-    unawaited(onPossiblePaste(oldValue, newValue));
-
-    // 粘贴通常一次插入多字符；先阻止写入，等剪贴板检查完成后再拆分或回写。
-    if (insertedLen > 1 ||
-        newValue.text.contains('\n') ||
-        newValue.text.contains('\r')) {
-      return oldValue;
+    if (insertedLen < 2 &&
+        !newValue.text.contains('\n') &&
+        !newValue.text.contains('\r')) {
+      return newValue;
     }
 
-    return newValue;
+    unawaited(onPossiblePaste(oldValue, newValue));
+    return oldValue;
   }
 }
 
