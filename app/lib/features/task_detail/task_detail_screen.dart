@@ -21,10 +21,13 @@ class TaskDetailScreen extends ConsumerStatefulWidget {
 }
 
 class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
-  final _subtaskController = TextEditingController();
   bool _loading = true;
+  bool _editingSubtasks = false;
   Task? _task;
   List<Task> _subtasks = const [];
+  List<Task> _subtaskSnapshot = const [];
+  final List<TextEditingController> _editSubtaskControllers = [];
+  final List<String?> _editSubtaskIds = [];
 
   @override
   void initState() {
@@ -34,7 +37,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
 
   @override
   void dispose() {
-    _subtaskController.dispose();
+    _clearEditSubtaskFields();
     super.dispose();
   }
 
@@ -50,31 +53,106 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
     });
   }
 
-  Future<void> _addSubtask() async {
-    final title = _subtaskController.text.trim();
-    if (title.isEmpty) return;
+  void _clearEditSubtaskFields() {
+    for (final c in _editSubtaskControllers) {
+      c.dispose();
+    }
+    _editSubtaskControllers.clear();
+    _editSubtaskIds.clear();
+  }
 
+  void _enterSubtaskEdit({bool addEmptyRow = false}) {
+    _clearEditSubtaskFields();
+    _subtaskSnapshot = List.from(_subtasks);
+    for (final sub in _subtasks) {
+      _editSubtaskControllers.add(TextEditingController(text: sub.title));
+      _editSubtaskIds.add(sub.id);
+    }
+    if (addEmptyRow && _editSubtaskControllers.isEmpty) {
+      _editSubtaskControllers.add(TextEditingController());
+      _editSubtaskIds.add(null);
+    }
+    setState(() => _editingSubtasks = true);
+  }
+
+  void _addEditSubtaskField() {
+    setState(() {
+      _editSubtaskControllers.add(TextEditingController());
+      _editSubtaskIds.add(null);
+    });
+  }
+
+  void _removeEditSubtaskField(int index) {
+    setState(() {
+      _editSubtaskControllers[index].dispose();
+      _editSubtaskControllers.removeAt(index);
+      _editSubtaskIds.removeAt(index);
+    });
+  }
+
+  void _cancelSubtaskEdit() {
+    _clearEditSubtaskFields();
+    setState(() {
+      _editingSubtasks = false;
+      _subtaskSnapshot = const [];
+    });
+  }
+
+  Future<void> _saveSubtaskEdit() async {
     final repo = await ref.read(taskRepositoryProvider.future);
+    final snapshotById = {for (final s in _subtaskSnapshot) s.id: s};
+    final currentIds = _editSubtaskIds.whereType<String>().toSet();
+
     try {
-      await repo.createSubtask(parentId: widget.taskId, title: title);
+      for (final id in snapshotById.keys) {
+        if (!currentIds.contains(id)) {
+          await repo.trash(id);
+        }
+      }
+
+      for (var i = 0; i < _editSubtaskControllers.length; i++) {
+        final title = _editSubtaskControllers[i].text.trim();
+        final id = _editSubtaskIds[i];
+
+        if (id == null) {
+          if (title.isNotEmpty) {
+            await repo.createSubtask(parentId: widget.taskId, title: title);
+          }
+          continue;
+        }
+
+        if (title.isEmpty) {
+          await repo.trash(id);
+          continue;
+        }
+
+        final original = snapshotById[id];
+        if (original != null && original.title != title) {
+          await repo.update(original.copyWith(title: title));
+        }
+      }
     } catch (e) {
       if (!mounted) return;
       showAppSnackBar(
         context,
-        message: '无法添加子任务',
+        message: '无法保存子任务',
         icon: Icons.error_outline,
         type: AppSnackType.error,
       );
       return;
     }
 
-    _subtaskController.clear();
+    _clearEditSubtaskFields();
+    setState(() {
+      _editingSubtasks = false;
+      _subtaskSnapshot = const [];
+    });
     await _load();
     unawaited(triggerSyncIfSignedIn(ref));
     if (!mounted) return;
     showAppSnackBar(
       context,
-      message: '已添加子任务',
+      message: '已保存子任务',
       icon: Icons.check_circle_outline,
       type: AppSnackType.success,
     );
@@ -99,6 +177,104 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
       message: '已保存为模板',
       icon: Icons.bookmark_outline,
       type: AppSnackType.success,
+    );
+  }
+
+  Widget _buildSubtaskToolbar(BuildContext context) {
+    const compact = VisualDensity.compact;
+    const gap = SizedBox(width: 4);
+
+    return Row(
+      children: [
+        IconButton.filledTonal(
+          onPressed: _addEditSubtaskField,
+          icon: const Icon(Icons.playlist_add_outlined),
+          tooltip: '添加子任务',
+          visualDensity: compact,
+          style: IconButton.styleFrom(
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+        ),
+        const Spacer(),
+        TextButton(
+          onPressed: _cancelSubtaskEdit,
+          style: TextButton.styleFrom(
+            visualDensity: compact,
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+          child: const Text('取消'),
+        ),
+        gap,
+        Focus(
+          canRequestFocus: false,
+          child: FilledButton(
+            onPressed: _saveSubtaskEdit,
+            style: FilledButton.styleFrom(
+              visualDensity: compact,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: const Text('保存'),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSubtaskSection(BuildContext context) {
+    if (_editingSubtasks) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const SizedBox(height: 12),
+          SubtaskTitleEditor(
+            controllers: _editSubtaskControllers,
+            onRemove: _removeEditSubtaskField,
+          ),
+          const SizedBox(height: 16),
+          _buildSubtaskToolbar(context),
+        ],
+      );
+    }
+
+    if (_subtasks.isNotEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const SizedBox(height: 20),
+          SubtaskListSection(subtasks: _subtasks),
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: _enterSubtaskEdit,
+              icon: const Icon(Icons.edit_outlined, size: 18),
+              label: const Text('编辑子任务'),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: 20),
+        Text(
+          '暂无子任务',
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+        ),
+        const SizedBox(height: 12),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            onPressed: () => _enterSubtaskEdit(addEmptyRow: true),
+            icon: const Icon(Icons.playlist_add_outlined, size: 18),
+            label: const Text('添加子任务'),
+          ),
+        ),
+      ],
     );
   }
 
@@ -147,35 +323,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                   ),
             ),
           ],
-          if (_subtasks.isNotEmpty) ...[
-            const SizedBox(height: 24),
-            SubtaskListSection(subtasks: _subtasks),
-          ],
-          const SizedBox(height: 24),
-          Padding(
-            padding: const EdgeInsets.only(bottom: 6),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _subtaskController,
-                    style: subtaskTitleInputStyle(context),
-                    decoration: subtaskTitleInputDecoration(context),
-                    onSubmitted: (_) => _addSubtask(),
-                    textInputAction: TextInputAction.done,
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.playlist_add_outlined, size: 20),
-                  onPressed: _addSubtask,
-                  tooltip: '添加子任务',
-                  visualDensity: VisualDensity.compact,
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                ),
-              ],
-            ),
-          ),
+          _buildSubtaskSection(context),
         ],
       ),
     );
