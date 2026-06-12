@@ -26,6 +26,7 @@ import 'package:todo_app/shared/widgets/swipeable_card.dart';
 import 'package:todo_app/shared/widgets/subtask_editor.dart';
 import 'package:todo_app/shared/widgets/tab_more_menu_button.dart';
 import 'package:todo_app/shared/widgets/tab_page_header.dart';
+import 'package:todo_app/shared/widgets/task_check_in_editor.dart';
 import 'package:todo_app/shared/widgets/task_schedule_editor.dart';
 import 'package:todo_app/shared/widgets/template_picker_sheet.dart';
 
@@ -55,6 +56,7 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
   TaskRecurrence _recurrence = TaskRecurrence.none;
   DateTime? _dailyUntil;
   DateTime? _dueDate;
+  int _checkInTarget = 1;
   final List<TextEditingController> _subtaskControllers = [];
 
   /// 拖拽/保存开始前输入法是否打开。
@@ -252,6 +254,7 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
         _recurrence = task.recurrence;
         _dailyUntil = task.dailyUntil;
         _dueDate = task.dueDate;
+        _checkInTarget = task.checkInTarget;
       });
       _ensureCaretVisible();
     }
@@ -331,6 +334,7 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
         dailyUntil: _recurrence != TaskRecurrence.none ? _dailyUntil : null,
         dueDate: _recurrence == TaskRecurrence.daily ? null : _dueDate,
         subtaskTitles: _subtaskTitles,
+        checkInTarget: _checkInTarget,
       );
       final task = result.parent;
 
@@ -348,6 +352,7 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
         _recurrence = TaskRecurrence.none;
         _dailyUntil = null;
         _dueDate = null;
+        _checkInTarget = 1;
         _clearSubtaskFields();
         _lastUndoTask = task;
       });
@@ -566,6 +571,11 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
                     setState(() => _dailyUntil = value),
                 onDueDateChanged: (value) =>
                     setState(() => _dueDate = value),
+              ),
+              checkInEditor: TaskCheckInEditor(
+                checkInTarget: _checkInTarget,
+                onCheckInTargetChanged: (value) =>
+                    setState(() => _checkInTarget = value),
               ),
               subtaskEditor: SubtaskTitleEditor(
                 controllers: _subtaskControllers,

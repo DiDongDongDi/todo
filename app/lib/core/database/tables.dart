@@ -23,6 +23,9 @@ class Tasks extends Table {
   DateTimeColumn get dailyUntil => dateTime().nullable()();
   DateTimeColumn get lastDailyCompletedAt => dateTime().nullable()();
   DateTimeColumn get dueDate => dateTime().nullable()();
+  IntColumn get checkInTarget => integer().withDefault(const Constant(1))();
+  IntColumn get checkInCount => integer().withDefault(const Constant(0))();
+  DateTimeColumn get lastCheckInAt => dateTime().nullable()();
 
   @override
   Set<Column> get primaryKey => {id};

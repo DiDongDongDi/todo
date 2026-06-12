@@ -45,6 +45,7 @@ class TemplateRepository {
     DateTime? dailyUntil,
     DateTime? dueDate,
     List<String> subtaskTitles = const [],
+    int checkInTarget = 1,
   }) async {
     final now = DateTime.now().toUtc();
     final template = TaskTemplate(
@@ -58,6 +59,7 @@ class TemplateRepository {
       createdAt: now,
       updatedAt: now,
       syncVersion: 1,
+      checkInTarget: checkInTarget.clamp(1, 99),
     );
     await _store.upsert(template);
     return template;
@@ -96,6 +98,7 @@ class TemplateRepository {
       dailyUntil: task.dailyUntil,
       dueDate: task.dueDate,
       subtaskTitles: subtaskTitles,
+      checkInTarget: task.checkInTarget,
     );
   }
 
@@ -107,6 +110,7 @@ class TemplateRepository {
     DateTime? dueDate,
     List<String> subtaskTitles = const [],
     String? titleOverride,
+    int checkInTarget = 1,
   }) async {
     return create(
       title: titleOverride ?? title,
@@ -115,6 +119,7 @@ class TemplateRepository {
       dailyUntil: dailyUntil,
       dueDate: dueDate,
       subtaskTitles: subtaskTitles,
+      checkInTarget: checkInTarget,
     );
   }
 
@@ -128,6 +133,7 @@ class TemplateRepository {
       recurrence: template.recurrence,
       dailyUntil: template.dailyUntil,
       dueDate: template.dueDate,
+      checkInTarget: template.checkInTarget,
     );
 
     final created = <Task>[parent];

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:todo_app/core/database/task_store.dart';
 import 'package:todo_app/core/models/task.dart';
+import 'package:todo_app/core/models/task_check_in.dart';
 import 'package:todo_app/core/models/task_hierarchy.dart';
 import 'package:todo_app/core/models/task_schedule.dart';
 import 'package:todo_app/core/settings/process_today_only_settings.dart';
@@ -126,6 +127,7 @@ class TaskRepository {
     DateTime? dailyUntil,
     DateTime? dueDate,
     String? parentId,
+    int checkInTarget = 1,
   }) async {
     final now = DateTime.now().toUtc();
     final normalizedDue = recurrence == TaskRecurrence.daily
@@ -148,6 +150,7 @@ class TaskRepository {
       dailyUntil: recurrence != TaskRecurrence.none ? dailyUntil : null,
       dueDate: normalizedDue,
       parentId: parentId,
+      checkInTarget: checkInTarget.clamp(1, 99),
     );
     await _store.upsert(task);
     return task;
@@ -161,6 +164,7 @@ class TaskRepository {
     TaskRecurrence recurrence = TaskRecurrence.none,
     DateTime? dailyUntil,
     DateTime? dueDate,
+    int checkInTarget = 1,
   }) async {
     final parent = await _require(parentId);
     if (parent.isSubtask) {
@@ -174,6 +178,7 @@ class TaskRepository {
       dailyUntil: dailyUntil,
       dueDate: dueDate,
       parentId: parentId,
+      checkInTarget: checkInTarget,
     );
   }
 
@@ -185,6 +190,7 @@ class TaskRepository {
     DateTime? dailyUntil,
     DateTime? dueDate,
     List<String> subtaskTitles = const [],
+    int checkInTarget = 1,
   }) async {
     final parent = await createInbox(
       title: title,
@@ -193,6 +199,7 @@ class TaskRepository {
       recurrence: recurrence,
       dailyUntil: dailyUntil,
       dueDate: dueDate,
+      checkInTarget: checkInTarget,
     );
 
     final subtasks = <Task>[];
@@ -214,9 +221,13 @@ class TaskRepository {
   }
 
   Future<Task> update(Task task) async {
-    final updated = task.copyWith(
+    final clampedCount = clampCheckInCount(task.checkInCount, task.checkInTarget);
+    final normalized = clampedCount != task.checkInCount
+        ? task.copyWith(checkInCount: clampedCount)
+        : task;
+    final updated = normalized.copyWith(
       updatedAt: DateTime.now().toUtc(),
-      syncVersion: task.syncVersion + 1,
+      syncVersion: normalized.syncVersion + 1,
     );
     await _store.upsert(updated);
     return updated;
@@ -259,6 +270,99 @@ class TaskRepository {
       updatedAt: now,
       syncVersion: task.syncVersion + 1,
       clearLastDailyCompletedAt: true,
+    );
+    await _store.upsert(updated);
+    return updated;
+  }
+
+  Future<({Task task, CheckInResult result})> checkIn(String id) async {
+    final task = await _require(id);
+    final nowLocal = DateTime.now();
+    final todayLocal = DateTime(nowLocal.year, nowLocal.month, nowLocal.day);
+    final nowUtc = DateTime.now().toUtc();
+    final target = task.checkInTarget.clamp(1, 99);
+
+    if (target <= 1) {
+      if (isRecurring(task)) {
+        final updated = await completeRecurringPeriod(id);
+        return (task: updated, result: CheckInResult.finalCompletion);
+      }
+      final updated = await archive(id);
+      return (task: updated, result: CheckInResult.finalCompletion);
+    }
+
+    final effective = effectiveCheckInCount(task, now: nowLocal);
+    final newCount = effective + 1;
+
+    if (newCount < target) {
+      final updated = task.copyWith(
+        checkInCount: newCount,
+        lastCheckInAt: todayLocal,
+        updatedAt: nowUtc,
+        syncVersion: task.syncVersion + 1,
+      );
+      await _store.upsert(updated);
+      return (task: updated, result: CheckInResult.partial);
+    }
+
+    if (isRecurring(task)) {
+      final updated = task.copyWith(
+        lastDailyCompletedAt: todayLocal,
+        checkInCount: 0,
+        lastCheckInAt: todayLocal,
+        updatedAt: nowUtc,
+        syncVersion: task.syncVersion + 1,
+      );
+      await _store.upsert(updated);
+      return (task: updated, result: CheckInResult.finalCompletion);
+    }
+
+    final updated = task.copyWith(
+      status: TaskStatus.archived,
+      archivedAt: nowUtc,
+      checkInCount: target,
+      lastCheckInAt: todayLocal,
+      updatedAt: nowUtc,
+      syncVersion: task.syncVersion + 1,
+      clearTrashedAt: true,
+    );
+    await _store.upsert(updated);
+    return (task: updated, result: CheckInResult.finalCompletion);
+  }
+
+  Future<Task> undoCheckIn(String id, {required bool wasFinalCompletion}) async {
+    final task = await _require(id);
+    final nowLocal = DateTime.now();
+    final todayLocal = DateTime(nowLocal.year, nowLocal.month, nowLocal.day);
+    final nowUtc = DateTime.now().toUtc();
+    final target = task.checkInTarget.clamp(1, 99);
+
+    if (!wasFinalCompletion) {
+      final effective = effectiveCheckInCount(task, now: nowLocal);
+      final newCount = (effective - 1).clamp(0, target);
+      final updated = task.copyWith(
+        checkInCount: newCount,
+        lastCheckInAt: newCount == 0 ? null : todayLocal,
+        updatedAt: nowUtc,
+        syncVersion: task.syncVersion + 1,
+        clearLastCheckInAt: newCount == 0,
+      );
+      await _store.upsert(updated);
+      return updated;
+    }
+
+    Task refreshed;
+    if (isRecurring(task)) {
+      refreshed = await undoDailyCompletion(id);
+    } else {
+      refreshed = await restoreToInbox(id);
+    }
+
+    final updated = refreshed.copyWith(
+      checkInCount: target - 1,
+      lastCheckInAt: todayLocal,
+      updatedAt: nowUtc,
+      syncVersion: refreshed.syncVersion + 1,
     );
     await _store.upsert(updated);
     return updated;
