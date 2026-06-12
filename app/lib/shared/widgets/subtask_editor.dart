@@ -1,6 +1,38 @@
 import 'package:flutter/material.dart';
 import 'package:todo_app/core/models/task.dart';
 
+TextStyle? subtaskTitleInputStyle(BuildContext context) {
+  return Theme.of(context).textTheme.bodyMedium;
+}
+
+InputDecoration subtaskTitleInputDecoration(BuildContext context) {
+  final theme = Theme.of(context);
+  final colorScheme = theme.colorScheme;
+  final fieldBorder = OutlineInputBorder(
+    borderRadius: BorderRadius.circular(8),
+    borderSide: BorderSide(color: colorScheme.outlineVariant),
+  );
+
+  return InputDecoration(
+    hintText: '子任务',
+    hintStyle: theme.textTheme.bodyMedium?.copyWith(
+      color: colorScheme.onSurfaceVariant,
+    ),
+    isDense: true,
+    filled: true,
+    fillColor: colorScheme.surfaceContainerHigh,
+    contentPadding: const EdgeInsets.symmetric(
+      horizontal: 10,
+      vertical: 6,
+    ),
+    border: fieldBorder,
+    enabledBorder: fieldBorder,
+    focusedBorder: fieldBorder.copyWith(
+      borderSide: BorderSide(color: colorScheme.primary),
+    ),
+  );
+}
+
 /// 草稿态子任务标题编辑（收集页保存前、处理页编辑态使用）。
 class SubtaskTitleEditor extends StatefulWidget {
   const SubtaskTitleEditor({
@@ -86,13 +118,6 @@ class _SubtaskTitleEditorState extends State<SubtaskTitleEditor> {
       return const SizedBox.shrink();
     }
 
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final fieldBorder = OutlineInputBorder(
-      borderRadius: BorderRadius.circular(8),
-      borderSide: BorderSide(color: colorScheme.outlineVariant),
-    );
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
@@ -105,25 +130,8 @@ class _SubtaskTitleEditorState extends State<SubtaskTitleEditor> {
                 child: TextField(
                   controller: widget.controllers[index],
                   focusNode: _focusNodes[index],
-                  style: theme.textTheme.bodyMedium,
-                  decoration: InputDecoration(
-                    hintText: '子任务',
-                    hintStyle: theme.textTheme.bodyMedium?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                    isDense: true,
-                    filled: true,
-                    fillColor: colorScheme.surfaceContainerHigh,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 6,
-                    ),
-                    border: fieldBorder,
-                    enabledBorder: fieldBorder,
-                    focusedBorder: fieldBorder.copyWith(
-                      borderSide: BorderSide(color: colorScheme.primary),
-                    ),
-                  ),
+                  style: subtaskTitleInputStyle(context),
+                  decoration: subtaskTitleInputDecoration(context),
                   textInputAction: TextInputAction.next,
                 ),
               ),
