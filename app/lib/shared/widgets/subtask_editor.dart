@@ -225,12 +225,13 @@ class _SubtaskTitleEditorState extends State<SubtaskTitleEditor> {
   ) {
     if (lines.length <= 1) return false;
 
+    final insertedLen = newValue.text.length - oldValue.text.length;
     final newTrim = newValue.text.trim();
     final firstLine = lines.first.trim();
-    if (newTrim.isEmpty || newTrim != firstLine) return false;
+    if (newTrim != firstLine) return false;
 
-    return oldValue.text.isEmpty ||
-        newValue.text.length - oldValue.text.length == firstLine.length;
+    // 一次性插入整行首行（Android 只保留首行时），排除逐字输入。
+    return insertedLen == firstLine.length;
   }
 
   Future<void> _importFromMultilineText(
@@ -402,17 +403,12 @@ class _SubtaskTitleEditorState extends State<SubtaskTitleEditor> {
   }
 }
 
-/// 移动端单行 [TextField] 粘贴时可能只保留首行或把换行压成空格；拦截后读剪贴板拆分。
+/// Android 单行输入框粘贴时会把换行压成空格；拦截批量插入后改读剪贴板拆分。
 class _SubtaskPasteFallbackFormatter extends TextInputFormatter {
   const _SubtaskPasteFallbackFormatter({
-    required this.onMultilineText,
     required this.onPossiblePaste,
   });
 
-  final Future<void> Function(
-    TextEditingValue oldValue,
-    TextEditingValue newValue,
-  ) onMultilineText;
   final Future<void> Function(
     TextEditingValue oldValue,
     TextEditingValue newValue,
@@ -423,14 +419,17 @@ class _SubtaskPasteFallbackFormatter extends TextInputFormatter {
     TextEditingValue oldValue,
     TextEditingValue newValue,
   ) {
-    if (newValue.text.contains('\n') || newValue.text.contains('\r')) {
-      unawaited(onMultilineText(oldValue, newValue));
-      return oldValue;
-    }
+    if (newValue.text == oldValue.text) return newValue;
 
     final insertedLen = newValue.text.length - oldValue.text.length;
-    if (insertedLen > 1) {
-      unawaited(onPossiblePaste(oldValue, newValue));
+    if (insertedLen < 1) return newValue;
+
+    unawaited(onPossiblePaste(oldValue, newValue));
+
+    // 粘贴通常一次插入多字符；先阻止写入，等剪贴板检查完成后再拆分或回写。
+    if (insertedLen > 1 ||
+        newValue.text.contains('\n') ||
+        newValue.text.contains('\r')) {
       return oldValue;
     }
 
