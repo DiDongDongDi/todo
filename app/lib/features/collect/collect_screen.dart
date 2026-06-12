@@ -204,6 +204,16 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
     });
   }
 
+  void _importSubtaskLines(int index, List<String> lines) {
+    setState(() {
+      SubtaskTitleEditor.importLinesIntoControllers(
+        controllers: _subtaskControllers,
+        index: index,
+        lines: lines,
+      );
+    });
+  }
+
   void _clearSubtaskFields() {
     for (final c in _subtaskControllers) {
       c.dispose();
@@ -588,6 +598,7 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
                 controllers: _subtaskControllers,
                 onRemove: _removeSubtaskField,
                 onSubmitRow: _submitSubtaskRow,
+                onImportLines: _importSubtaskLines,
               ),
             ),
           ),

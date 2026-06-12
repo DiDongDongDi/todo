@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:todo_app/core/import/subtask_batch_import_parser.dart';
 import 'package:todo_app/core/models/task.dart';
 
 TextStyle? subtaskTitleInputStyle(BuildContext context) {
@@ -41,12 +42,14 @@ class SubtaskTitleEditor extends StatefulWidget {
     required this.onRemove,
     this.onAnyFieldFocusChanged,
     this.onSubmitRow,
+    this.onImportLines,
   });
 
   final List<TextEditingController> controllers;
   final ValueChanged<int> onRemove;
   final ValueChanged<bool>? onAnyFieldFocusChanged;
   final Future<int> Function(int index)? onSubmitRow;
+  final void Function(int index, List<String> lines)? onImportLines;
 
   static List<String> nonEmptyTitles(Iterable<TextEditingController> controllers) {
     return controllers
@@ -55,18 +58,35 @@ class SubtaskTitleEditor extends StatefulWidget {
         .toList();
   }
 
+  /// Replaces row [index] with [lines].first and inserts the rest below.
+  static void importLinesIntoControllers({
+    required List<TextEditingController> controllers,
+    required int index,
+    required List<String> lines,
+  }) {
+    if (lines.isEmpty || index < 0 || index >= controllers.length) return;
+
+    controllers[index].text = lines.first;
+    for (var i = lines.length - 1; i >= 1; i--) {
+      controllers.insert(index + 1, TextEditingController(text: lines[i]));
+    }
+  }
+
   @override
   State<SubtaskTitleEditor> createState() => _SubtaskTitleEditorState();
 }
 
 class _SubtaskTitleEditorState extends State<SubtaskTitleEditor> {
   final List<FocusNode> _focusNodes = [];
+  final List<VoidCallback> _controllerListeners = [];
   int? _pendingFocusIndex;
+  bool _importing = false;
 
   @override
   void initState() {
     super.initState();
     _syncFocusNodes();
+    _syncControllerListeners();
   }
 
   @override
@@ -74,16 +94,65 @@ class _SubtaskTitleEditorState extends State<SubtaskTitleEditor> {
     super.didUpdateWidget(oldWidget);
     // 父级可能就地 mutate 同一 List，old/new widget 的 length 会相同。
     _syncFocusNodes();
+    _syncControllerListeners();
   }
 
   @override
   void dispose() {
+    _detachAllControllerListeners();
     for (final node in _focusNodes) {
       node.removeListener(_notifyFocusChanged);
       node.dispose();
     }
     _focusNodes.clear();
     super.dispose();
+  }
+
+  void _syncControllerListeners() {
+    while (_controllerListeners.length < widget.controllers.length) {
+      final index = _controllerListeners.length;
+      void listener() => _handleControllerChanged(index);
+      widget.controllers[index].addListener(listener);
+      _controllerListeners.add(listener);
+    }
+    while (_controllerListeners.length > widget.controllers.length) {
+      final index = _controllerListeners.length - 1;
+      widget.controllers[index].removeListener(_controllerListeners.removeLast());
+    }
+  }
+
+  void _detachAllControllerListeners() {
+    while (_controllerListeners.isNotEmpty) {
+      final index = _controllerListeners.length - 1;
+      widget.controllers[index].removeListener(_controllerListeners.removeLast());
+    }
+  }
+
+  void _handleControllerChanged(int index) {
+    if (_importing) return;
+    if (index < 0 || index >= widget.controllers.length) return;
+
+    final text = widget.controllers[index].text;
+    if (!text.contains('\n') && !text.contains('\r')) return;
+
+    final lines = parseSubtaskBatchImport(text);
+    if (lines.isEmpty) {
+      _importing = true;
+      widget.controllers[index].text = '';
+      _importing = false;
+      return;
+    }
+
+    if (lines.length == 1) {
+      _importing = true;
+      widget.controllers[index].text = lines.first;
+      _importing = false;
+      return;
+    }
+
+    _importing = true;
+    widget.onImportLines?.call(index, lines);
+    _importing = false;
   }
 
   void _syncFocusNodes() {
@@ -144,6 +213,7 @@ class _SubtaskTitleEditorState extends State<SubtaskTitleEditor> {
   @override
   Widget build(BuildContext context) {
     _syncFocusNodes();
+    _syncControllerListeners();
     if (widget.controllers.isEmpty) {
       return const SizedBox.shrink();
     }

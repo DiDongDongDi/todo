@@ -259,6 +259,16 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     });
   }
 
+  void _importEditSubtaskLines(int index, List<String> lines) {
+    setState(() {
+      SubtaskTitleEditor.importLinesIntoControllers(
+        controllers: _editSubtaskControllers,
+        index: index,
+        lines: lines,
+      );
+    });
+  }
+
   void _onEditSubtaskFocusChanged(bool focused) {
     if (_editSubtaskFocused == focused) return;
     setState(() => _editSubtaskFocused = focused);
@@ -609,6 +619,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
                           onRemove: _removeEditSubtaskField,
                           onAnyFieldFocusChanged: _onEditSubtaskFocusChanged,
                           onSubmitRow: _submitEditSubtaskRow,
+                          onImportLines: _importEditSubtaskLines,
                         )
                       : null,
                   onAddSubtask: !task.isSubtask && _editUiVisible

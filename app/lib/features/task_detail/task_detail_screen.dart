@@ -392,6 +392,19 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
     });
   }
 
+  void _importEditSubtaskLines(int index, List<String> lines) {
+    setState(() {
+      SubtaskTitleEditor.importLinesIntoControllers(
+        controllers: _editSubtaskControllers,
+        index: index,
+        lines: lines,
+      );
+      for (var i = 1; i < lines.length; i++) {
+        _editSubtaskIds.insert(index + i, null);
+      }
+    });
+  }
+
   void _cancelSubtaskEdit() {
     _clearEditSubtaskFields();
     setState(() {
@@ -532,6 +545,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
             controllers: _editSubtaskControllers,
             onRemove: _removeEditSubtaskField,
             onSubmitRow: _submitEditSubtaskRow,
+            onImportLines: _importEditSubtaskLines,
           ),
           const SizedBox(height: 16),
           _buildSubtaskToolbar(context),
