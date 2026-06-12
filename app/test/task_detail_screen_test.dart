@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:todo_app/core/database/task_store.dart';
@@ -80,12 +81,26 @@ void main() {
   late String parentId;
 
   setUp(() async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+      const MethodChannel('com.llfbandit.record/messages'),
+      (call) async => null,
+    );
+
     repo = TaskRepository(_MemoryTaskStore(), const Uuid());
     final result = await repo.createInboxWithSubtasks(
       title: 'Parent task',
       subtaskTitles: ['Sub A', 'Sub B'],
     );
     parentId = result.parent.id;
+  });
+
+  tearDown(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+      const MethodChannel('com.llfbandit.record/messages'),
+      null,
+    );
   });
 
   testWidgets('shows read-only subtask list with edit entry', (tester) async {
@@ -195,5 +210,64 @@ void main() {
 
     expect(find.byType(SubtaskTitleEditor), findsOneWidget);
     expect(find.byType(TextField), findsOneWidget);
+  });
+
+  testWidgets('edit task button enters parent task edit mode', (tester) async {
+    await _pumpTaskDetail(tester, repo: repo, taskId: parentId);
+
+    expect(find.text('编辑任务'), findsOneWidget);
+    expect(find.text('Parent task'), findsOneWidget);
+
+    await tester.tap(find.text('编辑任务'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(TextField), findsOneWidget);
+    expect(find.text('保存'), findsOneWidget);
+    expect(find.text('取消'), findsOneWidget);
+    expect(find.text('编辑子任务'), findsNothing);
+  });
+
+  testWidgets('save task edit persists title change', (tester) async {
+    await _pumpTaskDetail(tester, repo: repo, taskId: parentId);
+
+    await tester.tap(find.text('编辑任务'));
+    await tester.pumpAndSettle();
+
+    final titleField = find.byType(TextField);
+    await tester.enterText(titleField, 'Updated parent');
+    await tester.pump();
+    expect(tester.widget<TextField>(titleField).controller!.text, 'Updated parent');
+
+    await tester.runAsync(() async {
+      await tester.tap(find.text('保存'));
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+    });
+    await tester.pumpAndSettle();
+
+    final updated = await repo.getById(parentId);
+    expect(updated?.title, 'Updated parent');
+    expect(find.text('Updated parent'), findsOneWidget);
+  });
+
+  testWidgets('task edit and subtask edit are mutually exclusive', (tester) async {
+    await _pumpTaskDetail(tester, repo: repo, taskId: parentId);
+
+    await tester.tap(find.text('编辑子任务'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SubtaskTitleEditor), findsOneWidget);
+
+    await tester.tap(find.text('编辑任务'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SubtaskTitleEditor), findsNothing);
+    expect(find.byType(TextField), findsOneWidget);
+    expect(find.text('编辑子任务'), findsNothing);
+
+    await tester.tap(find.text('取消'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('编辑子任务'), findsOneWidget);
+    expect(find.byType(SubtaskListSection), findsOneWidget);
   });
 }
