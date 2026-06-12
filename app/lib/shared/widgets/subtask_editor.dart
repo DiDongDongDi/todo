@@ -40,11 +40,13 @@ class SubtaskTitleEditor extends StatefulWidget {
     required this.controllers,
     required this.onRemove,
     this.onAnyFieldFocusChanged,
+    this.onSubmitRow,
   });
 
   final List<TextEditingController> controllers;
   final ValueChanged<int> onRemove;
   final ValueChanged<bool>? onAnyFieldFocusChanged;
+  final Future<int> Function(int index)? onSubmitRow;
 
   static List<String> nonEmptyTitles(Iterable<TextEditingController> controllers) {
     return controllers
@@ -59,6 +61,7 @@ class SubtaskTitleEditor extends StatefulWidget {
 
 class _SubtaskTitleEditorState extends State<SubtaskTitleEditor> {
   final List<FocusNode> _focusNodes = [];
+  int? _pendingFocusIndex;
 
   @override
   void initState() {
@@ -101,8 +104,35 @@ class _SubtaskTitleEditorState extends State<SubtaskTitleEditor> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         _notifyFocusChanged();
+        _applyPendingFocus();
       });
+    } else {
+      _applyPendingFocus();
     }
+  }
+
+  void _applyPendingFocus() {
+    final focusIndex = _pendingFocusIndex;
+    if (focusIndex == null) return;
+    if (focusIndex < 0 || focusIndex >= _focusNodes.length) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final index = _pendingFocusIndex;
+      if (index == null || index < 0 || index >= _focusNodes.length) return;
+      _pendingFocusIndex = null;
+      _focusNodes[index].requestFocus();
+    });
+  }
+
+  Future<void> _handleSubmitted(int index) async {
+    if (widget.controllers[index].text.trim().isEmpty) return;
+    final onSubmitRow = widget.onSubmitRow;
+    if (onSubmitRow == null) return;
+
+    _pendingFocusIndex = await onSubmitRow(index);
+    if (!mounted) return;
+    _applyPendingFocus();
   }
 
   void _notifyFocusChanged() {
@@ -133,6 +163,7 @@ class _SubtaskTitleEditorState extends State<SubtaskTitleEditor> {
                   style: subtaskTitleInputStyle(context),
                   decoration: subtaskTitleInputDecoration(context),
                   textInputAction: TextInputAction.next,
+                  onSubmitted: (_) => _handleSubmitted(index),
                 ),
               ),
               IconButton(

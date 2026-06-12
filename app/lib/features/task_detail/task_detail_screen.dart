@@ -44,7 +44,8 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
   Future<void> _load() async {
     final repo = await ref.read(taskRepositoryProvider.future);
     final task = await repo.getById(widget.taskId);
-    final subtasks = task != null ? await repo.getSubtasks(widget.taskId) : <Task>[];
+    final subtasks =
+        task != null ? await repo.getSubtasks(widget.taskId) : <Task>[];
     if (!mounted) return;
     setState(() {
       _task = task;
@@ -80,6 +81,14 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
       _editSubtaskControllers.add(TextEditingController());
       _editSubtaskIds.add(null);
     });
+  }
+
+  Future<int> _submitEditSubtaskRow(int index) async {
+    setState(() {
+      _editSubtaskControllers.insert(index + 1, TextEditingController());
+      _editSubtaskIds.insert(index + 1, null);
+    });
+    return index + 1;
   }
 
   void _removeEditSubtaskField(int index) {
@@ -229,6 +238,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
           SubtaskTitleEditor(
             controllers: _editSubtaskControllers,
             onRemove: _removeEditSubtaskField,
+            onSubmitRow: _submitEditSubtaskRow,
           ),
           const SizedBox(height: 16),
           _buildSubtaskToolbar(context),

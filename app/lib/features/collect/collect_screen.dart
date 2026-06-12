@@ -190,6 +190,13 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
     setState(() => _subtaskControllers.add(TextEditingController()));
   }
 
+  Future<int> _submitSubtaskRow(int index) async {
+    setState(() {
+      _subtaskControllers.insert(index + 1, TextEditingController());
+    });
+    return index + 1;
+  }
+
   void _removeSubtaskField(int index) {
     setState(() {
       _subtaskControllers[index].dispose();
@@ -580,6 +587,7 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
               subtaskEditor: SubtaskTitleEditor(
                 controllers: _subtaskControllers,
                 onRemove: _removeSubtaskField,
+                onSubmitRow: _submitSubtaskRow,
               ),
             ),
           ),
