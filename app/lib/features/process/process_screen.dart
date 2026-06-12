@@ -220,12 +220,13 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
       }
       return;
     }
-    if (_subtasksTaskId == task.id) return;
     final parentId = task.id;
-    setState(() {
-      _subtasksTaskId = parentId;
-      _subtasks = const [];
-    });
+    if (_subtasksTaskId != parentId) {
+      setState(() {
+        _subtasksTaskId = parentId;
+        _subtasks = const [];
+      });
+    }
     unawaited(_fetchSubtasks(parentId));
   }
 

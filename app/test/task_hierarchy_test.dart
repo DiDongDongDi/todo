@@ -39,6 +39,15 @@ void main() {
         isFalse,
       );
     });
+
+    test('false when subtask is trashed', () {
+      final parent = _task(id: 'p');
+      final sub = _task(id: 's', parentId: 'p', status: TaskStatus.trashed);
+      expect(
+        hasOpenSubtasks(parent, [parent, sub], todayOnly: false, now: today),
+        isFalse,
+      );
+    });
   });
 
   group('filterProcessTasks', () {
@@ -57,6 +66,17 @@ void main() {
       final parent = _task(id: 'p', title: 'Parent');
       final sub1 = _task(id: 's1', parentId: 'p', status: TaskStatus.archived);
       final inbox = [parent, sub1];
+
+      final result = filterProcessTasks(inbox, todayOnly: false, now: today);
+
+      expect(result.map((t) => t.id), ['p']);
+    });
+
+    test('shows parent when all subtasks trashed', () {
+      final parent = _task(id: 'p', title: 'Parent');
+      final sub1 = _task(id: 's1', parentId: 'p', status: TaskStatus.trashed);
+      final sub2 = _task(id: 's2', parentId: 'p', status: TaskStatus.trashed);
+      final inbox = [parent, sub1, sub2];
 
       final result = filterProcessTasks(inbox, todayOnly: false, now: today);
 
