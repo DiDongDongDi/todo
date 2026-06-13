@@ -103,4 +103,95 @@ void main() {
 
     expect(loaded, isEmpty);
   });
+
+  test('restoreToInbox subtask also restores parent but not siblings', () async {
+    final parent = await repo.createInbox(title: 'Parent');
+    final sub1 = await repo.createSubtask(parentId: parent.id, title: 'Sub 1');
+    final sub2 = await repo.createSubtask(parentId: parent.id, title: 'Sub 2');
+
+    await repo.trash(parent.id);
+
+    await repo.restoreToInbox(sub1.id);
+
+    final restoredParent = await repo.getById(parent.id);
+    final restoredSub1 = await repo.getById(sub1.id);
+    final restoredSub2 = await repo.getById(sub2.id);
+
+    expect(restoredParent?.status, TaskStatus.inbox);
+    expect(restoredSub1?.status, TaskStatus.inbox);
+    expect(restoredSub2?.status, TaskStatus.trashed);
+  });
+
+  test('restoreToInbox parent restores all subtasks', () async {
+    final parent = await repo.createInbox(title: 'Parent');
+    final sub1 = await repo.createSubtask(parentId: parent.id, title: 'Sub 1');
+    final sub2 = await repo.createSubtask(parentId: parent.id, title: 'Sub 2');
+
+    await repo.trash(parent.id);
+
+    await repo.restoreToInbox(parent.id);
+
+    final restoredParent = await repo.getById(parent.id);
+    final restoredSub1 = await repo.getById(sub1.id);
+    final restoredSub2 = await repo.getById(sub2.id);
+
+    expect(restoredParent?.status, TaskStatus.inbox);
+    expect(restoredSub1?.status, TaskStatus.inbox);
+    expect(restoredSub2?.status, TaskStatus.inbox);
+  });
+
+  test('restoreToInbox subtask only when parent still in inbox', () async {
+    final parent = await repo.createInbox(title: 'Parent');
+    final sub = await repo.createSubtask(parentId: parent.id, title: 'Sub');
+
+    await repo.trash(sub.id);
+
+    await repo.restoreToInbox(sub.id);
+
+    final restoredParent = await repo.getById(parent.id);
+    final restoredSub = await repo.getById(sub.id);
+
+    expect(restoredParent?.status, TaskStatus.inbox);
+    expect(restoredSub?.status, TaskStatus.inbox);
+  });
+
+  test('restoreToInbox parent from archive restores all archived subtasks', () async {
+    final parent = await repo.createInbox(title: 'Parent');
+    final sub1 = await repo.createSubtask(parentId: parent.id, title: 'Sub 1');
+    final sub2 = await repo.createSubtask(parentId: parent.id, title: 'Sub 2');
+
+    await repo.archive(parent.id);
+    await repo.archive(sub1.id);
+    await repo.archive(sub2.id);
+
+    await repo.restoreToInbox(parent.id);
+
+    final restoredParent = await repo.getById(parent.id);
+    final restoredSub1 = await repo.getById(sub1.id);
+    final restoredSub2 = await repo.getById(sub2.id);
+
+    expect(restoredParent?.status, TaskStatus.inbox);
+    expect(restoredSub1?.status, TaskStatus.inbox);
+    expect(restoredSub2?.status, TaskStatus.inbox);
+  });
+
+  test('restoreToInbox subtask from archive restores parent but not siblings', () async {
+    final parent = await repo.createInbox(title: 'Parent');
+    final sub1 = await repo.createSubtask(parentId: parent.id, title: 'Sub 1');
+    final sub2 = await repo.createSubtask(parentId: parent.id, title: 'Sub 2');
+
+    await repo.archive(parent.id);
+    await repo.archive(sub1.id);
+    await repo.archive(sub2.id);
+
+    await repo.restoreToInbox(sub1.id);
+
+    final restoredParent = await repo.getById(parent.id);
+    final restoredSub1 = await repo.getById(sub1.id);
+    final restoredSub2 = await repo.getById(sub2.id);
+
+    expect(restoredParent?.status, TaskStatus.inbox);
+    expect(restoredSub1?.status, TaskStatus.inbox);
+    expect(restoredSub2?.status, TaskStatus.archived);
+  });
 }

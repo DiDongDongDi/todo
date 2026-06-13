@@ -230,7 +230,7 @@ class _CompletedTaskListViewState extends ConsumerState<CompletedTaskListView> {
 
     final repo = await ref.read(taskRepositoryProvider.future);
     if (entry.isPeriodCompletion) {
-      await repo.undoDailyCompletion(entry.task.id);
+      await repo.undoDailyCompletionWithHierarchy(entry.task.id);
     } else {
       await repo.restoreToInbox(entry.task.id);
     }

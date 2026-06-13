@@ -280,6 +280,30 @@ class TaskRepository {
     return updated;
   }
 
+  Future<Task> undoDailyCompletionWithHierarchy(String id) async {
+    final task = await _require(id);
+    final now = DateTime.now();
+
+    if (task.isSubtask) {
+      final restored = await undoDailyCompletion(id);
+      final parentId = task.parentId!;
+      final parent = await _store.getById(parentId);
+      if (parent != null && isPeriodCompleted(parent, now)) {
+        await undoDailyCompletion(parentId);
+      }
+      return restored;
+    }
+
+    final restored = await undoDailyCompletion(id);
+    final subtasks = await _allSubtasks(id);
+    for (final sub in subtasks) {
+      if (isPeriodCompleted(sub, now)) {
+        await undoDailyCompletion(sub.id);
+      }
+    }
+    return restored;
+  }
+
   Future<({Task task, CheckInResult result})> checkIn(String id) async {
     final task = await _require(id);
     final nowLocal = DateTime.now();
@@ -402,8 +426,14 @@ class TaskRepository {
     return updated;
   }
 
-  Future<Task> restoreToInbox(String id) async {
-    final task = await _require(id);
+  Future<List<Task>> _allSubtasks(String parentId) async {
+    final all = await _store.getAll();
+    return all
+        .where((t) => t.parentId == parentId && t.deletedAt == null)
+        .toList();
+  }
+
+  Future<Task> _restoreSingle(Task task) async {
     final now = DateTime.now().toUtc();
     final updated = task.copyWith(
       status: TaskStatus.inbox,
@@ -414,6 +444,29 @@ class TaskRepository {
     );
     await _store.upsert(updated);
     return updated;
+  }
+
+  Future<Task> restoreToInbox(String id) async {
+    final task = await _require(id);
+
+    if (task.isSubtask) {
+      final restored = await _restoreSingle(task);
+      final parentId = task.parentId!;
+      final parent = await _store.getById(parentId);
+      if (parent != null && parent.status != TaskStatus.inbox) {
+        await _restoreSingle(parent);
+      }
+      return restored;
+    }
+
+    final restored = await _restoreSingle(task);
+    final subtasks = await _allSubtasks(id);
+    for (final sub in subtasks) {
+      if (sub.status != TaskStatus.inbox) {
+        await _restoreSingle(sub);
+      }
+    }
+    return restored;
   }
 
   Future<Task> _require(String id) async {
