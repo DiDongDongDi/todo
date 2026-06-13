@@ -100,4 +100,35 @@ void main() {
       expect(result.first.id, 't');
     });
   });
+
+  group('parentIdsWithSubtasks', () {
+    test('includes parent with inbox subtask', () {
+      final parent = _task(id: 'p');
+      final sub = _task(id: 's', parentId: 'p');
+      expect(parentIdsWithSubtasks([parent, sub]), {'p'});
+    });
+
+    test('includes parent with trashed subtask', () {
+      final parent = _task(id: 'p', status: TaskStatus.trashed);
+      final sub = _task(id: 's', parentId: 'p', status: TaskStatus.trashed);
+      expect(parentIdsWithSubtasks([parent, sub]), {'p'});
+    });
+
+    test('excludes standalone task', () {
+      final task = _task(id: 't');
+      expect(parentIdsWithSubtasks([task]), isEmpty);
+    });
+  });
+
+  group('countSubtasks and parentTaskSubtitleLabel', () {
+    test('counts active subtasks across statuses', () {
+      final parent = _task(id: 'p');
+      final sub1 = _task(id: 's1', parentId: 'p');
+      final sub2 = _task(id: 's2', parentId: 'p', status: TaskStatus.trashed);
+      final all = [parent, sub1, sub2];
+
+      expect(countSubtasks('p', all), 2);
+      expect(parentTaskSubtitleLabel(parent, all), '父任务 · 2 个子任务');
+    });
+  });
 }

@@ -107,6 +107,37 @@ final trashedTasksProvider = StreamProvider<List<Task>>((ref) async* {
   yield* store.watchByStatus(TaskStatus.trashed);
 });
 
+final allActiveTasksProvider = Provider<AsyncValue<List<Task>>>((ref) {
+  final inboxAsync = ref.watch(inboxTasksProvider);
+  final archivedAsync = ref.watch(archivedTasksProvider);
+  final trashedAsync = ref.watch(trashedTasksProvider);
+
+  if (inboxAsync.isLoading ||
+      archivedAsync.isLoading ||
+      trashedAsync.isLoading) {
+    return const AsyncValue.loading();
+  }
+  if (inboxAsync.hasError) {
+    return AsyncValue.error(inboxAsync.error!, inboxAsync.stackTrace!);
+  }
+  if (archivedAsync.hasError) {
+    return AsyncValue.error(archivedAsync.error!, archivedAsync.stackTrace!);
+  }
+  if (trashedAsync.hasError) {
+    return AsyncValue.error(trashedAsync.error!, trashedAsync.stackTrace!);
+  }
+
+  return AsyncValue.data([
+    ...inboxAsync.value ?? [],
+    ...archivedAsync.value ?? [],
+    ...trashedAsync.value ?? [],
+  ]);
+});
+
+final parentTaskIdsProvider = Provider<AsyncValue<Set<String>>>((ref) {
+  return ref.watch(allActiveTasksProvider).whenData(parentIdsWithSubtasks);
+});
+
 class TaskRepository {
   TaskRepository(this._store, this._uuid);
 

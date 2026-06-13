@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:todo_app/core/models/task.dart';
+import 'package:todo_app/core/models/task_hierarchy.dart';
 import 'package:todo_app/core/models/task_schedule.dart';
 import 'package:todo_app/core/repositories/task_repository.dart';
 import 'package:todo_app/core/settings/restore_sound_settings.dart';
@@ -108,8 +109,17 @@ class _RestoreTaskListViewState extends ConsumerState<RestoreTaskListView> {
     );
   }
 
-  Widget _buildRow(Task task, int index) {
+  Widget _buildRow(
+    Task task,
+    int index,
+    Set<String> parentIds,
+    List<Task> allTasks,
+  ) {
     _rowKeys.putIfAbsent(task.id, GlobalKey.new);
+
+    final subtitle = parentIds.contains(task.id)
+        ? parentTaskSubtitleLabel(task, allTasks)
+        : null;
 
     return Padding(
       padding: EdgeInsets.only(
@@ -118,6 +128,7 @@ class _RestoreTaskListViewState extends ConsumerState<RestoreTaskListView> {
       child: SwipeableRestoreTile(
         key: _rowKeys[task.id],
         task: task,
+        subtitle: subtitle,
         restoreIcon: widget.restoreIcon,
         restoreTooltip: widget.restoreTooltip,
         onRestore: () => _handleRestore(
@@ -130,6 +141,8 @@ class _RestoreTaskListViewState extends ConsumerState<RestoreTaskListView> {
   @override
   Widget build(BuildContext context) {
     final tasksAsync = ref.watch(widget.tasksProvider);
+    final parentIds = ref.watch(parentTaskIdsProvider).value ?? const {};
+    final allTasks = ref.watch(allActiveTasksProvider).value ?? const [];
 
     ref.listen(widget.tasksProvider, (previous, next) {
       next.whenData(_syncTasks);
@@ -155,7 +168,7 @@ class _RestoreTaskListViewState extends ConsumerState<RestoreTaskListView> {
             if (index >= _tasks.length) {
               return const SizedBox.shrink();
             }
-            return _buildRow(_tasks[index], index);
+            return _buildRow(_tasks[index], index, parentIds, allTasks);
           },
         );
       },
@@ -259,9 +272,36 @@ class _CompletedTaskListViewState extends ConsumerState<CompletedTaskListView> {
     );
   }
 
-  Widget _buildRow(CompletedTaskEntry entry, int index) {
+  String? _composeSubtitle(
+    Task task,
+    Set<String> parentIds,
+    List<Task> allTasks, {
+    String? scheduleLabel,
+  }) {
+    final parts = <String>[];
+    if (scheduleLabel != null && scheduleLabel.isNotEmpty) {
+      parts.add(scheduleLabel);
+    }
+    if (parentIds.contains(task.id)) {
+      parts.add(parentTaskSubtitleLabel(task, allTasks));
+    }
+    if (parts.isEmpty) return null;
+    return parts.join(' · ');
+  }
+
+  Widget _buildRow(
+    CompletedTaskEntry entry,
+    int index,
+    Set<String> parentIds,
+    List<Task> allTasks,
+  ) {
     _rowKeys.putIfAbsent(entry.task.id, GlobalKey.new);
-    final scheduleSubtitle = completedScheduleLabel(entry.task);
+    final subtitle = _composeSubtitle(
+      entry.task,
+      parentIds,
+      allTasks,
+      scheduleLabel: completedScheduleLabel(entry.task),
+    );
 
     return Padding(
       padding: EdgeInsets.only(
@@ -270,7 +310,7 @@ class _CompletedTaskListViewState extends ConsumerState<CompletedTaskListView> {
       child: SwipeableRestoreTile(
         key: _rowKeys[entry.task.id],
         task: entry.task,
-        subtitle: scheduleSubtitle,
+        subtitle: subtitle,
         restoreIcon: Icons.undo,
         restoreTooltip: entry.isPeriodCompletion
             ? '撤销本周期完成'
@@ -285,6 +325,8 @@ class _CompletedTaskListViewState extends ConsumerState<CompletedTaskListView> {
   @override
   Widget build(BuildContext context) {
     final entriesAsync = ref.watch(completedTasksProvider);
+    final parentIds = ref.watch(parentTaskIdsProvider).value ?? const {};
+    final allTasks = ref.watch(allActiveTasksProvider).value ?? const [];
 
     ref.listen(completedTasksProvider, (previous, next) {
       next.whenData(_syncEntries);
@@ -310,7 +352,7 @@ class _CompletedTaskListViewState extends ConsumerState<CompletedTaskListView> {
             if (index >= _entries.length) {
               return const SizedBox.shrink();
             }
-            return _buildRow(_entries[index], index);
+            return _buildRow(_entries[index], index, parentIds, allTasks);
           },
         );
       },

@@ -21,6 +21,23 @@ Task? parentOf(Task task, Map<String, Task> byId) {
   return byId[parentId];
 }
 
+/// 返回至少有一条未软删子任务的父任务 id 集合。
+Set<String> parentIdsWithSubtasks(Iterable<Task> all) {
+  return all
+      .where((t) => t.parentId != null && t.deletedAt == null)
+      .map((t) => t.parentId!)
+      .toSet();
+}
+
+int countSubtasks(String parentId, Iterable<Task> all) {
+  return all.where((t) => t.parentId == parentId && t.deletedAt == null).length;
+}
+
+String parentTaskSubtitleLabel(Task task, Iterable<Task> all) {
+  final count = countSubtasks(task.id, all);
+  return '父任务 · $count 个子任务';
+}
+
 List<Task> filterProcessTasks(
   List<Task> inbox, {
   required bool todayOnly,
