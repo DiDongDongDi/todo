@@ -1002,7 +1002,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
   Future<void> _archive(Task task, {bool animated = false}) async {
     if (animated) {
       await _animateFlyout(
-        const Offset(1.5, 0),
+        const Offset(-1.5, 0),
         () => _performArchive(task),
         feedback: AppHaptics.none,
       );
