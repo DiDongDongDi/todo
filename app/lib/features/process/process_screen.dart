@@ -340,11 +340,11 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     final wasPartialCheckIn = _lastUndoWasPartialCheckIn;
     if (task == null || from == null) return;
 
-    final enterFromLeft = from == TaskStatus.trashed;
-    final enterFromRight = from == TaskStatus.archived ||
-        from == TaskStatus.someday ||
+    final enterFromLeft = from == TaskStatus.trashed ||
+        from == TaskStatus.archived ||
         wasPeriod ||
-        wasPartialCheckIn ||
+        wasPartialCheckIn;
+    final enterFromRight = from == TaskStatus.someday ||
         _lastUndoWasRestoreToInbox;
     if (!enterFromLeft && !enterFromRight) return;
 
