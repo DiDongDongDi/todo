@@ -73,6 +73,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
   List<Task> _subtasks = const [];
   final List<TextEditingController> _editSubtaskControllers = [];
   bool _editSubtaskFocused = false;
+  bool _savingEdit = false;
 
   /// 与收集页一致：底部按钮组由焦点驱动；tab 不可见时一律视为非编辑 UI。
   bool get _editUiVisible =>
@@ -197,7 +198,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
   }
 
   void _scheduleEditSessionCleanup() {
-    if (_editUiVisible || !_editing) return;
+    if (_savingEdit || _editUiVisible || !_editing) return;
     _exitEditMode(_taskForBlurExit());
   }
 
@@ -290,17 +291,21 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
   List<String> get _editSubtaskTitles =>
       SubtaskTitleEditor.nonEmptyTitles(_editSubtaskControllers);
 
-  Future<void> _createEditSubtasks(String parentId) async {
-    final titles = _editSubtaskTitles;
-    if (titles.isEmpty) return;
+  Future<List<Task>> _createEditSubtasks(
+    String parentId,
+    List<String> titles,
+  ) async {
+    if (titles.isEmpty) return const [];
 
     final repo = await ref.read(taskRepositoryProvider.future);
+    final created = <Task>[];
     for (final title in titles) {
-      await repo.createSubtask(parentId: parentId, title: title);
+      created.add(await repo.createSubtask(parentId: parentId, title: title));
     }
     unawaited(triggerSyncIfSignedIn(ref));
-    if (!mounted) return;
+    if (!mounted) return created;
     await _fetchSubtasks(parentId);
+    return created;
   }
 
   Future<List<Task>> _waitForProcessTask(String taskId) async {
@@ -699,6 +704,16 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     }
   }
 
+  void _syncEditDraftFromTask(Task task) {
+    _editRecurrence = task.recurrence;
+    _editDailyUntil = task.dailyUntil;
+    _editDueDate = task.dueDate;
+    _editCheckInTarget = task.checkInTarget;
+    _editAttachments
+      ..clear()
+      ..addAll(task.attachments);
+  }
+
   void _ensureEditCaretVisible() {
     final text = _editController.text;
     _editController.value = TextEditingValue(
@@ -751,6 +766,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     _editFocusNode.unfocus();
     if (task != null) {
       _syncDisplayFromTask(task);
+      _syncEditDraftFromTask(task);
     }
     _syncVolumeKeyHandler();
   }
@@ -762,67 +778,84 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
 
   Future<void> _saveEdit(Task task) async {
     await AppHaptics.light();
-    final repo = await ref.read(taskRepositoryProvider.future);
-    final hasAudio =
-        _editAttachments.any((a) => a.type == AttachmentType.audio);
-    final audioChanged = hasAudio &&
-        _editAttachments.any(
-          (a) =>
-              a.type == AttachmentType.audio &&
-              !task.attachments.any((o) => o.localPath == a.localPath),
-        );
-
-    var transcriptionStatus = task.transcriptionStatus;
-    if (!hasAudio) {
-      transcriptionStatus = TranscriptionStatus.none;
-    } else if (audioChanged) {
-      transcriptionStatus = TranscriptionStatus.pending;
-    }
-
-    final editDue = _editRecurrence == TaskRecurrence.daily ? null : _editDueDate;
-    final normalizedDue = normalizeRecurringDueDate(
-      recurrence: _editRecurrence,
-      dueDate: editDue,
-    );
-
-    final updated = await repo.update(
-      task.copyWith(
-        title: _editController.text.trim(),
-        attachments: List.from(_editAttachments),
-        transcriptionStatus: transcriptionStatus,
-        recurrence: _editRecurrence,
-        dailyUntil:
-            _editRecurrence != TaskRecurrence.none ? _editDailyUntil : null,
-        dueDate: normalizedDue,
-        clearDailyUntil:
-            _editRecurrence == TaskRecurrence.none || _editDailyUntil == null,
-        clearDueDate:
-            _editRecurrence == TaskRecurrence.daily || editDue == null,
-        checkInTarget: _editCheckInTarget.clamp(1, 99),
-      ),
-    );
-
-    if (hasAudio && transcriptionStatus == TranscriptionStatus.pending) {
-      unawaited(ref.read(transcriptionServiceProvider).processTask(updated));
-    }
-    unawaited(triggerSyncIfSignedIn(ref));
-
-    if (!task.isSubtask && _editSubtaskTitles.isNotEmpty) {
-      try {
-        await _createEditSubtasks(task.id);
-      } catch (e) {
-        if (mounted) {
-          showAppSnackBar(
-            context,
-            message: '无法添加子任务',
-            icon: Icons.error_outline,
-            type: AppSnackType.error,
+    _savingEdit = true;
+    final pendingSubtaskTitles = List<String>.from(_editSubtaskTitles);
+    try {
+      final repo = await ref.read(taskRepositoryProvider.future);
+      final hasAudio =
+          _editAttachments.any((a) => a.type == AttachmentType.audio);
+      final audioChanged = hasAudio &&
+          _editAttachments.any(
+            (a) =>
+                a.type == AttachmentType.audio &&
+                !task.attachments.any((o) => o.localPath == a.localPath),
           );
+
+      var transcriptionStatus = task.transcriptionStatus;
+      if (!hasAudio) {
+        transcriptionStatus = TranscriptionStatus.none;
+      } else if (audioChanged) {
+        transcriptionStatus = TranscriptionStatus.pending;
+      }
+
+      final editDue =
+          _editRecurrence == TaskRecurrence.daily ? null : _editDueDate;
+      final normalizedDue = normalizeRecurringDueDate(
+        recurrence: _editRecurrence,
+        dueDate: editDue,
+      );
+
+      final updated = await repo.update(
+        task.copyWith(
+          title: _editController.text.trim(),
+          attachments: List.from(_editAttachments),
+          transcriptionStatus: transcriptionStatus,
+          recurrence: _editRecurrence,
+          dailyUntil:
+              _editRecurrence != TaskRecurrence.none ? _editDailyUntil : null,
+          dueDate: normalizedDue,
+          clearDailyUntil:
+              _editRecurrence == TaskRecurrence.none || _editDailyUntil == null,
+          clearDueDate:
+              _editRecurrence == TaskRecurrence.daily || editDue == null,
+          checkInTarget: _editCheckInTarget.clamp(1, 99),
+        ),
+      );
+
+      if (hasAudio && transcriptionStatus == TranscriptionStatus.pending) {
+        unawaited(ref.read(transcriptionServiceProvider).processTask(updated));
+      }
+      unawaited(triggerSyncIfSignedIn(ref));
+
+      var createdSubs = const <Task>[];
+      if (!task.isSubtask && pendingSubtaskTitles.isNotEmpty) {
+        try {
+          createdSubs =
+              await _createEditSubtasks(task.id, pendingSubtaskTitles);
+        } catch (e) {
+          if (mounted) {
+            showAppSnackBar(
+              context,
+              message: '无法添加子任务',
+              icon: Icons.error_outline,
+              type: AppSnackType.error,
+            );
+          }
         }
       }
-    }
 
-    _exitEditMode(task);
+      _exitEditMode(updated);
+
+      final targetId = createdSubs.isNotEmpty
+          ? createdSubs.last.id
+          : updated.id;
+      final tasks = await _waitForProcessTask(targetId);
+      if (!mounted) return;
+      final idx = tasks.indexWhere((t) => t.id == targetId);
+      if (idx >= 0) setState(() => _index = idx);
+    } finally {
+      _savingEdit = false;
+    }
   }
 
   void _removeEditAttachment(int index) {
