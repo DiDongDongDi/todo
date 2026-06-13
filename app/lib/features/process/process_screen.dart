@@ -333,11 +333,11 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     final wasPartialCheckIn = _lastUndoWasPartialCheckIn;
     if (task == null || from == null) return;
 
-    final enterFromLeft = from == TaskStatus.trashed;
-    final enterFromRight = from == TaskStatus.archived ||
-        from == TaskStatus.someday ||
+    final enterFromLeft = from == TaskStatus.trashed ||
+        from == TaskStatus.archived ||
         wasPeriod ||
         wasPartialCheckIn;
+    final enterFromRight = from == TaskStatus.someday;
     if (!enterFromLeft && !enterFromRight) return;
 
     Future<void> restoreAndSwitch() async {
