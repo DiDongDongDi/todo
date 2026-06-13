@@ -131,4 +131,82 @@ void main() {
       expect(parentTaskSubtitleLabel(parent, all), '父任务 · 2 个子任务');
     });
   });
+
+  group('taskSchedulesEqual', () {
+    test('true when all schedule fields match', () {
+      final due = DateTime(2026, 6, 1);
+      final a = _task(id: 'a').copyWith(
+        recurrence: TaskRecurrence.monthly,
+        dueDate: due,
+        dailyUntil: DateTime(2026, 12, 31),
+      );
+      final b = _task(id: 'b').copyWith(
+        recurrence: TaskRecurrence.monthly,
+        dueDate: due,
+        dailyUntil: DateTime(2026, 12, 31),
+      );
+      expect(taskSchedulesEqual(a, b), isTrue);
+    });
+
+    test('false when dueDate differs', () {
+      final a = _task(id: 'a').copyWith(
+        recurrence: TaskRecurrence.none,
+        dueDate: DateTime(2026, 6, 1),
+      );
+      final b = _task(id: 'b').copyWith(
+        recurrence: TaskRecurrence.none,
+        dueDate: DateTime(2026, 6, 15),
+      );
+      expect(taskSchedulesEqual(a, b), isFalse);
+    });
+  });
+
+  group('subtaskShouldInheritParentSchedule', () {
+    test('true when sub has no schedule', () {
+      final sub = _task(id: 's', parentId: 'p');
+      final parent = _task(id: 'p').copyWith(
+        recurrence: TaskRecurrence.none,
+        dueDate: DateTime(2026, 6, 1),
+      );
+      expect(subtaskShouldInheritParentSchedule(sub, parent), isTrue);
+    });
+
+    test('true when sub schedule matches parent before', () {
+      final due = DateTime(2026, 6, 1);
+      final parent = _task(id: 'p').copyWith(
+        recurrence: TaskRecurrence.none,
+        dueDate: due,
+      );
+      final sub = _task(id: 's', parentId: 'p').copyWith(
+        recurrence: TaskRecurrence.none,
+        dueDate: due,
+      );
+      expect(subtaskShouldInheritParentSchedule(sub, parent), isTrue);
+    });
+
+    test('false when sub has own schedule', () {
+      final parent = _task(id: 'p').copyWith(
+        recurrence: TaskRecurrence.none,
+        dueDate: DateTime(2026, 6, 1),
+      );
+      final sub = _task(id: 's', parentId: 'p').copyWith(
+        recurrence: TaskRecurrence.none,
+        dueDate: DateTime(2026, 7, 1),
+      );
+      expect(subtaskShouldInheritParentSchedule(sub, parent), isFalse);
+    });
+  });
+
+  group('applyParentSchedule', () {
+    test('copies parent schedule to sub', () {
+      final parent = _task(id: 'p').copyWith(
+        recurrence: TaskRecurrence.none,
+        dueDate: DateTime(2026, 6, 15),
+      );
+      final sub = _task(id: 's', parentId: 'p');
+      final result = applyParentSchedule(sub, parent);
+      expect(result.recurrence, TaskRecurrence.none);
+      expect(result.dueDate, DateTime(2026, 6, 15));
+    });
+  });
 }

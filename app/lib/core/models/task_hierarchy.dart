@@ -1,6 +1,43 @@
 import 'package:todo_app/core/models/task.dart';
 import 'package:todo_app/core/models/task_schedule.dart';
 
+bool _datesEqual(DateTime? a, DateTime? b) {
+  if (a == null && b == null) return true;
+  if (a == null || b == null) return false;
+  return localDate(a) == localDate(b);
+}
+
+/// 比较两个任务的计划字段（recurrence、dueDate、dailyUntil）。
+bool taskSchedulesEqual(Task a, Task b) {
+  return a.recurrence == b.recurrence &&
+      _datesEqual(a.dueDate, b.dueDate) &&
+      _datesEqual(a.dailyUntil, b.dailyUntil);
+}
+
+/// 子任务是否应随父任务计划变更而继承（未单独设置或与父任务旧计划一致）。
+bool subtaskShouldInheritParentSchedule(Task sub, Task parentBefore) {
+  return !isScheduled(sub) || taskSchedulesEqual(sub, parentBefore);
+}
+
+/// 将父任务计划复制到子任务，复用与 createInbox 相同的规范化逻辑。
+Task applyParentSchedule(Task sub, Task parent) {
+  final editDue =
+      parent.recurrence == TaskRecurrence.daily ? null : parent.dueDate;
+  final normalizedDue = normalizeRecurringDueDate(
+    recurrence: parent.recurrence,
+    dueDate: editDue,
+  );
+  return sub.copyWith(
+    recurrence: parent.recurrence,
+    dailyUntil:
+        parent.recurrence != TaskRecurrence.none ? parent.dailyUntil : null,
+    dueDate: normalizedDue,
+    clearDailyUntil:
+        parent.recurrence == TaskRecurrence.none || parent.dailyUntil == null,
+    clearDueDate: parent.recurrence == TaskRecurrence.daily || editDue == null,
+  );
+}
+
 bool hasOpenSubtasks(
   Task parent,
   Iterable<Task> all, {
