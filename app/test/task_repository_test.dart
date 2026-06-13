@@ -285,4 +285,31 @@ void main() {
       expect(updatedSub?.dueDate, due);
     });
   });
+
+  test('reorderInboxTasks assigns descending sortOrder and persists order', () async {
+    final taskA = await repo.createInbox(title: 'A');
+    final taskB = await repo.createInbox(title: 'B');
+    final taskC = await repo.createInbox(title: 'C');
+
+    await repo.reorderInboxTasks([taskC, taskA, taskB]);
+
+    final loadedC = await repo.getById(taskC.id);
+    final loadedA = await repo.getById(taskA.id);
+    final loadedB = await repo.getById(taskB.id);
+
+    expect(loadedC, isNotNull);
+    expect(loadedA, isNotNull);
+    expect(loadedB, isNotNull);
+    expect(loadedC!.sortOrder, greaterThan(loadedA!.sortOrder));
+    expect(loadedA.sortOrder, greaterThan(loadedB!.sortOrder));
+
+    final all = await repo.getAll();
+    final inbox = all.where((t) => t.status == TaskStatus.inbox).toList()
+      ..sort((a, b) {
+        final order = b.sortOrder.compareTo(a.sortOrder);
+        if (order != 0) return order;
+        return b.createdAt.compareTo(a.createdAt);
+      });
+    expect(inbox.map((t) => t.title).toList(), ['C', 'A', 'B']);
+  });
 }

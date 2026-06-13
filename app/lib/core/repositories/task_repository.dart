@@ -543,6 +543,19 @@ class TaskRepository {
   Future<List<Task>> getAll() => _store.getAll();
 
   Future<Task?> getById(String id) => _store.getById(id);
+
+  /// Persists [orderedTasks] as inbox queue order (index 0 = front).
+  Future<void> reorderInboxTasks(List<Task> orderedTasks) async {
+    if (orderedTasks.isEmpty) return;
+
+    final base = DateTime.now().toUtc().millisecondsSinceEpoch.toDouble();
+    for (var i = 0; i < orderedTasks.length; i++) {
+      final task = orderedTasks[i];
+      final newOrder = base - i;
+      if ((task.sortOrder - newOrder).abs() < 0.001) continue;
+      await update(task.copyWith(sortOrder: newOrder));
+    }
+  }
 }
 
 final taskRepositoryProvider = FutureProvider<TaskRepository>((ref) async {
