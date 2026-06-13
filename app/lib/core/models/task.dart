@@ -1,4 +1,4 @@
-enum TaskStatus { inbox, archived, trashed }
+enum TaskStatus { inbox, archived, trashed, someday }
 
 enum TranscriptionStatus { none, pending, done, failed }
 
@@ -49,6 +49,7 @@ class Task {
     this.transcriptionStatus = TranscriptionStatus.none,
     this.archivedAt,
     this.trashedAt,
+    this.somedayAt,
     this.deletedAt,
     this.syncVersion = 0,
     this.recurrence = TaskRecurrence.none,
@@ -70,6 +71,7 @@ class Task {
   final TranscriptionStatus transcriptionStatus;
   final DateTime? archivedAt;
   final DateTime? trashedAt;
+  final DateTime? somedayAt;
   final DateTime createdAt;
   final DateTime updatedAt;
   final DateTime? deletedAt;
@@ -100,6 +102,7 @@ class Task {
     TranscriptionStatus? transcriptionStatus,
     DateTime? archivedAt,
     DateTime? trashedAt,
+    DateTime? somedayAt,
     DateTime? createdAt,
     DateTime? updatedAt,
     DateTime? deletedAt,
@@ -115,6 +118,7 @@ class Task {
     bool clearParentId = false,
     bool clearArchivedAt = false,
     bool clearTrashedAt = false,
+    bool clearSomedayAt = false,
     bool clearDailyUntil = false,
     bool clearLastDailyCompletedAt = false,
     bool clearDueDate = false,
@@ -130,6 +134,7 @@ class Task {
       transcriptionStatus: transcriptionStatus ?? this.transcriptionStatus,
       archivedAt: clearArchivedAt ? null : (archivedAt ?? this.archivedAt),
       trashedAt: clearTrashedAt ? null : (trashedAt ?? this.trashedAt),
+      somedayAt: clearSomedayAt ? null : (somedayAt ?? this.somedayAt),
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       deletedAt: deletedAt ?? this.deletedAt,
@@ -159,6 +164,7 @@ class Task {
         'transcription_status': transcriptionStatus.name,
         'archived_at': archivedAt?.toIso8601String(),
         'trashed_at': trashedAt?.toIso8601String(),
+        'someday_at': somedayAt?.toIso8601String(),
         'created_at': createdAt.toIso8601String(),
         'updated_at': updatedAt.toIso8601String(),
         'deleted_at': deletedAt?.toIso8601String(),
@@ -202,6 +208,9 @@ class Task {
           : null,
       trashedAt: json['trashed_at'] != null
           ? DateTime.parse(json['trashed_at'] as String)
+          : null,
+      somedayAt: json['someday_at'] != null
+          ? DateTime.parse(json['someday_at'] as String)
           : null,
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),

@@ -91,7 +91,7 @@ class TaskCardFooter extends StatelessWidget {
     required bool isListening,
     required VoidCallback? onCancelEdit,
     required VoidCallback? onSave,
-    required VoidCallback? onTrash,
+    required VoidCallback? onSomeday,
     required VoidCallback? onComplete,
     required String completeLabel,
     required bool showRetryTranscription,
@@ -156,15 +156,6 @@ class TaskCardFooter extends StatelessWidget {
         const SizedBox(height: 16),
         Row(
           children: [
-            IconButton.filledTonal(
-              onPressed: onTrash,
-              icon: Icon(Icons.close, color: colorScheme.error),
-              tooltip: '删除',
-              style: IconButton.styleFrom(
-                backgroundColor: colorScheme.errorContainer,
-              ),
-            ),
-            const SizedBox(width: 8),
             FilledButton.icon(
               onPressed: onComplete,
               icon: const Icon(Icons.check, size: 20),
@@ -173,6 +164,12 @@ class TaskCardFooter extends StatelessWidget {
                 backgroundColor: semanticColors.success,
                 foregroundColor: Colors.white,
               ),
+            ),
+            const SizedBox(width: 8),
+            IconButton.filledTonal(
+              onPressed: onSomeday,
+              icon: const Icon(Icons.lightbulb_outline),
+              tooltip: '将来也许',
             ),
             if (showRetryTranscription && onRetryTranscription != null) ...[
               const SizedBox(width: 8),

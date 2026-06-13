@@ -86,7 +86,7 @@ class TemplateRepository {
 
     final all = await _taskRepo.getAll();
     final subtaskTitles = all
-        .where((t) => t.parentId == taskId && t.status != TaskStatus.trashed)
+        .where((t) => t.parentId == taskId && t.status != TaskStatus.trashed && t.status != TaskStatus.someday)
         .map((t) => t.title)
         .where((t) => t.trim().isNotEmpty)
         .toList();

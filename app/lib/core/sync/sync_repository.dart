@@ -87,6 +87,7 @@ class SyncRepository {
       'transcription_status': migrated['transcription_status'] ?? 'none',
       'archived_at': migrated['archived_at'],
       'trashed_at': migrated['trashed_at'],
+      'someday_at': migrated['someday_at'],
       'created_at': migrated['created_at'],
       'updated_at': migrated['updated_at'],
       'deleted_at': migrated['deleted_at'],
