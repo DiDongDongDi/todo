@@ -107,14 +107,21 @@ final trashedTasksProvider = StreamProvider<List<Task>>((ref) async* {
   yield* store.watchByStatus(TaskStatus.trashed);
 });
 
+final somedayTasksProvider = StreamProvider<List<Task>>((ref) async* {
+  final store = await ref.watch(taskStoreInitProvider.future);
+  yield* store.watchByStatus(TaskStatus.someday);
+});
+
 final allActiveTasksProvider = Provider<AsyncValue<List<Task>>>((ref) {
   final inboxAsync = ref.watch(inboxTasksProvider);
   final archivedAsync = ref.watch(archivedTasksProvider);
   final trashedAsync = ref.watch(trashedTasksProvider);
+  final somedayAsync = ref.watch(somedayTasksProvider);
 
   if (inboxAsync.isLoading ||
       archivedAsync.isLoading ||
-      trashedAsync.isLoading) {
+      trashedAsync.isLoading ||
+      somedayAsync.isLoading) {
     return const AsyncValue.loading();
   }
   if (inboxAsync.hasError) {
@@ -126,11 +133,15 @@ final allActiveTasksProvider = Provider<AsyncValue<List<Task>>>((ref) {
   if (trashedAsync.hasError) {
     return AsyncValue.error(trashedAsync.error!, trashedAsync.stackTrace!);
   }
+  if (somedayAsync.hasError) {
+    return AsyncValue.error(somedayAsync.error!, somedayAsync.stackTrace!);
+  }
 
   return AsyncValue.data([
     ...inboxAsync.value ?? [],
     ...archivedAsync.value ?? [],
     ...trashedAsync.value ?? [],
+    ...somedayAsync.value ?? [],
   ]);
 });
 
@@ -149,6 +160,8 @@ class TaskRepository {
   Stream<List<Task>> watchArchived() => _store.watchByStatus(TaskStatus.archived);
 
   Stream<List<Task>> watchTrashed() => _store.watchByStatus(TaskStatus.trashed);
+
+  Stream<List<Task>> watchSomeday() => _store.watchByStatus(TaskStatus.someday);
 
   Future<Task> createInbox({
     required String title,
@@ -250,7 +263,8 @@ class TaskRepository {
           (t) =>
               t.parentId == parentId &&
               t.deletedAt == null &&
-              t.status != TaskStatus.trashed,
+              t.status != TaskStatus.trashed &&
+              t.status != TaskStatus.someday,
         )
         .toList()
       ..sort((a, b) => b.sortOrder.compareTo(a.sortOrder));
@@ -312,6 +326,7 @@ class TaskRepository {
       updatedAt: now,
       syncVersion: task.syncVersion + 1,
       clearTrashedAt: true,
+      clearSomedayAt: true,
     );
     await _store.upsert(updated);
     return updated;
@@ -419,6 +434,7 @@ class TaskRepository {
       updatedAt: nowUtc,
       syncVersion: task.syncVersion + 1,
       clearTrashedAt: true,
+      clearSomedayAt: true,
     );
     await _store.upsert(updated);
     return (task: updated, result: CheckInResult.finalCompletion);
@@ -486,6 +502,37 @@ class TaskRepository {
       updatedAt: now,
       syncVersion: task.syncVersion + 1,
       clearArchivedAt: true,
+      clearSomedayAt: true,
+    );
+    await _store.upsert(updated);
+    return updated;
+  }
+
+  Future<Task> moveToSomeday(String id) async {
+    final task = await _require(id);
+    final now = DateTime.now().toUtc();
+
+    if (task.isSubtask) {
+      return _moveToSomedaySingle(task, now);
+    }
+
+    final subtasks = await getSubtasks(id);
+    for (final sub in subtasks) {
+      if (sub.status != TaskStatus.someday) {
+        await _moveToSomedaySingle(sub, now);
+      }
+    }
+    return _moveToSomedaySingle(task, now);
+  }
+
+  Future<Task> _moveToSomedaySingle(Task task, DateTime now) async {
+    final updated = task.copyWith(
+      status: TaskStatus.someday,
+      somedayAt: now,
+      updatedAt: now,
+      syncVersion: task.syncVersion + 1,
+      clearArchivedAt: true,
+      clearTrashedAt: true,
     );
     await _store.upsert(updated);
     return updated;
@@ -506,9 +553,23 @@ class TaskRepository {
       syncVersion: task.syncVersion + 1,
       clearArchivedAt: true,
       clearTrashedAt: true,
+      clearSomedayAt: true,
     );
     await _store.upsert(updated);
     return updated;
+  }
+
+  Future<int> restoreAllSomedayToInbox() async {
+    final tasks = await _store.getByStatus(TaskStatus.someday);
+    if (tasks.isEmpty) return 0;
+
+    var count = 0;
+    for (final task in tasks) {
+      if (task.isSubtask) continue;
+      await restoreToInbox(task.id);
+      count++;
+    }
+    return count;
   }
 
   Future<Task> restoreToInbox(String id) async {

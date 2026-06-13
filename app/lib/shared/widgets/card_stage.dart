@@ -24,6 +24,8 @@ class CardStage extends StatelessWidget {
     this.onDragEnd,
     this.leftLabel = '删除',
     this.rightLabel = '完成',
+    this.leftBandColor,
+    this.rightBandColor,
   });
 
   final GlobalKey<SwipeableCardState> swipeKey;
@@ -42,6 +44,8 @@ class CardStage extends StatelessWidget {
   final VoidCallback? onDragEnd;
   final String leftLabel;
   final String rightLabel;
+  final Color? leftBandColor;
+  final Color? rightBandColor;
 
   @override
   Widget build(BuildContext context) {
@@ -71,6 +75,8 @@ class CardStage extends StatelessWidget {
                   onDragEnd: onDragEnd,
                   leftLabel: leftLabel,
                   rightLabel: rightLabel,
+                  leftBandColor: leftBandColor,
+                  rightBandColor: rightBandColor,
                   child: child,
                 ),
               ],
