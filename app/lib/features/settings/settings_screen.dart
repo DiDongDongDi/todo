@@ -39,7 +39,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         const TabPageHeader(title: '设置'),
         Expanded(
           child: ListView(
-            padding: AppLayout.cardPadding.copyWith(top: 8, bottom: 24),
+            padding: AppLayout.cardPadding.copyWith(top: 20, bottom: 24),
             children: [
               if (_volumeKeySupported == true) ...[
                 SwitchListTile(
