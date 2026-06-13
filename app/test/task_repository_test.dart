@@ -312,4 +312,45 @@ void main() {
       });
     expect(inbox.map((t) => t.title).toList(), ['C', 'A', 'B']);
   });
+
+  test('moveToSomeday moves task and cascades to subtasks', () async {
+    final parent = await repo.createInbox(title: 'Parent');
+    final sub1 = await repo.createSubtask(parentId: parent.id, title: 'Sub 1');
+    final sub2 = await repo.createSubtask(parentId: parent.id, title: 'Sub 2');
+
+    await repo.moveToSomeday(parent.id);
+
+    final movedParent = await repo.getById(parent.id);
+    final movedSub1 = await repo.getById(sub1.id);
+    final movedSub2 = await repo.getById(sub2.id);
+
+    expect(movedParent?.status, TaskStatus.someday);
+    expect(movedParent?.somedayAt, isNotNull);
+    expect(movedSub1?.status, TaskStatus.someday);
+    expect(movedSub2?.status, TaskStatus.someday);
+  });
+
+  test('restoreToInbox clears someday status', () async {
+    final task = await repo.createInbox(title: 'Later');
+    await repo.moveToSomeday(task.id);
+
+    await repo.restoreToInbox(task.id);
+
+    final restored = await repo.getById(task.id);
+    expect(restored?.status, TaskStatus.inbox);
+    expect(restored?.somedayAt, isNull);
+  });
+
+  test('restoreAllSomedayToInbox restores all top-level someday tasks', () async {
+    final taskA = await repo.createInbox(title: 'A');
+    final taskB = await repo.createInbox(title: 'B');
+    await repo.moveToSomeday(taskA.id);
+    await repo.moveToSomeday(taskB.id);
+
+    final count = await repo.restoreAllSomedayToInbox();
+
+    expect(count, 2);
+    expect((await repo.getById(taskA.id))?.status, TaskStatus.inbox);
+    expect((await repo.getById(taskB.id))?.status, TaskStatus.inbox);
+  });
 }

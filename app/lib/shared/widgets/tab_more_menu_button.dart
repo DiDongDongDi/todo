@@ -5,10 +5,11 @@ import 'package:todo_app/shared/utils/haptics.dart';
 import 'package:todo_app/shared/widgets/haptic_tap_scope.dart';
 
 enum ProcessMoreAction {
+  someday,
   archive,
   trash,
-  sync,
   saveTemplate,
+  delete,
 }
 
 enum CollectMoreAction {

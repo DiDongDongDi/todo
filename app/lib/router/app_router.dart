@@ -5,6 +5,7 @@ import 'package:todo_app/features/auth/auth_screen.dart';
 import 'package:todo_app/features/shell/shell_screen.dart';
 import 'package:todo_app/features/task_detail/task_detail_screen.dart';
 import 'package:todo_app/features/settings/sound_settings_screen.dart';
+import 'package:todo_app/features/someday/someday_screen.dart';
 import 'package:todo_app/features/templates/template_edit_screen.dart';
 import 'package:todo_app/features/templates/template_list_screen.dart';
 import 'package:todo_app/features/trash/trash_screen.dart';
@@ -27,6 +28,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/trash',
         builder: (context, state) => const TrashScreen(),
+      ),
+      GoRoute(
+        path: '/someday',
+        builder: (context, state) => const SomedayScreen(),
       ),
       GoRoute(
         path: '/auth',

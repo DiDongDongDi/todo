@@ -75,6 +75,8 @@ class JsonTaskStore implements TaskStore {
         list.sort(_compareArchived);
       case TaskStatus.trashed:
         list.sort(_compareTrashed);
+      case TaskStatus.someday:
+        list.sort(_compareSomeday);
     }
     return list;
   }
@@ -96,6 +98,14 @@ class JsonTaskStore implements TaskStore {
   int _compareTrashed(Task a, Task b) {
     final aTime = a.trashedAt ?? a.updatedAt;
     final bTime = b.trashedAt ?? b.updatedAt;
+    final cmp = bTime.compareTo(aTime);
+    if (cmp != 0) return cmp;
+    return b.updatedAt.compareTo(a.updatedAt);
+  }
+
+  int _compareSomeday(Task a, Task b) {
+    final aTime = a.somedayAt ?? a.updatedAt;
+    final bTime = b.somedayAt ?? b.updatedAt;
     final cmp = bTime.compareTo(aTime);
     if (cmp != 0) return cmp;
     return b.updatedAt.compareTo(a.updatedAt);

@@ -29,7 +29,7 @@ class BigTaskCard extends StatelessWidget {
     this.onActivateInput,
     this.feedback = CollectCardFeedback.none,
     this.onDismissFeedback,
-    this.onTrash,
+    this.onSomeday,
     this.onComplete,
     this.onPrevious,
     this.onNext,
@@ -66,7 +66,7 @@ class BigTaskCard extends StatelessWidget {
   final VoidCallback? onActivateInput;
   final CollectCardFeedback feedback;
   final VoidCallback? onDismissFeedback;
-  final VoidCallback? onTrash;
+  final VoidCallback? onSomeday;
   final VoidCallback? onComplete;
   final VoidCallback? onPrevious;
   final VoidCallback? onNext;
@@ -160,15 +160,6 @@ class BigTaskCard extends StatelessWidget {
                           const SizedBox(height: 16),
                           Row(
                             children: [
-                              IconButton.filledTonal(
-                                onPressed: onTrash,
-                                icon: Icon(Icons.close, color: colorScheme.error),
-                                tooltip: '删除',
-                                style: IconButton.styleFrom(
-                                  backgroundColor: colorScheme.errorContainer,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
                               FilledButton.icon(
                                 onPressed: onComplete,
                                 icon: const Icon(Icons.check, size: 20),
@@ -177,6 +168,12 @@ class BigTaskCard extends StatelessWidget {
                                   backgroundColor: context.semanticColors.success,
                                   foregroundColor: Colors.white,
                                 ),
+                              ),
+                              const SizedBox(width: 8),
+                              IconButton.filledTonal(
+                                onPressed: onSomeday,
+                                icon: const Icon(Icons.lightbulb_outline),
+                                tooltip: '将来也许',
                               ),
                               if (task!.canRetryTranscription &&
                                   onRetryTranscription != null) ...[

@@ -23,6 +23,8 @@ class SwipeableCard extends StatefulWidget {
     this.onFlyoutFeedback,
     this.leftLabel = '删除',
     this.rightLabel = '完成',
+    this.leftBandColor,
+    this.rightBandColor,
     this.upLabel,
     this.downLabel,
   });
@@ -43,6 +45,8 @@ class SwipeableCard extends StatefulWidget {
   final FlyoutFeedback? onFlyoutFeedback;
   final String leftLabel;
   final String rightLabel;
+  final Color? leftBandColor;
+  final Color? rightBandColor;
   final String? upLabel;
   final String? downLabel;
 
@@ -353,8 +357,8 @@ class SwipeableCardState extends State<SwipeableCard>
     required double width,
     required double height,
     required Offset offset,
-    required ColorScheme colorScheme,
-    required Color successColor,
+    required Color leftColor,
+    required Color rightColor,
     required Widget cardChild,
   }) {
     return Stack(
@@ -365,7 +369,7 @@ class SwipeableCardState extends State<SwipeableCard>
           Positioned.fill(
             child: DecoratedBox(
               decoration: BoxDecoration(
-                color: colorScheme.error.withValues(
+                color: leftColor.withValues(
                   alpha: _bandOpacity(offset.dx),
                 ),
                 borderRadius: BorderRadius.circular(_cardBorderRadius),
@@ -376,7 +380,7 @@ class SwipeableCardState extends State<SwipeableCard>
           Positioned.fill(
             child: DecoratedBox(
               decoration: BoxDecoration(
-                color: successColor.withValues(
+                color: rightColor.withValues(
                   alpha: _bandOpacity(offset.dx),
                 ),
                 borderRadius: BorderRadius.circular(_cardBorderRadius),
@@ -392,7 +396,7 @@ class SwipeableCardState extends State<SwipeableCard>
                 child: Text(
                   widget.leftLabel,
                   style: TextStyle(
-                    color: colorScheme.error,
+                    color: leftColor,
                     fontWeight: FontWeight.bold,
                     fontSize: 18,
                   ),
@@ -409,7 +413,7 @@ class SwipeableCardState extends State<SwipeableCard>
                 child: Text(
                   widget.rightLabel,
                   style: TextStyle(
-                    color: successColor,
+                    color: rightColor,
                     fontWeight: FontWeight.bold,
                     fontSize: 18,
                   ),
@@ -432,6 +436,8 @@ class SwipeableCardState extends State<SwipeableCard>
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final successColor = context.semanticColors.success;
+    final leftColor = widget.leftBandColor ?? colorScheme.error;
+    final rightColor = widget.rightBandColor ?? successColor;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -453,8 +459,8 @@ class SwipeableCardState extends State<SwipeableCard>
                     width: width,
                     height: height,
                     offset: _dragAnimation!.value,
-                    colorScheme: colorScheme,
-                    successColor: successColor,
+                    leftColor: leftColor,
+                    rightColor: rightColor,
                     cardChild: child!,
                   );
                 },
@@ -464,8 +470,8 @@ class SwipeableCardState extends State<SwipeableCard>
                 width: width,
                 height: height,
                 offset: _drag,
-                colorScheme: colorScheme,
-                successColor: successColor,
+                leftColor: leftColor,
+                rightColor: rightColor,
                 cardChild: cardChild,
               );
 

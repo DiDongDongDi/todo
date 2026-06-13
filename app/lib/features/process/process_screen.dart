@@ -21,6 +21,7 @@ import 'package:todo_app/core/settings/volume_key_settings.dart';
 import 'package:todo_app/core/stats/stats_provider.dart';
 import 'package:todo_app/core/sync/sync_engine.dart';
 import 'package:todo_app/core/transcription/transcription_service.dart';
+import 'package:todo_app/shared/theme/app_semantic_colors.dart';
 import 'package:todo_app/shared/utils/app_audio_recorder.dart';
 import 'package:todo_app/shared/utils/attachment_storage.dart';
 import 'package:todo_app/shared/utils/haptics.dart';
@@ -333,8 +334,10 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     if (task == null || from == null) return;
 
     final enterFromLeft = from == TaskStatus.trashed;
-    final enterFromRight =
-        from == TaskStatus.archived || wasPeriod || wasPartialCheckIn;
+    final enterFromRight = from == TaskStatus.archived ||
+        from == TaskStatus.someday ||
+        wasPeriod ||
+        wasPartialCheckIn;
     if (!enterFromLeft && !enterFromRight) return;
 
     Future<void> restoreAndSwitch() async {
@@ -548,9 +551,9 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
               }
             : {
                 const SingleActivator(LogicalKeyboardKey.arrowLeft): () =>
-                    _trash(task, animated: true),
-                const SingleActivator(LogicalKeyboardKey.arrowRight): () =>
                     _archive(task, animated: true),
+                const SingleActivator(LogicalKeyboardKey.arrowRight): () =>
+                    _moveToSomeday(task, animated: true),
                 const SingleActivator(LogicalKeyboardKey.arrowUp): () =>
                     _setIndex(clampedIndex - 1, tasks.length, animated: true),
                 const SingleActivator(LogicalKeyboardKey.arrowDown): () =>
@@ -568,6 +571,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
               onSearch: () => _openTaskSearch(tasks, task),
               onShuffle: () => _shuffleProcessQueue(tasks),
               onSaveTemplate: () => _saveCurrentAsTemplate(task),
+              onDeleteCurrentTask: () => _trash(task, animated: true),
             ),
             Expanded(
               child: CardStage(
@@ -575,12 +579,16 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
                 enabled: touchFirst && !_editUiVisible,
                 verticalEnterAnimation: true,
                 onFlyoutFeedback: AppHaptics.none,
+                leftLabel: '完成',
+                rightLabel: '将来也许',
+                leftBandColor: context.semanticColors.success,
+                rightBandColor: Theme.of(context).colorScheme.primary,
                 shouldAnimateFlyout: (flyout) async {
                   if (flyout.dy != 0) return tasks.length > 1;
                   return true;
                 },
-                onSwipeLeft: () => _trash(task),
-                onSwipeRight: () => _archive(task),
+                onSwipeLeft: () => _archive(task),
+                onSwipeRight: () => _moveToSomeday(task),
                 onSwipeUp: () =>
                     _setIndex(clampedIndex + 1, tasks.length),
                 onSwipeDown: () =>
@@ -626,7 +634,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
                           onTransientUiClosed: _endTransientEditUi,
                         )
                       : null,
-                  onTrash: () => _trash(task, animated: true),
+                  onSomeday: () => _moveToSomeday(task, animated: true),
                   onComplete: () => _archive(task, animated: true),
                   onPrevious: () => _setIndex(
                     clampedIndex - 1,
@@ -1080,6 +1088,8 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
 
     _lastUndoTask = task;
     _lastUndoFrom = TaskStatus.trashed;
+    _lastUndoWasPeriodCompletion = false;
+    _lastUndoWasPartialCheckIn = false;
     _showUndoSnackbar(
       message: '已移至回收站',
       icon: Icons.delete_outline,
@@ -1088,6 +1098,36 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
 
     unawaited(triggerSyncIfSignedIn(ref));
     unawaited(_playTrashFeedback());
+  }
+
+  Future<void> _moveToSomeday(Task task, {bool animated = false}) async {
+    if (animated) {
+      await _animateFlyout(
+        const Offset(1.5, 0),
+        () => _performMoveToSomeday(task),
+        feedback: AppHaptics.none,
+      );
+    } else {
+      await _performMoveToSomeday(task);
+    }
+  }
+
+  Future<void> _performMoveToSomeday(Task task) async {
+    final repo = await ref.read(taskRepositoryProvider.future);
+    await repo.moveToSomeday(task.id);
+
+    _lastUndoTask = task;
+    _lastUndoFrom = TaskStatus.someday;
+    _lastUndoWasPeriodCompletion = false;
+    _lastUndoWasPartialCheckIn = false;
+    _showUndoSnackbar(
+      message: '已移至将来也许',
+      icon: Icons.lightbulb_outline,
+      type: AppSnackType.info,
+    );
+
+    unawaited(triggerSyncIfSignedIn(ref));
+    unawaited(AppHaptics.medium());
   }
 
   Future<void> _playTrashFeedback() async {
@@ -1163,6 +1203,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     VoidCallback? onSearch,
     VoidCallback? onShuffle,
     VoidCallback? onSaveTemplate,
+    VoidCallback? onDeleteCurrentTask,
   }) {
     final theme = Theme.of(context);
     return Padding(
@@ -1207,6 +1248,11 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
           TabMoreMenuButton<ProcessMoreAction>(
             items: [
               TabMoreMenuEntry.item(
+                value: ProcessMoreAction.someday,
+                icon: Icons.lightbulb_outline,
+                label: '将来也许',
+              ),
+              TabMoreMenuEntry.item(
                 value: ProcessMoreAction.archive,
                 icon: Icons.task_alt_outlined,
                 label: '已完成',
@@ -1216,30 +1262,34 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
                 icon: Icons.delete_outline,
                 label: '回收站',
               ),
-              TabMoreMenuEntry.item(
-                value: ProcessMoreAction.sync,
-                icon: Icons.sync_outlined,
-                label: '同步配置',
-              ),
-              if (onSaveTemplate != null) ...[
+              if (onSaveTemplate != null || onDeleteCurrentTask != null) ...[
                 const TabMoreMenuEntry.divider(),
-                TabMoreMenuEntry.item(
-                  value: ProcessMoreAction.saveTemplate,
-                  icon: Icons.bookmark_outline,
-                  label: '保存为模板',
-                ),
+                if (onSaveTemplate != null)
+                  TabMoreMenuEntry.item(
+                    value: ProcessMoreAction.saveTemplate,
+                    icon: Icons.bookmark_outline,
+                    label: '保存为模板',
+                  ),
+                if (onDeleteCurrentTask != null)
+                  TabMoreMenuEntry.item(
+                    value: ProcessMoreAction.delete,
+                    icon: Icons.delete_outline,
+                    label: '删除当前任务',
+                  ),
               ],
             ],
             onSelected: (action) {
               switch (action) {
+                case ProcessMoreAction.someday:
+                  context.push('/someday');
                 case ProcessMoreAction.archive:
                   context.push('/archive');
                 case ProcessMoreAction.trash:
                   context.push('/trash');
-                case ProcessMoreAction.sync:
-                  context.push('/auth');
                 case ProcessMoreAction.saveTemplate:
                   onSaveTemplate?.call();
+                case ProcessMoreAction.delete:
+                  onDeleteCurrentTask?.call();
               }
             },
           ),
