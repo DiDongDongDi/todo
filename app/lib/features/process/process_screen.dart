@@ -74,6 +74,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
   final List<TextEditingController> _editSubtaskControllers = [];
   bool _editSubtaskFocused = false;
   bool _savingEdit = false;
+  bool _shuffling = false;
 
   /// 与收集页一致：底部按钮组由焦点驱动；tab 不可见时一律视为非编辑 UI。
   bool get _editUiVisible =>
@@ -427,6 +428,37 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     }
   }
 
+  Future<void> _shuffleProcessQueue(List<Task> tasks) async {
+    if (tasks.length <= 1 || _shuffling || _editUiVisible) return;
+
+    setState(() => _shuffling = true);
+    try {
+      await _animateFlyout(const Offset(0, -1.5), () async {
+        final shuffled = List<Task>.from(tasks)..shuffle();
+        final repo = await ref.read(taskRepositoryProvider.future);
+        await repo.reorderInboxTasks(shuffled);
+        unawaited(triggerSyncIfSignedIn(ref));
+        await _waitForProcessTask(shuffled.first.id);
+        if (!mounted) return;
+        _editFocusNode.unfocus();
+        setState(() {
+          _index = 0;
+          _editing = false;
+        });
+        AppHaptics.medium();
+      });
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: '任务顺序已随机打散',
+        icon: Icons.shuffle,
+        type: AppSnackType.success,
+      );
+    } finally {
+      if (mounted) setState(() => _shuffling = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     ref.listen(volumeKeyShortcutsProvider, (_, __) => _syncVolumeKeyHandler());
@@ -534,6 +566,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
               archivedToday: archivedToday,
               todayOnly: todayOnly,
               onSearch: () => _openTaskSearch(tasks, task),
+              onShuffle: () => _shuffleProcessQueue(tasks),
               onSaveTemplate: () => _saveCurrentAsTemplate(task),
             ),
             Expanded(
@@ -1128,6 +1161,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     required int archivedToday,
     required bool todayOnly,
     VoidCallback? onSearch,
+    VoidCallback? onShuffle,
     VoidCallback? onSaveTemplate,
   }) {
     final theme = Theme.of(context);
@@ -1149,6 +1183,16 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
             icon: const Icon(Icons.search),
             tooltip: '搜索任务',
             onPressed: taskCount > 0 ? onSearch : null,
+          ),
+          IconButton(
+            icon: const Icon(Icons.shuffle),
+            tooltip: '随机打散',
+            onPressed: taskCount > 1 &&
+                    onShuffle != null &&
+                    !_editUiVisible &&
+                    !_shuffling
+                ? onShuffle
+                : null,
           ),
           IconButton(
             icon: Icon(
