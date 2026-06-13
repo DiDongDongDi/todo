@@ -1249,7 +1249,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     }
 
     if (target.parentId == null) {
-      final allTasks = [
+      final allTasks = <Task>[
         ...ref.read(inboxTasksProvider).value ?? [],
         ...ref.read(somedayTasksProvider).value ?? [],
       ];
