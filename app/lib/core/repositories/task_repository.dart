@@ -257,6 +257,7 @@ class TaskRepository {
   }
 
   Future<Task> update(Task task) async {
+    final previous = await _store.getById(task.id);
     final clampedCount = clampCheckInCount(task.checkInCount, task.checkInTarget);
     final normalized = clampedCount != task.checkInCount
         ? task.copyWith(checkInCount: clampedCount)
@@ -266,7 +267,40 @@ class TaskRepository {
       syncVersion: normalized.syncVersion + 1,
     );
     await _store.upsert(updated);
+
+    if (previous != null &&
+        !updated.isSubtask &&
+        _scheduleChanged(previous, updated)) {
+      await _propagateScheduleToSubtasks(previous, updated);
+    }
+
     return updated;
+  }
+
+  bool _scheduleChanged(Task before, Task after) {
+    return before.recurrence != after.recurrence ||
+        !_datesEqual(before.dueDate, after.dueDate) ||
+        !_datesEqual(before.dailyUntil, after.dailyUntil);
+  }
+
+  bool _datesEqual(DateTime? a, DateTime? b) {
+    if (a == null && b == null) return true;
+    if (a == null || b == null) return false;
+    return localDate(a) == localDate(b);
+  }
+
+  Future<void> _propagateScheduleToSubtasks(
+    Task parentBefore,
+    Task parentAfter,
+  ) async {
+    if (!isScheduled(parentAfter)) return;
+
+    final subtasks = await _allSubtasks(parentAfter.id);
+    for (final sub in subtasks) {
+      if (sub.status == TaskStatus.trashed) continue;
+      if (!subtaskShouldInheritParentSchedule(sub, parentBefore)) continue;
+      await update(applyParentSchedule(sub, parentAfter));
+    }
   }
 
   Future<Task> archive(String id) async {

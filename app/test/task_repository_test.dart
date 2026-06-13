@@ -194,4 +194,95 @@ void main() {
     expect(restoredSub1?.status, TaskStatus.inbox);
     expect(restoredSub2?.status, TaskStatus.archived);
   });
+
+  group('parent schedule propagation', () {
+    test('unscheduled subtasks inherit parent schedule on update', () async {
+      final parent = await repo.createInbox(title: 'Parent');
+      final sub = await repo.createSubtask(parentId: parent.id, title: 'Sub');
+
+      final due = DateTime(2026, 6, 15);
+      await repo.update(
+        parent.copyWith(
+          recurrence: TaskRecurrence.none,
+          dueDate: due,
+        ),
+      );
+
+      final updatedSub = await repo.getById(sub.id);
+      expect(updatedSub?.recurrence, TaskRecurrence.none);
+      expect(updatedSub?.dueDate, due);
+    });
+
+    test('inherited subtasks follow parent schedule change', () async {
+      final due1 = DateTime(2026, 6, 1);
+      final due2 = DateTime(2026, 6, 15);
+      final parent = await repo.createInbox(title: 'Parent');
+      final sub = await repo.createSubtask(parentId: parent.id, title: 'Sub');
+
+      await repo.update(
+        parent.copyWith(
+          recurrence: TaskRecurrence.none,
+          dueDate: due1,
+        ),
+      );
+
+      final inherited = await repo.getById(sub.id);
+      expect(inherited?.dueDate, due1);
+
+      await repo.update(
+        parent.copyWith(
+          recurrence: TaskRecurrence.none,
+          dueDate: due2,
+        ),
+      );
+
+      final updatedSub = await repo.getById(sub.id);
+      expect(updatedSub?.dueDate, due2);
+    });
+
+    test('subtask with own schedule is not overwritten', () async {
+      final parentDue = DateTime(2026, 6, 1);
+      final subDue = DateTime(2026, 7, 1);
+      final parent = await repo.createInbox(title: 'Parent');
+      final sub = await repo.createSubtask(
+        parentId: parent.id,
+        title: 'Sub',
+        recurrence: TaskRecurrence.none,
+        dueDate: subDue,
+      );
+
+      await repo.update(
+        parent.copyWith(
+          recurrence: TaskRecurrence.none,
+          dueDate: parentDue,
+        ),
+      );
+
+      final updatedSub = await repo.getById(sub.id);
+      expect(updatedSub?.dueDate, subDue);
+    });
+
+    test('clearing parent schedule does not clear subtask schedule', () async {
+      final due = DateTime(2026, 6, 15);
+      final parent = await repo.createInbox(title: 'Parent');
+      final sub = await repo.createSubtask(parentId: parent.id, title: 'Sub');
+
+      await repo.update(
+        parent.copyWith(
+          recurrence: TaskRecurrence.none,
+          dueDate: due,
+        ),
+      );
+
+      await repo.update(
+        parent.copyWith(
+          recurrence: TaskRecurrence.none,
+          clearDueDate: true,
+        ),
+      );
+
+      final updatedSub = await repo.getById(sub.id);
+      expect(updatedSub?.dueDate, due);
+    });
+  });
 }
