@@ -211,6 +211,11 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     if (!mounted) return;
     setState(() {});
     _syncVolumeKeyHandler();
+    if (_editing && !_editUiVisible) {
+      _editPendingFocus = true;
+      unawaited(_requestEditFocus());
+      return;
+    }
     _scheduleEditSessionCleanup();
   }
 

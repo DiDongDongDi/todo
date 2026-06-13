@@ -108,6 +108,45 @@ class _SubtaskTitleEditorState extends State<SubtaskTitleEditor> {
     super.dispose();
   }
 
+  bool _isPasteKeyEvent(KeyEvent event) {
+    if (event is! KeyDownEvent) return false;
+
+    final keyboard = HardwareKeyboard.instance;
+    final isModifierPaste = event.logicalKey == LogicalKeyboardKey.keyV &&
+        (keyboard.isControlPressed || keyboard.isMetaPressed);
+    final isShiftInsert = event.logicalKey == LogicalKeyboardKey.insert &&
+        keyboard.isShiftPressed;
+
+    return isModifierPaste || isShiftInsert;
+  }
+
+  KeyEventResult _handlePasteKey(int index, FocusNode node, KeyEvent event) {
+    if (!_isPasteKeyEvent(event)) return KeyEventResult.ignored;
+    unawaited(_handlePaste(index));
+    return KeyEventResult.handled;
+  }
+
+  Future<void> _handlePaste(int index) async {
+    if (_pasteHandling) return;
+    if (!mounted) return;
+    if (index < 0 || index >= widget.controllers.length) return;
+
+    _pasteHandling = true;
+    try {
+      final data = await Clipboard.getData(Clipboard.kTextPlain);
+      final raw = data?.text;
+      if (raw == null || raw.isEmpty) return;
+
+      await _importLinesFromClipboard(
+        index,
+        raw,
+        widget.controllers[index].value,
+      );
+    } finally {
+      _pasteHandling = false;
+    }
+  }
+
   void _pasteSingleLine(int index, String text) {
     final controller = widget.controllers[index];
     final selection = controller.selection;
@@ -292,7 +331,10 @@ class _SubtaskTitleEditorState extends State<SubtaskTitleEditor> {
   void _syncFocusNodes() {
     var changed = false;
     while (_focusNodes.length < widget.controllers.length) {
-      final node = FocusNode();
+      final index = _focusNodes.length;
+      final node = FocusNode(
+        onKeyEvent: (node, event) => _handlePasteKey(index, node, event),
+      );
       node.addListener(_notifyFocusChanged);
       _focusNodes.add(node);
       changed = true;
@@ -302,6 +344,11 @@ class _SubtaskTitleEditorState extends State<SubtaskTitleEditor> {
       node.removeListener(_notifyFocusChanged);
       node.dispose();
       changed = true;
+    }
+    for (var i = 0; i < _focusNodes.length; i++) {
+      final index = i;
+      _focusNodes[i].onKeyEvent =
+          (node, event) => _handlePasteKey(index, node, event);
     }
     if (changed) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -344,6 +391,28 @@ class _SubtaskTitleEditorState extends State<SubtaskTitleEditor> {
     widget.onAnyFieldFocusChanged?.call(anyFocused);
   }
 
+  Widget _buildContextMenu(
+    BuildContext context,
+    EditableTextState editableTextState,
+    int index,
+  ) {
+    final buttonItems = editableTextState.contextMenuButtonItems.map((item) {
+      if (item.type != ContextMenuButtonType.paste) return item;
+      return ContextMenuButtonItem(
+        onPressed: () {
+          ContextMenuController.removeAny();
+          unawaited(_handlePaste(index));
+        },
+        type: ContextMenuButtonType.paste,
+      );
+    }).toList();
+
+    return AdaptiveTextSelectionToolbar.buttonItems(
+      anchors: editableTextState.contextMenuAnchors,
+      buttonItems: buttonItems,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     _syncFocusNodes();
@@ -369,6 +438,8 @@ class _SubtaskTitleEditorState extends State<SubtaskTitleEditor> {
                   textInputAction: TextInputAction.next,
                   maxLines: 1,
                   inputFormatters: [_pasteFallbackFormatter(index)],
+                  contextMenuBuilder: (context, editableTextState) =>
+                      _buildContextMenu(context, editableTextState, index),
                   onSubmitted: (_) => _handleSubmitted(index),
                 ),
               ),
