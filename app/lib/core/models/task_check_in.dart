@@ -1,6 +1,14 @@
 import 'package:todo_app/core/models/task.dart';
 import 'package:todo_app/core/models/task_schedule.dart';
 
+/// 未启用多次打卡时的目标次数。
+const int defaultCheckInTarget = 1;
+
+/// 启用多次打卡时 UI 可选的最低次数。
+const int minActiveCheckInTarget = 2;
+
+const int maxCheckInTarget = 99;
+
 bool hasCheckInGoal(Task task) => task.checkInTarget > 1;
 
 bool isSameCheckInPeriod(
