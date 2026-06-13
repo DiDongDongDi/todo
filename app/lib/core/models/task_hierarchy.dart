@@ -44,11 +44,29 @@ bool hasOpenSubtasks(
   required bool todayOnly,
   DateTime? now,
 }) {
+  return hasOpenSubtasksInQueue(
+    parent,
+    all,
+    queueStatus: TaskStatus.inbox,
+    todayOnly: todayOnly,
+    now: now,
+  );
+}
+
+bool hasOpenSubtasksInQueue(
+  Task parent,
+  Iterable<Task> all, {
+  required TaskStatus queueStatus,
+  bool todayOnly = false,
+  DateTime? now,
+}) {
   return all.any(
     (t) =>
         t.parentId == parent.id &&
-        t.status == TaskStatus.inbox &&
-        shouldShowInProcess(t, todayOnly: todayOnly, now: now),
+        t.status == queueStatus &&
+        (queueStatus == TaskStatus.someday
+            ? true
+            : shouldShowInProcess(t, todayOnly: todayOnly, now: now)),
   );
 }
 

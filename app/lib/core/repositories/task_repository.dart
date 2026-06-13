@@ -7,7 +7,10 @@ import 'package:todo_app/core/models/task.dart';
 import 'package:todo_app/core/models/task_check_in.dart';
 import 'package:todo_app/core/models/task_hierarchy.dart';
 import 'package:todo_app/core/models/task_schedule.dart';
-import 'package:todo_app/core/settings/process_today_only_settings.dart';
+import 'package:todo_app/core/models/playlist_tasks.dart';
+import 'package:todo_app/core/models/task_playlist.dart';
+import 'package:todo_app/core/repositories/playlist_repository.dart';
+import 'package:todo_app/core/settings/process_queue_source_settings.dart';
 import 'package:uuid/uuid.dart';
 
 const _storageKey = 'todo_tasks_v1';
@@ -64,15 +67,74 @@ final inboxTasksProvider = StreamProvider<List<Task>>((ref) async* {
   yield* store.watchByStatus(TaskStatus.inbox);
 });
 
-final processTasksProvider = StreamProvider<List<Task>>((ref) async* {
-  final store = await ref.watch(taskStoreInitProvider.future);
-  final todayOnlyAsync = ref.watch(processTodayOnlyProvider);
-  final todayOnly = todayOnlyAsync.value ?? false;
+List<Task> resolveProcessQueueTasks({
+  required ProcessQueueSource source,
+  required List<Task> inbox,
+  required List<Task> someday,
+  required List<TaskPlaylist> playlists,
+  DateTime? now,
+}) {
+  final today = now ?? DateTime.now();
+  switch (source.kind) {
+    case ProcessQueueKind.inbox:
+      return filterProcessTasks(inbox, todayOnly: false, now: today);
+    case ProcessQueueKind.daily:
+      return filterProcessTasks(inbox, todayOnly: true, now: today);
+    case ProcessQueueKind.someday:
+      return filterSomedayTasks(someday, now: today);
+    case ProcessQueueKind.playlist:
+      final playlistId = source.playlistId;
+      if (playlistId == null) return const [];
+      TaskPlaylist? playlist;
+      for (final p in playlists) {
+        if (p.id == playlistId) {
+          playlist = p;
+          break;
+        }
+      }
+      if (playlist == null) return const [];
+      return resolvePlaylistTasks(
+        playlist: playlist,
+        inbox: inbox,
+        someday: someday,
+      );
+  }
+}
 
-  yield* store.watchByStatus(TaskStatus.inbox).map((tasks) {
-    final now = DateTime.now();
-    return filterProcessTasks(tasks, todayOnly: todayOnly, now: now);
-  });
+final processTasksProvider = Provider<AsyncValue<List<Task>>>((ref) {
+  final sourceAsync = ref.watch(processQueueSourceProvider);
+  final inboxAsync = ref.watch(inboxTasksProvider);
+  final somedayAsync = ref.watch(somedayTasksProvider);
+  final playlistsAsync = ref.watch(playlistsProvider);
+
+  if (sourceAsync.isLoading ||
+      inboxAsync.isLoading ||
+      somedayAsync.isLoading ||
+      playlistsAsync.isLoading) {
+    return const AsyncValue.loading();
+  }
+  if (sourceAsync.hasError) {
+    return AsyncValue.error(sourceAsync.error!, sourceAsync.stackTrace!);
+  }
+  if (inboxAsync.hasError) {
+    return AsyncValue.error(inboxAsync.error!, inboxAsync.stackTrace!);
+  }
+  if (somedayAsync.hasError) {
+    return AsyncValue.error(somedayAsync.error!, somedayAsync.stackTrace!);
+  }
+  if (playlistsAsync.hasError) {
+    return AsyncValue.error(playlistsAsync.error!, playlistsAsync.stackTrace!);
+  }
+
+  final source = sourceAsync.value ?? const ProcessQueueSource.inbox();
+  return AsyncValue.data(
+    resolveProcessQueueTasks(
+      source: source,
+      inbox: inboxAsync.value ?? [],
+      someday: somedayAsync.value ?? [],
+      playlists: playlistsAsync.value ?? [],
+    ),
+  );
 });
 
 final archivedTasksProvider = StreamProvider<List<Task>>((ref) async* {
