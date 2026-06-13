@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:todo_app/core/models/task_check_in.dart';
 
 Future<void> showTaskCheckInSheet(
   BuildContext context, {
@@ -37,15 +38,19 @@ class _TaskCheckInSheet extends StatefulWidget {
 }
 
 class _TaskCheckInSheetState extends State<_TaskCheckInSheet> {
-  static const _minTarget = 1;
-  static const _maxTarget = 99;
-
   late int _target;
 
   @override
   void initState() {
     super.initState();
-    _target = widget.initialTarget.clamp(_minTarget, _maxTarget);
+    _target = _initialSheetTarget(widget.initialTarget);
+  }
+
+  int _initialSheetTarget(int initialTarget) {
+    if (initialTarget <= defaultCheckInTarget) {
+      return minActiveCheckInTarget;
+    }
+    return initialTarget.clamp(minActiveCheckInTarget, maxCheckInTarget);
   }
 
   void _commit() {
@@ -53,8 +58,9 @@ class _TaskCheckInSheetState extends State<_TaskCheckInSheet> {
     Navigator.pop(context);
   }
 
-  void _clearCheckIn() {
-    setState(() => _target = 1);
+  void _cancelCheckIn() {
+    widget.onCommit(defaultCheckInTarget);
+    Navigator.pop(context);
   }
 
   @override
@@ -81,7 +87,7 @@ class _TaskCheckInSheetState extends State<_TaskCheckInSheet> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               IconButton.filledTonal(
-                onPressed: _target > _minTarget
+                onPressed: _target > minActiveCheckInTarget
                     ? () => setState(() => _target--)
                     : null,
                 icon: const Icon(Icons.remove),
@@ -94,7 +100,7 @@ class _TaskCheckInSheetState extends State<_TaskCheckInSheet> {
               ),
               const SizedBox(width: 24),
               IconButton.filledTonal(
-                onPressed: _target < _maxTarget
+                onPressed: _target < maxCheckInTarget
                     ? () => setState(() => _target++)
                     : null,
                 icon: const Icon(Icons.add),
@@ -108,8 +114,8 @@ class _TaskCheckInSheetState extends State<_TaskCheckInSheet> {
             child: const Text('完成'),
           ),
           TextButton(
-            onPressed: _clearCheckIn,
-            child: const Text('重置为 1 次'),
+            onPressed: _cancelCheckIn,
+            child: const Text('取消打卡'),
           ),
         ],
       ),
@@ -118,6 +124,6 @@ class _TaskCheckInSheetState extends State<_TaskCheckInSheet> {
 }
 
 String checkInEditorSummary(int checkInTarget) {
-  if (checkInTarget <= 1) return '打卡';
+  if (checkInTarget <= defaultCheckInTarget) return '打卡';
   return '打卡 · ${checkInTarget}次';
 }
