@@ -11,11 +11,13 @@ import 'package:todo_app/core/models/task_check_in.dart';
 import 'package:todo_app/core/models/task_display.dart';
 import 'package:todo_app/core/models/task_hierarchy.dart';
 import 'package:todo_app/core/models/task_schedule.dart';
+import 'package:todo_app/core/navigation/shell_navigation.dart';
+import 'package:todo_app/core/repositories/playlist_repository.dart';
 import 'package:todo_app/core/repositories/task_repository.dart';
 import 'package:todo_app/core/repositories/template_repository.dart';
+import 'package:todo_app/core/settings/process_queue_source_settings.dart';
 import 'package:todo_app/core/settings/process_sound_settings.dart';
-import 'package:todo_app/core/settings/process_today_only_settings.dart';
-import 'package:todo_app/core/settings/volume_key_handler.dart';
+import 'package:todo_app/features/ask_ai/ask_ai_sheet.dart';
 import 'package:todo_app/core/settings/volume_key_platform.dart';
 import 'package:todo_app/core/settings/volume_key_settings.dart';
 import 'package:todo_app/core/stats/stats_provider.dart';
@@ -30,14 +32,18 @@ import 'package:todo_app/shared/utils/platform_capabilities.dart';
 import 'package:todo_app/shared/widgets/app_snackbar.dart';
 import 'package:todo_app/shared/widgets/big_task_card.dart';
 import 'package:todo_app/shared/widgets/card_stage.dart';
+import 'package:todo_app/shared/widgets/process_queue_selector.dart';
 import 'package:todo_app/shared/widgets/process_task_search_sheet.dart';
 import 'package:todo_app/shared/widgets/progress_widgets.dart';
+import 'package:todo_app/shared/widgets/save_playlist_dialog.dart';
 import 'package:todo_app/shared/widgets/save_template_dialog.dart';
+import 'package:todo_app/shared/widgets/task_multi_select_sheet.dart';
 import 'package:todo_app/shared/widgets/subtask_editor.dart';
 import 'package:todo_app/shared/widgets/swipeable_card.dart';
 import 'package:todo_app/shared/widgets/tab_more_menu_button.dart';
 import 'package:todo_app/shared/widgets/task_check_in_editor.dart';
 import 'package:todo_app/shared/widgets/task_schedule_editor.dart';
+import 'package:todo_app/core/settings/volume_key_handler.dart';
 
 class ProcessScreen extends ConsumerStatefulWidget {
   const ProcessScreen({super.key, this.isActive = true});
@@ -59,6 +65,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
   TaskStatus? _lastUndoFrom;
   bool _lastUndoWasPeriodCompletion = false;
   bool _lastUndoWasPartialCheckIn = false;
+  bool _lastUndoWasRestoreToInbox = false;
 
   TaskRecurrence _editRecurrence = TaskRecurrence.none;
   DateTime? _editDailyUntil;
@@ -337,7 +344,8 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     final enterFromRight = from == TaskStatus.archived ||
         from == TaskStatus.someday ||
         wasPeriod ||
-        wasPartialCheckIn;
+        wasPartialCheckIn ||
+        _lastUndoWasRestoreToInbox;
     if (!enterFromLeft && !enterFromRight) return;
 
     Future<void> restoreAndSwitch() async {
@@ -350,6 +358,8 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
         } else {
           await repo.undoDailyCompletion(task.id);
         }
+      } else if (_lastUndoWasRestoreToInbox) {
+        await repo.moveToSomeday(task.id);
       } else if (hasCheckInGoal(task)) {
         await repo.undoCheckIn(task.id, wasFinalCompletion: true);
       } else {
@@ -366,8 +376,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
       _lastUndoFrom = null;
       _lastUndoWasPeriodCompletion = false;
       _lastUndoWasPartialCheckIn = false;
-
-      _editFocusNode.unfocus();
+      _lastUndoWasRestoreToInbox = false;
       setState(() {
         _index = index;
         _editing = false;
@@ -465,12 +474,19 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
   @override
   Widget build(BuildContext context) {
     ref.listen(volumeKeyShortcutsProvider, (_, __) => _syncVolumeKeyHandler());
+    ref.listen(processNavigationIntentProvider, (previous, next) {
+      if (next == null) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (!mounted) return;
+        await _handleNavigationIntent(next);
+      });
+    });
 
     final tasksAsync = ref.watch(processTasksProvider);
-    final todayOnlyAsync = ref.watch(processTodayOnlyProvider);
+    final queueSourceAsync = ref.watch(processQueueSourceProvider);
     final statsAsync = ref.watch(statsProvider);
     final touchFirst = isTouchFirstPlatform;
-    final todayOnly = todayOnlyAsync.value ?? false;
+    final queueSource = queueSourceAsync.value ?? const ProcessQueueSource.inbox();
 
     return tasksAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -484,16 +500,13 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
                 context,
                 taskCount: 0,
                 archivedToday: statsAsync.value?.archivedToday ?? 0,
-                todayOnly: todayOnly,
               ),
               Expanded(
                 child: Center(
                   child: Padding(
                     padding: const EdgeInsets.all(32),
                     child: Text(
-                      todayOnly
-                          ? '今天没有计划任务'
-                          : '收集箱是空的，去收集页记一条吧',
+                      _emptyQueueMessage(queueSource),
                       textAlign: TextAlign.center,
                       style: const TextStyle(fontSize: 18),
                     ),
@@ -536,6 +549,8 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
           }
         }
 
+        final isSomedayQueue = queueSource.kind == ProcessQueueKind.someday;
+
         final shortcuts = _editUiVisible
             ? {
                 const SingleActivator(
@@ -553,7 +568,9 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
                 const SingleActivator(LogicalKeyboardKey.arrowLeft): () =>
                     _archive(task, animated: true),
                 const SingleActivator(LogicalKeyboardKey.arrowRight): () =>
-                    _moveToSomeday(task, animated: true),
+                    isSomedayQueue
+                        ? _restoreToInbox(task, animated: true)
+                        : _moveToSomeday(task, animated: true),
                 const SingleActivator(LogicalKeyboardKey.arrowUp): () =>
                     _setIndex(clampedIndex - 1, tasks.length, animated: true),
                 const SingleActivator(LogicalKeyboardKey.arrowDown): () =>
@@ -567,9 +584,9 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
               context,
               taskCount: tasks.length,
               archivedToday: archivedToday,
-              todayOnly: todayOnly,
               onSearch: () => _openTaskSearch(tasks, task),
               onShuffle: () => _shuffleProcessQueue(tasks),
+              onAskAi: () => showAskAiSheet(context, ref),
               onSaveTemplate: () => _saveCurrentAsTemplate(task),
               onDeleteCurrentTask: () => _trash(task, animated: true),
             ),
@@ -580,7 +597,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
                 verticalEnterAnimation: true,
                 onFlyoutFeedback: AppHaptics.none,
                 leftLabel: '完成',
-                rightLabel: '将来也许',
+                rightLabel: isSomedayQueue ? '移回收集箱' : '将来也许',
                 leftBandColor: context.semanticColors.success,
                 rightBandColor: Theme.of(context).colorScheme.primary,
                 shouldAnimateFlyout: (flyout) async {
@@ -588,7 +605,9 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
                   return true;
                 },
                 onSwipeLeft: () => _archive(task),
-                onSwipeRight: () => _moveToSomeday(task),
+                onSwipeRight: () => isSomedayQueue
+                    ? _restoreToInbox(task)
+                    : _moveToSomeday(task),
                 onSwipeUp: () =>
                     _setIndex(clampedIndex + 1, tasks.length),
                 onSwipeDown: () =>
@@ -634,7 +653,9 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
                           onTransientUiClosed: _endTransientEditUi,
                         )
                       : null,
-                  onSomeday: () => _moveToSomeday(task, animated: true),
+                  onSomeday: () => isSomedayQueue
+                      ? _restoreToInbox(task, animated: true)
+                      : _moveToSomeday(task, animated: true),
                   onComplete: () => _archive(task, animated: true),
                   onPrevious: () => _setIndex(
                     clampedIndex - 1,
@@ -1130,6 +1151,37 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     unawaited(AppHaptics.medium());
   }
 
+  Future<void> _restoreToInbox(Task task, {bool animated = false}) async {
+    if (animated) {
+      await _animateFlyout(
+        const Offset(1.5, 0),
+        () => _performRestoreToInbox(task),
+        feedback: AppHaptics.none,
+      );
+    } else {
+      await _performRestoreToInbox(task);
+    }
+  }
+
+  Future<void> _performRestoreToInbox(Task task) async {
+    final repo = await ref.read(taskRepositoryProvider.future);
+    await repo.restoreToInbox(task.id);
+
+    _lastUndoTask = task;
+    _lastUndoFrom = TaskStatus.inbox;
+    _lastUndoWasPeriodCompletion = false;
+    _lastUndoWasPartialCheckIn = false;
+    _lastUndoWasRestoreToInbox = true;
+    _showUndoSnackbar(
+      message: '已移回收集箱',
+      icon: Icons.inbox_outlined,
+      type: AppSnackType.success,
+    );
+
+    unawaited(triggerSyncIfSignedIn(ref));
+    unawaited(AppHaptics.medium());
+  }
+
   Future<void> _playTrashFeedback() async {
     final settings = await ref.read(processSoundProvider.future);
     await Future.wait([
@@ -1160,12 +1212,32 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
       return;
     }
 
-    final todayOnly = ref.read(processTodayOnlyProvider).value ?? false;
-    if (todayOnly) {
+    final neededSource = target.status == TaskStatus.someday
+        ? const ProcessQueueSource(kind: ProcessQueueKind.someday)
+        : const ProcessQueueSource.inbox();
+    final currentSource =
+        ref.read(processQueueSourceProvider).value ?? const ProcessQueueSource.inbox();
+
+    if (currentSource != neededSource) {
+      await ref.read(processQueueSourceProvider.notifier).setSource(neededSource);
+      processTasks = await _waitForProcessTask(target.id);
+      if (!mounted) return;
+      index = processTasks.indexWhere((t) => t.id == target.id);
+      if (index >= 0) {
+        await _setIndex(index, processTasks.length, animated: true);
+        return;
+      }
+    }
+
+    final queueSource = ref.read(processQueueSourceProvider).value ??
+        const ProcessQueueSource.inbox();
+    if (queueSource.kind == ProcessQueueKind.daily) {
       final inbox = ref.read(inboxTasksProvider).value ?? [];
-      final unfiltered = filterProcessTasks(inbox, todayOnly: false);
-      if (unfiltered.any((t) => t.id == target.id)) {
-        await ref.read(processTodayOnlyProvider.notifier).setEnabled(false);
+      final inInbox = inbox.any((t) => t.id == target.id);
+      if (inInbox) {
+        await ref
+            .read(processQueueSourceProvider.notifier)
+            .setSource(const ProcessQueueSource.inbox());
         processTasks = await _waitForProcessTask(target.id);
         if (!mounted) return;
         index = processTasks.indexWhere((t) => t.id == target.id);
@@ -1177,9 +1249,12 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     }
 
     if (target.parentId == null) {
-      final inbox = ref.read(inboxTasksProvider).value ?? [];
-      final todayOnly = ref.read(processTodayOnlyProvider).value ?? false;
-      if (hasOpenSubtasks(target, inbox, todayOnly: todayOnly)) {
+      final allTasks = [
+        ...ref.read(inboxTasksProvider).value ?? [],
+        ...ref.read(somedayTasksProvider).value ?? [],
+      ];
+      final todayOnly = queueSource.kind == ProcessQueueKind.daily;
+      if (hasOpenSubtasks(target, allTasks, todayOnly: todayOnly)) {
         if (!mounted) return;
         context.push('/task/${target.id}');
         return;
@@ -1195,13 +1270,85 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     );
   }
 
+  Future<void> _handleNavigationIntent(ProcessNavigationIntent intent) async {
+    await ref
+        .read(processQueueSourceProvider.notifier)
+        .setSource(intent.queueSource);
+    final tasks = await _waitForProcessTask(intent.taskId);
+    if (!mounted) return;
+    final index = tasks.indexWhere((t) => t.id == intent.taskId);
+    if (index >= 0) {
+      await _setIndex(index, tasks.length, animated: true);
+    }
+    ref.read(processNavigationIntentProvider.notifier).state = null;
+  }
+
+  String _emptyQueueMessage(ProcessQueueSource source) {
+    return switch (source.kind) {
+      ProcessQueueKind.inbox => '收集箱是空的，去收集页记一条吧',
+      ProcessQueueKind.daily => '今天没有计划任务',
+      ProcessQueueKind.someday => '将来也许列表是空的',
+      ProcessQueueKind.playlist => '该清单暂无可用任务',
+    };
+  }
+
+  Future<void> _createPlaylistManually() async {
+    final inbox = ref.read(inboxTasksProvider).value ?? [];
+    final someday = ref.read(somedayTasksProvider).value ?? [];
+    final selectable = [
+      ...inbox.where((t) => t.parentId == null),
+      ...someday.where((t) => t.parentId == null),
+    ];
+    if (selectable.isEmpty) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: '收集箱和将来也许中暂无任务',
+        icon: Icons.info_outline,
+        type: AppSnackType.info,
+      );
+      return;
+    }
+
+    final selected = await showTaskMultiSelectSheet(
+      context,
+      tasks: selectable,
+    );
+    if (selected == null || selected.isEmpty || !mounted) return;
+
+    final name = await showSavePlaylistDialog(context, defaultTitle: '我的清单');
+    if (name == null || !mounted) return;
+
+    final repo = await ref.read(playlistRepositoryProvider.future);
+    final playlist = await repo.createFromTaskIds(
+      title: name,
+      taskIds: selected.map((t) => t.id).toList(),
+    );
+    unawaited(triggerSyncIfSignedIn(ref));
+
+    await ref.read(processQueueSourceProvider.notifier).setSource(
+          ProcessQueueSource(
+            kind: ProcessQueueKind.playlist,
+            playlistId: playlist.id,
+          ),
+        );
+
+    if (!mounted) return;
+    showAppSnackBar(
+      context,
+      message: '已创建任务清单',
+      icon: Icons.playlist_add_check_outlined,
+      type: AppSnackType.success,
+    );
+  }
+
   Widget _buildTopBar(
     BuildContext context, {
     required int taskCount,
     required int archivedToday,
-    required bool todayOnly,
     VoidCallback? onSearch,
     VoidCallback? onShuffle,
+    VoidCallback? onAskAi,
     VoidCallback? onSaveTemplate,
     VoidCallback? onDeleteCurrentTask,
   }) {
@@ -1235,18 +1382,25 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
                 ? onShuffle
                 : null,
           ),
-          IconButton(
-            icon: Icon(
-              todayOnly ? Icons.today : Icons.today_outlined,
-              color: todayOnly ? theme.colorScheme.primary : null,
+          if (onAskAi != null)
+            IconButton(
+              icon: const Icon(Icons.auto_awesome_outlined),
+              tooltip: '问 AI',
+              onPressed: onAskAi,
             ),
-            tooltip: '只看今日',
-            onPressed: () => ref
-                .read(processTodayOnlyProvider.notifier)
-                .setEnabled(!todayOnly),
-          ),
+          const ProcessQueueSelector(),
           TabMoreMenuButton<ProcessMoreAction>(
             items: [
+              TabMoreMenuEntry.item(
+                value: ProcessMoreAction.askAi,
+                icon: Icons.auto_awesome,
+                label: '问 AI',
+              ),
+              TabMoreMenuEntry.item(
+                value: ProcessMoreAction.createPlaylist,
+                icon: Icons.playlist_add,
+                label: '创建任务清单',
+              ),
               TabMoreMenuEntry.item(
                 value: ProcessMoreAction.someday,
                 icon: Icons.lightbulb_outline,
@@ -1261,6 +1415,11 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
                 value: ProcessMoreAction.trash,
                 icon: Icons.delete_outline,
                 label: '回收站',
+              ),
+              TabMoreMenuEntry.item(
+                value: ProcessMoreAction.sync,
+                icon: Icons.sync_outlined,
+                label: '同步配置',
               ),
               if (onSaveTemplate != null || onDeleteCurrentTask != null) ...[
                 const TabMoreMenuEntry.divider(),
@@ -1280,12 +1439,18 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
             ],
             onSelected: (action) {
               switch (action) {
+                case ProcessMoreAction.askAi:
+                  onAskAi?.call();
+                case ProcessMoreAction.createPlaylist:
+                  unawaited(_createPlaylistManually());
                 case ProcessMoreAction.someday:
                   context.push('/someday');
                 case ProcessMoreAction.archive:
                   context.push('/archive');
                 case ProcessMoreAction.trash:
                   context.push('/trash');
+                case ProcessMoreAction.sync:
+                  context.push('/auth');
                 case ProcessMoreAction.saveTemplate:
                   onSaveTemplate?.call();
                 case ProcessMoreAction.delete:

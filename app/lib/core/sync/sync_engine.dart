@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:todo_app/core/auth/auth_service.dart';
 import 'package:todo_app/core/models/task.dart';
 import 'package:todo_app/core/models/task_template.dart';
+import 'package:todo_app/core/models/task_playlist.dart';
+import 'package:todo_app/core/repositories/playlist_repository.dart';
 import 'package:todo_app/core/repositories/task_repository.dart';
 import 'package:todo_app/core/repositories/template_repository.dart';
 import 'package:todo_app/core/sync/attachment_upload_service.dart';
@@ -97,6 +99,12 @@ class SyncEngine {
       final remoteTemplates = await repo.pullTemplates();
       await _mergeRemoteTemplates(templateRepo, remoteTemplates);
 
+      final playlistRepo = await _ref.read(playlistRepositoryProvider.future);
+      final localPlaylists = await playlistRepo.getAll();
+      await repo.pushPlaylists(localPlaylists);
+      final remotePlaylists = await repo.pullPlaylists();
+      await _mergeRemotePlaylists(playlistRepo, remotePlaylists);
+
       await _ref.read(transcriptionServiceProvider).processPendingTasks();
       _ref.read(lastSyncAtProvider.notifier).state = DateTime.now();
       _ref.read(syncStatusProvider.notifier).state = SyncStatus.idle;
@@ -178,6 +186,23 @@ class SyncEngine {
         await templateRepo.upsertRemote(r);
       } else if (r.updatedAt.isAfter(l.updatedAt)) {
         await templateRepo.upsertRemote(r);
+      }
+    }
+  }
+
+  Future<void> _mergeRemotePlaylists(
+    PlaylistRepository playlistRepo,
+    List<TaskPlaylist> remote,
+  ) async {
+    final local = await playlistRepo.getAll();
+    final localMap = {for (final p in local) p.id: p};
+
+    for (final r in remote) {
+      final l = localMap[r.id];
+      if (l == null) {
+        await playlistRepo.upsertRemote(r);
+      } else if (r.updatedAt.isAfter(l.updatedAt)) {
+        await playlistRepo.upsertRemote(r);
       }
     }
   }

@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:todo_app/core/models/legacy_note_migration.dart';
 import 'package:todo_app/core/models/task.dart';
+import 'package:todo_app/core/models/task_playlist.dart';
 import 'package:todo_app/core/models/task_template.dart';
 
 class SyncRepository {
@@ -10,6 +11,7 @@ class SyncRepository {
 
   static const _tasksTable = 'tasks';
   static const _templatesTable = 'task_templates';
+  static const _playlistsTable = 'task_playlists';
 
   Future<void> pushTasks(List<Task> tasks) async {
     final userId = _client.auth.currentUser?.id;
@@ -75,6 +77,39 @@ class SyncRepository {
         .toList();
   }
 
+  Future<void> pushPlaylists(List<TaskPlaylist> playlists) async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) return;
+    if (playlists.isEmpty) return;
+
+    final rows = playlists.map((p) {
+      final json = p.toJson();
+      json['user_id'] = userId;
+      return json;
+    }).toList();
+
+    await _client.from(_playlistsTable).upsert(rows);
+  }
+
+  Future<List<TaskPlaylist>> pullPlaylists() async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) return [];
+
+    final response = await _client
+        .from(_playlistsTable)
+        .select()
+        .eq('user_id', userId)
+        .order('updated_at', ascending: false);
+
+    return (response as List<dynamic>)
+        .map(
+          (e) => TaskPlaylist.fromJson(
+            _normalizePlaylistRemote(Map<String, dynamic>.from(e as Map)),
+          ),
+        )
+        .toList();
+  }
+
   Map<String, dynamic> _normalizeTaskRemote(Map<String, dynamic> row) {
     final migrated = migrateLegacyNoteInMap(Map<String, dynamic>.from(row));
     return {
@@ -120,6 +155,19 @@ class SyncRepository {
       'updated_at': migrated['updated_at'],
       'sync_version': migrated['sync_version'] ?? 0,
       'check_in_target': migrated['check_in_target'] ?? 1,
+    };
+  }
+
+  Map<String, dynamic> _normalizePlaylistRemote(Map<String, dynamic> row) {
+    return {
+      'id': row['id'],
+      'user_id': row['user_id'],
+      'title': row['title'] ?? '',
+      'task_ids': row['task_ids'] is List ? row['task_ids'] : [],
+      'source_query': row['source_query'],
+      'created_at': row['created_at'],
+      'updated_at': row['updated_at'],
+      'sync_version': row['sync_version'] ?? 0,
     };
   }
 

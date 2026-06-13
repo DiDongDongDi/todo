@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:todo_app/core/navigation/shell_navigation.dart';
 import 'package:todo_app/features/collect/collect_screen.dart';
 import 'package:todo_app/features/process/process_screen.dart';
 import 'package:todo_app/features/settings/settings_screen.dart';
@@ -13,7 +14,7 @@ class ShellScreen extends ConsumerStatefulWidget {
 }
 
 class _ShellScreenState extends ConsumerState<ShellScreen> {
-  int _index = 0;
+  int get _index => ref.watch(shellTabIndexProvider);
 
   Widget _tabPage(int index, Widget child) {
     final visible = _index == index;
@@ -61,8 +62,7 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
           selectedIndex: _index,
           onDestinationSelected: (i) {
             if (i == _index) return;
-            FocusManager.instance.primaryFocus?.unfocus();
-            setState(() => _index = i);
+            ref.read(shellTabIndexProvider.notifier).state = i;
           },
           destinations: const [
             NavigationDestination(
