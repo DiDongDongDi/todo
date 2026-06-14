@@ -294,17 +294,19 @@ class _CardDeckTransitionState extends State<CardDeckTransition>
                       slide: _bottomSlide,
                     ),
                   if (widget.topChild != null)
-                    Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        _wrapChild(
-                          sizedChild(widget.topChild),
-                          scale: _topScale,
-                          fade: _topFade,
-                          slide: _topSlide,
+                    _wrapChild(
+                      sizedChild(
+                        Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            widget.topChild!,
+                            if (isDelete) _buildDeleteOverlay(context),
+                          ],
                         ),
-                        if (isDelete) _buildDeleteOverlay(context),
-                      ],
+                      ),
+                      scale: _topScale,
+                      fade: _topFade,
+                      slide: _topSlide,
                     ),
                 ],
               ),
