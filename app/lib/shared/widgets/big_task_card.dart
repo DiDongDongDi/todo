@@ -112,48 +112,51 @@ class BigTaskCard extends StatelessWidget {
         elevation: 0,
         borderRadius: BorderRadius.circular(20),
         clipBehavior: Clip.none,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
                 child: _buildContentArea(context),
               ),
-              if (mode == BigTaskCardMode.collect)
-                _keyboardLiftedFooter(
-                  context,
-                  [
-                    const SizedBox(height: 8),
-                    _buildScheduleCheckInEditorsRow(
-                      scheduleEditor: scheduleEditor,
-                      checkInEditor: checkInEditor,
-                    ),
-                    const SizedBox(height: 16),
-                    _buildToolbarRow(
+            ),
+            if (mode == BigTaskCardMode.collect)
+              _keyboardLiftedFooter(
+                context,
+                [
+                  const SizedBox(height: 8),
+                  _buildScheduleCheckInEditorsRow(
+                    scheduleEditor: scheduleEditor,
+                    checkInEditor: checkInEditor,
+                  ),
+                  const SizedBox(height: 16),
+                  _buildToolbarRow(
+                    context,
+                    showCancel: editing,
+                  ),
+                ],
+              )
+            else if (mode == BigTaskCardMode.process && task != null)
+              editing
+                  ? _keyboardLiftedFooter(
                       context,
-                      showCancel: editing,
-                    ),
-                  ],
-                )
-              else if (mode == BigTaskCardMode.process && task != null)
-                editing
-                    ? _keyboardLiftedFooter(
-                        context,
-                        [
-                          const SizedBox(height: 12),
-                          _buildScheduleCheckInEditorsRow(
-                            scheduleEditor: scheduleEditor,
-                            checkInEditor: checkInEditor,
-                          ),
-                          const SizedBox(height: 8),
-                          _buildToolbarRow(
-                            context,
-                            showCancel: true,
-                          ),
-                        ],
-                      )
-                    : Column(
+                      [
+                        const SizedBox(height: 12),
+                        _buildScheduleCheckInEditorsRow(
+                          scheduleEditor: scheduleEditor,
+                          checkInEditor: checkInEditor,
+                        ),
+                        const SizedBox(height: 8),
+                        _buildToolbarRow(
+                          context,
+                          showCancel: true,
+                        ),
+                      ],
+                    )
+                  : Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
+                      child: Column(
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
@@ -200,8 +203,8 @@ class BigTaskCard extends StatelessWidget {
                           ),
                         ],
                       ),
-            ],
-          ),
+                    ),
+          ],
         ),
       ),
     );
@@ -300,9 +303,10 @@ class BigTaskCard extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     return KeyboardLift(
       bottomObstruction: shellBottomObstruction(context),
+      backgroundColor: colorScheme.surfaceContainerHighest,
       child: SuppressTapHaptic(
-        child: ColoredBox(
-          color: colorScheme.surfaceContainerHighest,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
