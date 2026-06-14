@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:todo_app/core/limits/resource_limits.dart';
 import 'package:todo_app/core/models/task.dart';
 import 'package:todo_app/core/repositories/task_repository.dart';
 import 'package:todo_app/core/repositories/template_repository.dart';
@@ -11,6 +12,7 @@ import 'package:todo_app/core/settings/collect_sound_settings.dart';
 import 'package:todo_app/core/settings/volume_key_handler.dart';
 import 'package:todo_app/core/settings/volume_key_platform.dart';
 import 'package:todo_app/core/settings/volume_key_settings.dart';
+import 'package:todo_app/core/sync/attachment_upload_service.dart';
 import 'package:todo_app/core/sync/sync_engine.dart';
 import 'package:todo_app/core/transcription/transcription_service.dart';
 import 'package:todo_app/shared/utils/app_audio_recorder.dart';
@@ -45,6 +47,7 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
   late final FocusNode _focusNode;
   final _swipeKey = GlobalKey<SwipeableCardState>();
   final _audioRecorder = AppAudioRecorder();
+  final _attachmentUpload = AttachmentUploadService();
 
   bool _recording = false;
   final List<TaskAttachment> _attachments = [];
@@ -379,6 +382,14 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
       if (!mounted) return;
 
       _showSaveSnackbar();
+    } on TaskLimitExceededException catch (e) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: e.message,
+        icon: Icons.info_outline,
+        type: AppSnackType.warning,
+      );
     } finally {
       _focusNode.unfocus();
       _saving = false;
@@ -422,6 +433,17 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
   }
 
   Future<void> _pickImage() async {
+    if (_attachments.length >= ResourceLimits.maxAttachmentsPerTask) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: ResourceLimits.attachmentsPerTaskExceededMessage,
+        icon: Icons.info_outline,
+        type: AppSnackType.info,
+      );
+      return;
+    }
+
     final picker = ImagePicker();
     final file = await picker.pickImage(source: ImageSource.gallery);
     if (file == null) return;
@@ -432,6 +454,21 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
       showAppSnackBar(
         context,
         message: '无法读取所选图片',
+        icon: Icons.error_outline,
+        type: AppSnackType.error,
+      );
+      return;
+    }
+
+    try {
+      await _attachmentUpload.validateAttachmentSize(
+        TaskAttachment(type: AttachmentType.image, localPath: localPath),
+      );
+    } on AttachmentLimitException catch (e) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: e.message,
         icon: Icons.error_outline,
         type: AppSnackType.error,
       );
@@ -471,6 +508,34 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
           context,
           message: '录音失败，请检查麦克风权限',
           icon: Icons.mic_off_outlined,
+          type: AppSnackType.error,
+        );
+        return;
+      }
+
+      if (_attachments.length >= ResourceLimits.maxAttachmentsPerTask) {
+        showAppSnackBar(
+          context,
+          message: ResourceLimits.attachmentsPerTaskExceededMessage,
+          icon: Icons.info_outline,
+          type: AppSnackType.info,
+        );
+        return;
+      }
+
+      try {
+        await _attachmentUpload.validateAttachmentSize(
+          TaskAttachment(
+            type: AttachmentType.audio,
+            localPath: result.path,
+            duration: result.durationSeconds,
+          ),
+        );
+      } on AttachmentLimitException catch (e) {
+        showAppSnackBar(
+          context,
+          message: e.message,
+          icon: Icons.error_outline,
           type: AppSnackType.error,
         );
         return;

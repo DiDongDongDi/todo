@@ -1,4 +1,13 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import {
+  checkRateLimit,
+  createAdminClient,
+  rateLimitConfigFor,
+} from "../_shared/rate_limit.ts";
+import {
+  selectTasksWithinBudget,
+  type TaskSummary,
+} from "../_shared/task_budget.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -6,7 +15,9 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-type TaskSummary = { id: string; title: string; status: string };
+const QUERY_MAX_LENGTH = Number(
+  Deno.env.get("AI_RECOMMEND_QUERY_MAX") ?? "500",
+);
 
 type LLMProvider = {
   recommend(query: string, tasks: TaskSummary[]): Promise<{
@@ -163,26 +174,54 @@ Deno.serve(async (req) => {
 
     const body = await req.json();
     const query = body.query as string | undefined;
-    const tasks = body.tasks as TaskSummary[] | undefined;
 
     if (!query?.trim()) {
       return jsonError("query is required", 400);
     }
-    if (!Array.isArray(tasks)) {
-      return jsonError("tasks array is required", 400);
+
+    const trimmedQuery = query.trim();
+    if (trimmedQuery.length > QUERY_MAX_LENGTH) {
+      return jsonError(`query must be at most ${QUERY_MAX_LENGTH} characters`, 400);
     }
 
-    const sanitized: TaskSummary[] = tasks
-      .filter((t) => t?.id && t?.title)
-      .map((t) => ({
-        id: String(t.id),
-        title: String(t.title).slice(0, 500),
-        status: String(t.status ?? "inbox"),
-      }))
-      .slice(0, 200);
+    const adminClient = createAdminClient();
+    const rateLimit = await checkRateLimit(
+      adminClient,
+      user.id,
+      "recommend",
+      rateLimitConfigFor("recommend"),
+    );
+    if (!rateLimit.ok) {
+      return jsonError(rateLimit.message, 429);
+    }
+
+    const { data: rawTasks, error: tasksError } = await userClient
+      .from("tasks")
+      .select("id, title, status")
+      .eq("user_id", user.id)
+      .in("status", ["inbox", "someday"])
+      .is("deleted_at", null)
+      .is("parent_id", null)
+      .order("updated_at", { ascending: false });
+
+    if (tasksError) {
+      console.error("recommend-tasks fetch tasks error:", tasksError);
+      return jsonError("Failed to load tasks", 500);
+    }
+
+    const allTasks: TaskSummary[] = (rawTasks ?? []).map((t) => ({
+      id: String(t.id),
+      title: String(t.title ?? ""),
+      status: String(t.status ?? "inbox"),
+    }));
+
+    const tasks = selectTasksWithinBudget(allTasks);
+    if (tasks.length === 0) {
+      return jsonError("暂无任务可推荐", 400);
+    }
 
     const llm = createLLMProvider();
-    const result = await llm.recommend(query.trim(), sanitized);
+    const result = await llm.recommend(trimmedQuery, tasks);
 
     return jsonResponse(result);
   } catch (e) {

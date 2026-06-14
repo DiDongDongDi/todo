@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:todo_app/core/limits/resource_limits.dart';
 import 'package:todo_app/core/models/legacy_note_migration.dart';
 import 'package:todo_app/core/models/task.dart';
 import 'package:todo_app/core/models/task_playlist.dart';
@@ -25,7 +26,14 @@ class SyncRepository {
       return json;
     }).toList();
 
-    await _client.from(_tasksTable).upsert(rows);
+    try {
+      await _client.from(_tasksTable).upsert(rows);
+    } on PostgrestException catch (e) {
+      if (ResourceLimits.isTaskLimitError(e)) {
+        throw TaskLimitExceededException();
+      }
+      rethrow;
+    }
   }
 
   Future<List<Task>> pullTasks() async {

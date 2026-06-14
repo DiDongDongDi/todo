@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:todo_app/core/ai/recommend_service.dart';
 import 'package:todo_app/core/auth/auth_service.dart';
+import 'package:todo_app/core/limits/resource_limits.dart';
 import 'package:todo_app/core/models/task.dart';
 import 'package:todo_app/core/navigation/shell_navigation.dart';
 import 'package:todo_app/core/repositories/playlist_repository.dart';
@@ -26,6 +27,7 @@ class AskAiScreen extends ConsumerStatefulWidget {
 class _AskAiScreenState extends ConsumerState<AskAiScreen> {
   final _queryController = TextEditingController();
   bool _loading = false;
+  bool _cooldown = false;
   RecommendResult? _result;
   String? _error;
 
@@ -36,7 +38,7 @@ class _AskAiScreenState extends ConsumerState<AskAiScreen> {
   }
 
   Future<void> _submit() async {
-    if (_loading) return;
+    if (_loading || _cooldown) return;
     setState(() {
       _loading = true;
       _error = null;
@@ -50,7 +52,14 @@ class _AskAiScreenState extends ConsumerState<AskAiScreen> {
       setState(() {
         _result = result;
         _loading = false;
+        _cooldown = true;
       });
+      Future<void>.delayed(
+        const Duration(milliseconds: ResourceLimits.aiSubmitCooldownMs),
+        () {
+          if (mounted) setState(() => _cooldown = false);
+        },
+      );
     } on RecommendException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -203,6 +212,7 @@ class _AskAiScreenState extends ConsumerState<AskAiScreen> {
                 enabled: signedIn && !_loading,
                 maxLines: 4,
                 minLines: 3,
+                maxLength: ResourceLimits.aiQueryMaxLength,
                 style: theme.textTheme.bodyMedium,
                 decoration: InputDecoration(
                   hintText: '例如：今天想整理一下家里，有什么适合做的？',
@@ -214,7 +224,7 @@ class _AskAiScreenState extends ConsumerState<AskAiScreen> {
               ),
               const SizedBox(height: 12),
               FilledButton.icon(
-                onPressed: signedIn && !_loading ? _submit : null,
+                onPressed: signedIn && !_loading && !_cooldown ? _submit : null,
                 icon: _loading
                     ? const SizedBox(
                         width: 18,

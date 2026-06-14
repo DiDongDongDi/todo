@@ -2,6 +2,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:todo_app/core/auth/auth_service.dart';
+import 'package:todo_app/core/limits/resource_limits.dart';
 import 'package:todo_app/core/models/task.dart';
 import 'package:todo_app/core/models/task_display.dart';
 import 'package:todo_app/core/repositories/task_repository.dart';
@@ -86,6 +87,11 @@ class TranscriptionService {
         },
       );
 
+      if (response.status == 429) {
+        debugPrint('Transcription rate limited for ${uploaded.id}');
+        return;
+      }
+
       final data = response.data;
       if (data is! Map) {
         await _markFailed(uploaded.id);
@@ -134,10 +140,17 @@ class TranscriptionService {
 
     final repo = await _ref.read(taskRepositoryProvider.future);
     final tasks = await repo.getAll();
+    var pendingCount = 0;
     for (final task in tasks) {
-      if (task.needsTranscription) {
-        await processTask(task);
+      if (!task.needsTranscription) continue;
+      if (pendingCount >= ResourceLimits.maxPendingTranscriptions) {
+        debugPrint(
+          'Transcription skipped: pending limit ${ResourceLimits.maxPendingTranscriptions}',
+        );
+        break;
       }
+      pendingCount++;
+      await processTask(task);
     }
   }
 

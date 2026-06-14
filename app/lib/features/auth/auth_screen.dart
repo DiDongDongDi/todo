@@ -134,6 +134,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     await AuthService.instance.signOut();
     ref.read(syncEngineProvider).stop();
     ref.read(lastSyncAtProvider.notifier).state = null;
+    ref.read(syncLimitMessageProvider.notifier).state = null;
     ref.read(syncStatusProvider.notifier).state = SyncStatus.idle;
     if (mounted) {
       setState(() {
@@ -169,6 +170,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     final authAsync = ref.watch(authStateProvider);
     final syncStatus = ref.watch(syncStatusProvider);
     final lastSyncAt = ref.watch(lastSyncAtProvider);
+    final syncLimitMessage = ref.watch(syncLimitMessageProvider);
     final user = authAsync.value?.session?.user;
     final theme = Theme.of(context);
 
@@ -195,6 +197,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
               email: user.email ?? user.id,
               lastSyncAt: lastSyncAt,
               formatLastSync: _formatLastSync,
+              limitMessage: syncLimitMessage,
             ),
             const SizedBox(height: 16),
             FilledButton.icon(
@@ -320,12 +323,14 @@ class _SyncStatusCard extends StatelessWidget {
     required this.email,
     required this.lastSyncAt,
     required this.formatLastSync,
+    this.limitMessage,
   });
 
   final SyncStatus syncStatus;
   final String email;
   final DateTime? lastSyncAt;
   final String Function(DateTime time) formatLastSync;
+  final String? limitMessage;
 
   @override
   Widget build(BuildContext context) {
@@ -348,6 +353,7 @@ class _SyncStatusCard extends StatelessWidget {
         '上次同步：${formatLastSync(lastSyncAt!)}',
       SyncStatus.idle => '首次同步完成后会显示时间',
       SyncStatus.syncing => '正在与云端交换数据',
+      SyncStatus.error when limitMessage != null => limitMessage!,
       SyncStatus.error => '请检查网络后点击「立即同步」重试',
       SyncStatus.offline => '本地更改已保存，联网后自动上传',
     };
