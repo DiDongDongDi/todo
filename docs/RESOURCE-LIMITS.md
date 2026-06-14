@@ -1,6 +1,6 @@
 # 远程资源限额
 
-官方托管模式下，用于限制用户恶意消耗 Groq/OpenAI、Supabase DB、Storage 等远程资源。服务端强制为主，客户端校验为辅。
+官方托管模式下，用于限制用户恶意消耗远程 AI API、Supabase DB、Storage 等远程资源。服务端强制为主，客户端校验为辅。
 
 ## 问 AI — `recommend-tasks`
 
