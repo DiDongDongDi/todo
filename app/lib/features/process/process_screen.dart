@@ -327,6 +327,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
   }
 
   void _addEditSubtaskField() {
+    _editPendingFocus = true;
     setState(() => _editSubtaskControllers.add(TextEditingController()));
   }
 

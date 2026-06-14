@@ -165,6 +165,7 @@ void main() {
     await tester.tap(find.byIcon(Icons.add));
     await tester.pump();
     await tester.pump();
+    await tester.pump();
 
     expect(controllers.length, 1);
     expect(find.byType(TextField), findsOneWidget);
@@ -254,7 +255,11 @@ class _SubtaskAppendHarnessState extends State<_SubtaskAppendHarness> {
     return Scaffold(
       body: Column(
         children: [
-          IconButton(onPressed: _addRow, icon: const Icon(Icons.add)),
+          Focus(
+            canRequestFocus: false,
+            skipTraversal: true,
+            child: IconButton(onPressed: _addRow, icon: const Icon(Icons.add)),
+          ),
           SubtaskTitleEditor(
             controllers: widget.controllers,
             onRemove: (_) {},

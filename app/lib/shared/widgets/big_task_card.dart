@@ -259,13 +259,17 @@ class BigTaskCard extends StatelessWidget {
         ),
         if (onAddSubtask != null) ...[
           gap,
-          IconButton.filledTonal(
-            onPressed: onAddSubtask,
-            icon: const Icon(Icons.playlist_add_outlined),
-            tooltip: '添加子任务',
-            visualDensity: compact,
-            style: IconButton.styleFrom(
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          Focus(
+            canRequestFocus: false,
+            skipTraversal: true,
+            child: IconButton.filledTonal(
+              onPressed: onAddSubtask,
+              icon: const Icon(Icons.playlist_add_outlined),
+              tooltip: '添加子任务',
+              visualDensity: compact,
+              style: IconButton.styleFrom(
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
             ),
           ),
         ],

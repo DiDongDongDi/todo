@@ -102,6 +102,8 @@ class _SubtaskTitleEditorState extends State<SubtaskTitleEditor> {
       final newCount = widget.controllers.length;
       if (newCount == oldCount + 1 && widget.controllers.last.text.isEmpty) {
         _pendingFocusIndex = newCount - 1;
+        _suppressFocusNotify = true;
+        _awaitingSubmitFocus = true;
       }
     }
     _syncFocusNodes();
@@ -391,23 +393,26 @@ class _SubtaskTitleEditorState extends State<SubtaskTitleEditor> {
       return;
     }
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) {
-        _suppressFocusNotify = false;
-        return;
-      }
-      final index = _pendingFocusIndex;
-      if (index == null || index < 0 || index >= _focusNodes.length) {
-        _clearSubmitFocusSuppression();
-        return;
-      }
-      _pendingFocusIndex = null;
-      _focusNodes[index].requestFocus();
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        _clearSubmitFocusSuppression();
-      });
-    });
+    unawaited(_applyPendingFocusAfterLayout());
+  }
+
+  Future<void> _applyPendingFocusAfterLayout() async {
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) {
+      _suppressFocusNotify = false;
+      _awaitingSubmitFocus = false;
+      return;
+    }
+    final index = _pendingFocusIndex;
+    if (index == null || index < 0 || index >= _focusNodes.length) {
+      _clearSubmitFocusSuppression();
+      return;
+    }
+    _pendingFocusIndex = null;
+    _focusNodes[index].requestFocus();
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) return;
+    _clearSubmitFocusSuppression();
   }
 
   Future<void> _handleSubmitted(int index) async {
