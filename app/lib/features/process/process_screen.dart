@@ -31,6 +31,7 @@ import 'package:todo_app/shared/utils/sounds.dart';
 import 'package:todo_app/shared/utils/platform_capabilities.dart';
 import 'package:todo_app/shared/widgets/app_snackbar.dart';
 import 'package:todo_app/shared/widgets/big_task_card.dart';
+import 'package:todo_app/shared/widgets/card_deck_transition.dart';
 import 'package:todo_app/shared/widgets/card_stage.dart';
 import 'package:todo_app/shared/widgets/process_queue_selector.dart';
 import 'package:todo_app/shared/widgets/process_task_search_sheet.dart';
@@ -83,6 +84,14 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
   bool _editSubtaskFocused = false;
   bool _savingEdit = false;
   bool _shuffling = false;
+
+  bool _deckTransitionActive = false;
+  CardDeckTransitionMode? _deckMode;
+  Task? _deckTopTask;
+  Task? _deckBottomTask;
+  Completer<void>? _deckTransitionCompleter;
+  TextEditingController? _deckPreviewTopController;
+  TextEditingController? _deckPreviewBottomController;
 
   /// 与收集页一致：底部按钮组由焦点驱动；tab 不可见时一律视为非编辑 UI。
   bool get _editUiVisible =>
@@ -165,8 +174,71 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     for (final c in _editSubtaskControllers) {
       c.dispose();
     }
+    _deckPreviewTopController?.dispose();
+    _deckPreviewBottomController?.dispose();
     unawaited(_editAudioRecorder.dispose());
     super.dispose();
+  }
+
+  void _onDeckTransitionComplete() {
+    final completer = _deckTransitionCompleter;
+    if (completer != null && !completer.isCompleted) {
+      completer.complete();
+    }
+  }
+
+  void _clearDeckTransitionState() {
+    _deckTransitionCompleter = null;
+    _deckPreviewTopController?.dispose();
+    _deckPreviewTopController = null;
+    _deckPreviewBottomController?.dispose();
+    _deckPreviewBottomController = null;
+    setState(() {
+      _deckTransitionActive = false;
+      _deckMode = null;
+      _deckTopTask = null;
+      _deckBottomTask = null;
+    });
+  }
+
+  Widget _buildTransitionPreviewCard(
+    Task task,
+    TextEditingController controller,
+  ) {
+    return BigTaskCard(
+      mode: BigTaskCardMode.process,
+      editing: false,
+      task: task,
+      controller: controller,
+      scheduleLabel: scheduleLabel(task),
+      scheduleOverdue: isOverdue(task),
+      checkInLabel: checkInLabel(task),
+      completeLabel: completeLabelForCheckIn(task),
+      canGoPrevious: false,
+      canGoNext: false,
+    );
+  }
+
+  Widget _buildDeckTransition() {
+    return CardDeckTransition(
+      key: ValueKey(
+        'deck-${_deckMode?.name}-${_deckTopTask?.id}-${_deckBottomTask?.id}',
+      ),
+      mode: _deckMode!,
+      topChild: _deckTopTask != null && _deckPreviewTopController != null
+          ? _buildTransitionPreviewCard(
+              _deckTopTask!,
+              _deckPreviewTopController!,
+            )
+          : null,
+      bottomChild: _deckBottomTask != null && _deckPreviewBottomController != null
+          ? _buildTransitionPreviewCard(
+              _deckBottomTask!,
+              _deckPreviewBottomController!,
+            )
+          : null,
+      onComplete: _onDeckTransitionComplete,
+    );
   }
 
   Task? _taskForBlurExit() {
@@ -340,14 +412,6 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     final wasPartialCheckIn = _lastUndoWasPartialCheckIn;
     if (task == null || from == null) return;
 
-    final enterFromLeft = from == TaskStatus.trashed ||
-        from == TaskStatus.archived ||
-        wasPeriod ||
-        wasPartialCheckIn;
-    final enterFromRight = from == TaskStatus.someday ||
-        _lastUndoWasRestoreToInbox;
-    if (!enterFromLeft && !enterFromRight) return;
-
     Future<void> restoreAndSwitch() async {
       final repo = await ref.read(taskRepositoryProvider.future);
       if (wasPartialCheckIn) {
@@ -384,6 +448,18 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
       AppHaptics.light();
     }
 
+    if (from == TaskStatus.trashed) {
+      await _undoTrashWithDeckAnimation(task, restoreAndSwitch);
+      return;
+    }
+
+    final enterFromLeft = from == TaskStatus.archived ||
+        wasPeriod ||
+        wasPartialCheckIn;
+    final enterFromRight = from == TaskStatus.someday ||
+        _lastUndoWasRestoreToInbox;
+    if (!enterFromLeft && !enterFromRight) return;
+
     Future<void> playEnterAnimation() async {
       await WidgetsBinding.instance.endOfFrame;
       if (!mounted) return;
@@ -408,6 +484,44 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
       if (!mounted) return;
       await playEnterAnimation();
     }
+  }
+
+  Future<void> _undoTrashWithDeckAnimation(
+    Task restoredTask,
+    Future<void> Function() restoreAndSwitch,
+  ) async {
+    if (_deckTransitionActive) return;
+
+    final tasks = ref.read(processTasksProvider).value ?? [];
+    final currentTask = tasks.isNotEmpty
+        ? tasks[_index.clamp(0, tasks.length - 1)]
+        : null;
+
+    _deckPreviewTopController?.dispose();
+    _deckPreviewBottomController?.dispose();
+    _deckPreviewTopController = currentTask != null
+        ? TextEditingController(text: currentTask.displayTitle)
+        : null;
+    _deckPreviewBottomController =
+        TextEditingController(text: restoredTask.displayTitle);
+
+    _deckTransitionCompleter = Completer<void>();
+
+    setState(() {
+      _deckTransitionActive = true;
+      _deckMode = CardDeckTransitionMode.undoRestore;
+      _deckTopTask = currentTask;
+      _deckBottomTask = restoredTask;
+    });
+
+    await _deckTransitionCompleter!.future;
+    if (!mounted) return;
+
+    await restoreAndSwitch();
+    if (!mounted) return;
+
+    _clearDeckTransitionState();
+    await _swipeKey.currentState?.resetPosition(animated: false);
   }
 
   void _showUndoSnackbar({
@@ -493,6 +607,19 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
       error: (e, _) => Center(child: Text('加载失败: $e')),
       data: (tasks) {
         if (tasks.isEmpty) {
+          if (_deckTransitionActive) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildTopBar(
+                  context,
+                  taskCount: 0,
+                  archivedToday: statsAsync.value?.archivedToday ?? 0,
+                ),
+                Expanded(child: _buildDeckTransition()),
+              ],
+            );
+          }
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -588,12 +715,15 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
               onShuffle: () => _shuffleProcessQueue(tasks),
               onAskAi: () => showAskAiSheet(context, ref),
               onSaveTemplate: () => _saveCurrentAsTemplate(task),
-              onDeleteCurrentTask: () => _trash(task, animated: true),
+              onDeleteCurrentTask:
+                  _deckTransitionActive ? null : () => _trash(task),
             ),
             Expanded(
-              child: CardStage(
+              child: _deckTransitionActive
+                  ? _buildDeckTransition()
+                  : CardStage(
                 swipeKey: _swipeKey,
-                enabled: touchFirst && !_editUiVisible,
+                enabled: touchFirst && !_editUiVisible && !_deckTransitionActive,
                 verticalEnterAnimation: true,
                 onFlyoutFeedback: AppHaptics.none,
                 leftLabel: '完成',
@@ -1091,16 +1221,42 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     );
   }
 
-  Future<void> _trash(Task task, {bool animated = false}) async {
-    if (animated) {
-      await _animateFlyout(
-        const Offset(-1.5, 0),
-        () => _performTrash(task),
-        feedback: AppHaptics.none,
-      );
+  Future<void> _trash(Task task) async {
+    if (_deckTransitionActive || _editUiVisible) return;
+
+    final tasks = ref.read(processTasksProvider).value;
+    if (tasks == null || tasks.isEmpty) return;
+
+    final index = _index.clamp(0, tasks.length - 1);
+    final nextTask = index + 1 < tasks.length ? tasks[index + 1] : null;
+
+    _deckPreviewTopController?.dispose();
+    _deckPreviewBottomController?.dispose();
+    _deckPreviewTopController = TextEditingController(text: task.displayTitle);
+    if (nextTask != null) {
+      _deckPreviewBottomController =
+          TextEditingController(text: nextTask.displayTitle);
     } else {
-      await _performTrash(task);
+      _deckPreviewBottomController = null;
     }
+
+    _deckTransitionCompleter = Completer<void>();
+
+    setState(() {
+      _deckTransitionActive = true;
+      _deckMode = CardDeckTransitionMode.delete;
+      _deckTopTask = task;
+      _deckBottomTask = nextTask;
+    });
+
+    await _deckTransitionCompleter!.future;
+    if (!mounted) return;
+
+    await _performTrash(task);
+    if (!mounted) return;
+
+    _clearDeckTransitionState();
+    await _swipeKey.currentState?.resetPosition(animated: false);
   }
 
   Future<void> _performTrash(Task task) async {
