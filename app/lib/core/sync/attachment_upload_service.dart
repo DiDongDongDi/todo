@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:todo_app/core/limits/resource_limits.dart';
 import 'package:todo_app/core/models/task.dart';
 
 /// Supabase Storage 附件上传与签名 URL 解析。
@@ -30,6 +31,73 @@ class AttachmentUploadService {
     return '$userId/$taskId/$filename';
   }
 
+  int maxBytesFor(AttachmentType type) {
+    return type == AttachmentType.audio
+        ? ResourceLimits.maxAudioFileBytes
+        : ResourceLimits.maxImageFileBytes;
+  }
+
+  String tooLargeMessageFor(AttachmentType type) {
+    return type == AttachmentType.audio
+        ? ResourceLimits.audioTooLargeMessage
+        : ResourceLimits.imageTooLargeMessage;
+  }
+
+  Future<int> fileSizeBytes(String localPath) async {
+    if (kIsWeb || localPath.isEmpty) return 0;
+    final file = File(localPath);
+    if (!await file.exists()) return 0;
+    return file.length();
+  }
+
+  Future<void> validateAttachmentSize(TaskAttachment attachment) async {
+    final size = await fileSizeBytes(attachment.localPath);
+    final maxBytes = maxBytesFor(attachment.type);
+    if (size > maxBytes) {
+      throw AttachmentLimitException(tooLargeMessageFor(attachment.type));
+    }
+  }
+
+  Future<int> estimateUserStorageBytes({
+    required SupabaseClient client,
+    required String userId,
+  }) async {
+    try {
+      final taskFolders = await client.storage.from(bucket).list(path: userId);
+      var total = 0;
+      for (final folder in taskFolders) {
+        if (folder.id == null) continue;
+        final files = await client.storage
+            .from(bucket)
+            .list(path: '$userId/${folder.name}');
+        for (final file in files) {
+          final meta = file.metadata;
+          if (meta != null && meta['size'] != null) {
+            total += (meta['size'] as num).toInt();
+          }
+        }
+      }
+      return total;
+    } catch (e, st) {
+      debugPrint('Storage quota estimate failed: $e\n$st');
+      return 0;
+    }
+  }
+
+  Future<void> validateStorageQuota({
+    required SupabaseClient client,
+    required String userId,
+    required TaskAttachment attachment,
+  }) async {
+    final fileSize = await fileSizeBytes(attachment.localPath);
+    if (fileSize <= 0) return;
+
+    final used = await estimateUserStorageBytes(client: client, userId: userId);
+    if (used + fileSize > ResourceLimits.maxStoragePerUserBytes) {
+      throw AttachmentLimitException(ResourceLimits.storageQuotaExceededMessage);
+    }
+  }
+
   Future<TaskAttachment> uploadAttachment({
     required SupabaseClient client,
     required String userId,
@@ -40,6 +108,13 @@ class AttachmentUploadService {
 
     final file = File(attachment.localPath);
     if (!await file.exists()) return attachment;
+
+    await validateAttachmentSize(attachment);
+    await validateStorageQuota(
+      client: client,
+      userId: userId,
+      attachment: attachment,
+    );
 
     final objectPath = storagePathFor(
       userId: userId,
@@ -84,6 +159,9 @@ class AttachmentUploadService {
               attachment: attachment,
             ),
           );
+        } on AttachmentLimitException catch (e) {
+          debugPrint('Attachment upload skipped ($taskId): $e');
+          results.add(attachment);
         } catch (e, st) {
           debugPrint('Attachment upload failed ($taskId): $e\n$st');
           results.add(attachment);

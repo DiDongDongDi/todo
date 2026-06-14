@@ -3,3 +3,9 @@
 
 [functions.transcribe]
 verify_jwt = true
+
+[functions.recommend-tasks]
+verify_jwt = true
+
+[functions.cleanup-ai-usage]
+verify_jwt = false

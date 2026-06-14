@@ -1,11 +1,20 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import {
+  checkRateLimit,
+  createAdminClient,
+  rateLimitConfigFor,
+} from "../_shared/rate_limit.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
 };
+
+const MAX_AUDIO_BYTES = Number(
+  Deno.env.get("AI_TRANSCRIBE_MAX_AUDIO_BYTES") ?? String(10 * 1024 * 1024),
+);
 
 type STTProvider = {
   transcribe(audio: Uint8Array, mime: string): Promise<string>;
@@ -160,6 +169,22 @@ Deno.serve(async (req) => {
 
     const audioBytes = new Uint8Array(await fileData.arrayBuffer());
     const mime = fileData.type || "audio/mp4";
+
+    if (audioBytes.length > MAX_AUDIO_BYTES) {
+      await markFailed(adminClient, taskId);
+      return jsonError("Audio file too large", 400);
+    }
+
+    const adminForRateLimit = createAdminClient();
+    const rateLimit = await checkRateLimit(
+      adminForRateLimit,
+      user.id,
+      "transcribe",
+      rateLimitConfigFor("transcribe"),
+    );
+    if (!rateLimit.ok) {
+      return jsonError(rateLimit.message, 429);
+    }
 
     let title: string;
     try {

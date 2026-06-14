@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:todo_app/core/database/task_store.dart';
+import 'package:todo_app/core/limits/resource_limits.dart';
 import 'package:todo_app/core/models/task.dart';
 import 'package:todo_app/core/models/task_check_in.dart';
 import 'package:todo_app/core/models/task_hierarchy.dart';
@@ -235,6 +236,7 @@ class TaskRepository {
     String? parentId,
     int checkInTarget = 1,
   }) async {
+    await _ensureTaskCapacity();
     final now = DateTime.now().toUtc();
     final normalizedDue = recurrence == TaskRecurrence.daily
         ? null
@@ -260,6 +262,14 @@ class TaskRepository {
     );
     await _store.upsert(task);
     return task;
+  }
+
+  Future<void> _ensureTaskCapacity() async {
+    final all = await _store.getAll();
+    final active = all.where((t) => t.deletedAt == null).length;
+    if (active >= ResourceLimits.maxTasksPerUser) {
+      throw TaskLimitExceededException();
+    }
   }
 
   Future<Task> createSubtask({

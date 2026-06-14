@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:todo_app/core/limits/resource_limits.dart';
 import 'package:todo_app/core/auth/auth_service.dart';
 import 'package:todo_app/core/models/task.dart';
 import 'package:todo_app/core/models/task_template.dart';
@@ -21,6 +22,8 @@ final syncEngineProvider = Provider<SyncEngine>((ref) {
 final syncStatusProvider = StateProvider<SyncStatus>((ref) => SyncStatus.idle);
 
 final lastSyncAtProvider = StateProvider<DateTime?>((ref) => null);
+
+final syncLimitMessageProvider = StateProvider<String?>((ref) => null);
 
 enum SyncStatus { idle, syncing, error, offline }
 
@@ -85,6 +88,7 @@ class SyncEngine {
     }
 
     _ref.read(syncStatusProvider.notifier).state = SyncStatus.syncing;
+    _ref.read(syncLimitMessageProvider.notifier).state = null;
     try {
       final taskRepo = await _ref.read(taskRepositoryProvider.future);
       var local = await taskRepo.getAll();
@@ -108,6 +112,10 @@ class SyncEngine {
       await _ref.read(transcriptionServiceProvider).processPendingTasks();
       _ref.read(lastSyncAtProvider.notifier).state = DateTime.now();
       _ref.read(syncStatusProvider.notifier).state = SyncStatus.idle;
+    } on TaskLimitExceededException catch (e) {
+      debugPrint('Sync task limit: $e');
+      _ref.read(syncLimitMessageProvider.notifier).state = e.message;
+      _ref.read(syncStatusProvider.notifier).state = SyncStatus.error;
     } catch (e, st) {
       debugPrint('Sync error: $e\n$st');
       _ref.read(syncStatusProvider.notifier).state = SyncStatus.error;

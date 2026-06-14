@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:todo_app/core/auth/auth_service.dart';
+import 'package:todo_app/core/limits/resource_limits.dart';
 import 'package:todo_app/core/models/task.dart';
 import 'package:todo_app/core/repositories/task_repository.dart';
 
@@ -24,8 +25,6 @@ class RecommendService {
 
   final Ref _ref;
 
-  static const _maxTasks = 200;
-
   Future<RecommendResult> recommend(String query) async {
     if (!AuthService.instance.isSignedIn) {
       throw RecommendException('请先登录以使用 AI 推荐');
@@ -38,10 +37,10 @@ class RecommendService {
 
     final inbox = _ref.read(inboxTasksProvider).value ?? [];
     final someday = _ref.read(somedayTasksProvider).value ?? [];
-    final candidates = [...inbox, ...someday]
-        .where((t) => t.parentId == null)
-        .take(_maxTasks)
-        .toList();
+    final candidates = [
+      ...inbox.where((t) => t.parentId == null),
+      ...someday.where((t) => t.parentId == null),
+    ];
 
     if (candidates.isEmpty) {
       throw RecommendException('收集箱和将来也许中暂无任务可推荐');
@@ -51,28 +50,26 @@ class RecommendService {
     if (trimmedQuery.isEmpty) {
       throw RecommendException('请描述你的想法和需求');
     }
+    if (trimmedQuery.length > ResourceLimits.aiQueryMaxLength) {
+      throw RecommendException(
+        '描述请控制在 ${ResourceLimits.aiQueryMaxLength} 字以内',
+      );
+    }
 
     final response = await client.functions.invoke(
       'recommend-tasks',
-      body: {
-        'query': trimmedQuery,
-        'tasks': candidates
-            .map(
-              (t) => {
-                'id': t.id,
-                'title': t.title,
-                'status': t.status.name,
-              },
-            )
-            .toList(),
-      },
+      body: {'query': trimmedQuery},
     );
 
+    final mappedError = ResourceLimits.aiErrorMessageFromResponse(
+      status: response.status,
+      data: response.data,
+    );
+    if (mappedError != null) {
+      throw RecommendException(mappedError);
+    }
+
     if (response.status != 200) {
-      final data = response.data;
-      if (data is Map && data['error'] != null) {
-        throw RecommendException(data['error'].toString());
-      }
       throw RecommendException('AI 推荐失败 (${response.status})');
     }
 
