@@ -341,6 +341,56 @@ void main() {
     expect(restored?.somedayAt, isNull);
   });
 
+  test('trash preserves check-in fields for daily recurring task', () async {
+    final task = await repo.createInbox(
+      title: 'Daily habit',
+      recurrence: TaskRecurrence.daily,
+      checkInTarget: 3,
+    );
+
+    await repo.trash(task.id);
+
+    final trashed = await repo.getById(task.id);
+    expect(trashed?.status, TaskStatus.trashed);
+    expect(trashed?.checkInTarget, 3);
+    expect(trashed?.checkInCount, 0);
+    expect(trashed?.lastCheckInAt, isNull);
+  });
+
+  test('restoreToInbox preserves check-in fields after trash', () async {
+    final task = await repo.createInbox(
+      title: 'Daily habit',
+      recurrence: TaskRecurrence.daily,
+      checkInTarget: 3,
+    );
+
+    await repo.trash(task.id);
+    await repo.restoreToInbox(task.id);
+
+    final restored = await repo.getById(task.id);
+    expect(restored?.status, TaskStatus.inbox);
+    expect(restored?.checkInTarget, 3);
+    expect(restored?.checkInCount, 0);
+    expect(restored?.lastCheckInAt, isNull);
+  });
+
+  test('trash and restore preserve partial check-in progress', () async {
+    final created = await repo.createInbox(
+      title: 'Daily workout',
+      recurrence: TaskRecurrence.daily,
+      checkInTarget: 3,
+    );
+    final checkedIn = await repo.checkIn(created.id);
+
+    await repo.trash(checkedIn.task.id);
+    await repo.restoreToInbox(checkedIn.task.id);
+
+    final restored = await repo.getById(checkedIn.task.id);
+    expect(restored?.status, TaskStatus.inbox);
+    expect(restored?.checkInCount, 1);
+    expect(restored?.lastCheckInAt, isNotNull);
+  });
+
   test('restoreAllSomedayToInbox restores all top-level someday tasks', () async {
     final taskA = await repo.createInbox(title: 'A');
     final taskB = await repo.createInbox(title: 'B');

@@ -411,7 +411,9 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
 
     Future<void> restoreAndSwitch() async {
       final repo = await ref.read(taskRepositoryProvider.future);
-      if (wasPartialCheckIn) {
+      if (from == TaskStatus.trashed) {
+        await repo.restoreToInbox(task.id);
+      } else if (wasPartialCheckIn) {
         await repo.undoCheckIn(task.id, wasFinalCompletion: false);
       } else if (wasPeriod) {
         if (hasCheckInGoal(task)) {
