@@ -832,12 +832,14 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
     return KeyboardLift(
       bottomObstruction: shellBottomObstruction(context),
       child: SuppressTapHaptic(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
+        child: ColoredBox(
+          color: colorScheme.surface,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
               Row(
                 children: [
                   TaskScheduleEditor(
@@ -914,6 +916,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
               ),
             ],
           ),
+        ),
         ),
       ),
     );

@@ -297,13 +297,17 @@ class BigTaskCard extends StatelessWidget {
   }
 
   Widget _keyboardLiftedFooter(BuildContext context, List<Widget> children) {
+    final colorScheme = Theme.of(context).colorScheme;
     return KeyboardLift(
       bottomObstruction: shellBottomObstruction(context),
       child: SuppressTapHaptic(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: children,
+        child: ColoredBox(
+          color: colorScheme.surfaceContainerHighest,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: children,
+          ),
         ),
       ),
     );

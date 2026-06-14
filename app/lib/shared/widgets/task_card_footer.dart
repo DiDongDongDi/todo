@@ -231,7 +231,12 @@ class _FooterShell extends StatelessWidget {
         duration: kTaskCardFooterDuration,
         curve: Curves.easeOutCubic,
         alignment: Alignment.topCenter,
-        child: SuppressTapHaptic(child: child),
+        child: SuppressTapHaptic(
+          child: ColoredBox(
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            child: child,
+          ),
+        ),
       ),
     );
   }
