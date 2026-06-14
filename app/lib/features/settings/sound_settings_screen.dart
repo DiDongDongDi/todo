@@ -82,7 +82,7 @@ class _SoundSettingsScreenState extends ConsumerState<SoundSettingsScreen> {
         NotificationSoundSection(
           title: '处理 · 完成音效',
           description: unsupportedHint ??
-              '右滑归档或点击完成时播放所选系统通知音。',
+              '左滑完成或点击完成时播放所选系统通知音。',
           preference: process.complete,
           supported: supported,
           onEnabledChanged: (value) => ref
@@ -94,9 +94,23 @@ class _SoundSettingsScreenState extends ConsumerState<SoundSettingsScreen> {
           ),
         ),
         NotificationSoundSection(
+          title: '处理 · 将来也许音效',
+          description: unsupportedHint ??
+              '右滑或点击将来也许时播放所选系统通知音。',
+          preference: process.someday,
+          supported: supported,
+          onEnabledChanged: (value) => ref
+              .read(processSoundProvider.notifier)
+              .setEnabled(ProcessSoundKind.someday, value),
+          onPick: () => _pickProcessSound(
+            ProcessSoundKind.someday,
+            process.someday,
+          ),
+        ),
+        NotificationSoundSection(
           title: '处理 · 删除音效',
           description: unsupportedHint ??
-              '左滑放弃或移至回收站时播放所选系统通知音。',
+              '点击删除按钮移至回收站时播放所选系统通知音。',
           preference: process.trash,
           supported: supported,
           onEnabledChanged: (value) => ref
@@ -110,7 +124,7 @@ class _SoundSettingsScreenState extends ConsumerState<SoundSettingsScreen> {
         NotificationSoundSection(
           title: '恢复音效',
           description: unsupportedHint ??
-              '在已完成或回收站恢复任务到收集箱时播放所选系统通知音。',
+              '在已完成、回收站或将来也许队列恢复任务到收集箱时播放所选系统通知音。',
           preference: restore,
           supported: supported,
           onEnabledChanged: (value) =>
@@ -161,6 +175,7 @@ class _SoundSettingsScreenState extends ConsumerState<SoundSettingsScreen> {
     final settings = ref.read(processSoundProvider).value;
     final updated = switch (kind) {
       ProcessSoundKind.complete => settings?.complete,
+      ProcessSoundKind.someday => settings?.someday,
       ProcessSoundKind.trash => settings?.trash,
     };
     if (updated != null && updated.canPlay) {

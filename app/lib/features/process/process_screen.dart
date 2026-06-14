@@ -16,6 +16,7 @@ import 'package:todo_app/core/repositories/task_repository.dart';
 import 'package:todo_app/core/repositories/template_repository.dart';
 import 'package:todo_app/core/settings/process_queue_source_settings.dart';
 import 'package:todo_app/core/settings/process_sound_settings.dart';
+import 'package:todo_app/core/settings/restore_sound_settings.dart';
 import 'package:todo_app/core/settings/volume_key_platform.dart';
 import 'package:todo_app/core/settings/volume_key_settings.dart';
 import 'package:todo_app/core/stats/stats_provider.dart';
@@ -1299,7 +1300,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     );
 
     unawaited(triggerSyncIfSignedIn(ref));
-    unawaited(AppHaptics.medium());
+    unawaited(_playSomedayFeedback());
   }
 
   Future<void> _restoreToInbox(Task task, {bool animated = false}) async {
@@ -1330,7 +1331,23 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     );
 
     unawaited(triggerSyncIfSignedIn(ref));
-    unawaited(AppHaptics.medium());
+    unawaited(_playRestoreFeedback());
+  }
+
+  Future<void> _playSomedayFeedback() async {
+    final settings = await ref.read(processSoundProvider.future);
+    await Future.wait([
+      AppHaptics.medium(),
+      AppSounds.play(settings.someday),
+    ]);
+  }
+
+  Future<void> _playRestoreFeedback() async {
+    final preference = await ref.read(restoreSoundProvider.future);
+    await Future.wait([
+      AppHaptics.medium(),
+      AppSounds.play(preference),
+    ]);
   }
 
   Future<void> _playTrashFeedback() async {
