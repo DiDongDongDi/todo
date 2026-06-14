@@ -225,18 +225,15 @@ class _FooterShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext buildContext) {
+    final colorScheme = Theme.of(context).colorScheme;
     return KeyboardLift(
       bottomObstruction: shellBottomObstruction(context),
+      backgroundColor: colorScheme.surfaceContainerHighest,
       child: AnimatedSize(
         duration: kTaskCardFooterDuration,
         curve: Curves.easeOutCubic,
         alignment: Alignment.topCenter,
-        child: SuppressTapHaptic(
-          child: ColoredBox(
-            color: Theme.of(context).colorScheme.surfaceContainerHighest,
-            child: child,
-          ),
-        ),
+        child: SuppressTapHaptic(child: child),
       ),
     );
   }

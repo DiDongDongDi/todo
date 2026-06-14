@@ -14,12 +14,16 @@ class KeyboardLift extends StatefulWidget {
   const KeyboardLift({
     super.key,
     required this.child,
+    this.backgroundColor,
     this.bottomObstruction = 0,
     this.duration = const Duration(milliseconds: 280),
     this.curve = Curves.easeOutCubic,
   });
 
   final Widget child;
+
+  /// 键盘上移时在 [child] 下方延伸的背景色，避免 footer 与键盘之间露出透明空隙。
+  final Color? backgroundColor;
 
   /// 屏幕底部已有固定 UI（如底栏）占用的键盘 inset 部分。
   final double bottomObstruction;
@@ -86,9 +90,28 @@ class _KeyboardLiftState extends State<KeyboardLift>
 
   @override
   Widget build(BuildContext context) {
+    final child = widget.backgroundColor != null && _lift > 0
+        ? Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Positioned(
+                left: 0,
+                right: 0,
+                top: 0,
+                bottom: -_lift,
+                child: ColoredBox(
+                  key: const Key('keyboard_lift_extended_background'),
+                  color: widget.backgroundColor!,
+                ),
+              ),
+              widget.child,
+            ],
+          )
+        : widget.child;
+
     return Transform.translate(
       offset: Offset(0, -_lift),
-      child: widget.child,
+      child: child,
     );
   }
 }
