@@ -81,6 +81,7 @@ class SubtaskTitleEditor extends StatefulWidget {
 
 class _SubtaskTitleEditorState extends State<SubtaskTitleEditor> {
   final List<FocusNode> _focusNodes = [];
+  final List<GlobalKey> _rowKeys = [];
   final List<_SubtaskPasteFallbackFormatter> _pasteFormatters = [];
   int? _pendingFocusIndex;
   bool _pasteHandling = false;
@@ -124,6 +125,7 @@ class _SubtaskTitleEditorState extends State<SubtaskTitleEditor> {
       node.dispose();
     }
     _focusNodes.clear();
+    _rowKeys.clear();
     super.dispose();
   }
 
@@ -347,6 +349,44 @@ class _SubtaskTitleEditorState extends State<SubtaskTitleEditor> {
     return newText.substring(start, newText.length - suffix.length);
   }
 
+  void _syncRowKeys() {
+    while (_rowKeys.length < widget.controllers.length) {
+      _rowKeys.add(GlobalKey());
+    }
+    while (_rowKeys.length > widget.controllers.length) {
+      _rowKeys.removeLast();
+    }
+  }
+
+  void _scrollRowIntoView(int index) {
+    void doScroll() {
+      if (!mounted) return;
+      if (index < 0 || index >= _rowKeys.length) return;
+      final rowContext = _rowKeys[index].currentContext;
+      if (rowContext == null) return;
+      Scrollable.ensureVisible(
+        rowContext,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOutCubic,
+        alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
+      );
+    }
+
+    Future<void> scrollAfterLayout() async {
+      await WidgetsBinding.instance.endOfFrame;
+      if (!mounted) return;
+      doScroll();
+      // 对齐 KeyboardLift 280ms 动画，键盘 inset 稳定后再滚一次。
+      for (var i = 0; i < 18; i++) {
+        await WidgetsBinding.instance.endOfFrame;
+        if (!mounted) return;
+      }
+      doScroll();
+    }
+
+    unawaited(scrollAfterLayout());
+  }
+
   void _syncFocusNodes() {
     var changed = false;
     while (_focusNodes.length < widget.controllers.length) {
@@ -418,6 +458,7 @@ class _SubtaskTitleEditorState extends State<SubtaskTitleEditor> {
     }
     _pendingFocusIndex = null;
     _focusNodes[index].requestFocus();
+    _scrollRowIntoView(index);
     await WidgetsBinding.instance.endOfFrame;
     if (!mounted) return;
     _clearSubmitFocusSuppression();
@@ -447,9 +488,13 @@ class _SubtaskTitleEditorState extends State<SubtaskTitleEditor> {
 
   void _notifyFocusChanged() {
     if (!mounted || _suppressFocusNotify) return;
-    final anyFocused = _focusNodes.any((node) => node.hasFocus);
+    final focusedIndex = _focusNodes.indexWhere((node) => node.hasFocus);
+    final anyFocused = focusedIndex >= 0;
     if (_awaitingSubmitFocus && !anyFocused) return;
-    if (anyFocused) _awaitingSubmitFocus = false;
+    if (anyFocused) {
+      _awaitingSubmitFocus = false;
+      _scrollRowIntoView(focusedIndex);
+    }
     widget.onAnyFieldFocusChanged?.call(anyFocused);
   }
 
@@ -479,6 +524,7 @@ class _SubtaskTitleEditorState extends State<SubtaskTitleEditor> {
   Widget build(BuildContext context) {
     _maybeScheduleAppendFocus();
     _syncFocusNodes();
+    _syncRowKeys();
     _syncPasteFormatters();
     if (widget.controllers.isEmpty) {
       return const SizedBox.shrink();
@@ -489,6 +535,7 @@ class _SubtaskTitleEditorState extends State<SubtaskTitleEditor> {
       mainAxisSize: MainAxisSize.min,
       children: List.generate(widget.controllers.length, (index) {
         return Padding(
+          key: _rowKeys[index],
           padding: const EdgeInsets.only(bottom: 6),
           child: Row(
             children: [
