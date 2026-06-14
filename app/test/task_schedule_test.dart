@@ -691,6 +691,16 @@ void main() {
         isFalse,
       );
     });
+
+    test('includes someday tasks', () {
+      expect(
+        shouldIncludeInSearch(
+          _task(status: TaskStatus.someday),
+          now: today,
+        ),
+        isTrue,
+      );
+    });
   });
 
   group('completedScheduleLabel', () {

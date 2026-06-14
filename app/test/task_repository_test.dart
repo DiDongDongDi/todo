@@ -1,7 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:todo_app/core/database/task_store.dart';
 import 'package:todo_app/core/models/task.dart';
+import 'package:todo_app/core/models/task_playlist.dart';
 import 'package:todo_app/core/repositories/task_repository.dart';
+import 'package:todo_app/core/settings/process_queue_source_settings.dart';
 import 'package:uuid/uuid.dart';
 
 class _MemoryTaskStore implements TaskStore {
@@ -402,5 +404,157 @@ void main() {
     expect(count, 2);
     expect((await repo.getById(taskA.id))?.status, TaskStatus.inbox);
     expect((await repo.getById(taskB.id))?.status, TaskStatus.inbox);
+  });
+
+  group('resolveSearchableProcessTasks', () {
+    Task _makeTask({
+      required String id,
+      required String title,
+      TaskStatus status = TaskStatus.inbox,
+    }) {
+      return Task(
+        id: id,
+        title: title,
+        status: status,
+        createdAt: DateTime(2026, 1, 1),
+        updatedAt: DateTime(2026, 1, 1),
+      );
+    }
+
+    test('includes inbox, someday, and playlist tasks without duplicates', () {
+      final inbox = [_makeTask(id: 'inbox-1', title: 'Inbox task')];
+      final someday = [
+        _makeTask(id: 'someday-1', title: 'Someday task', status: TaskStatus.someday),
+      ];
+      final playlists = [
+        TaskPlaylist(
+          id: 'playlist-1',
+          title: 'My list',
+          taskIds: ['inbox-1', 'playlist-only'],
+          createdAt: DateTime(2026, 1, 1),
+          updatedAt: DateTime(2026, 1, 1),
+        ),
+      ];
+      final allTasks = [
+        ...inbox,
+        ...someday,
+        _makeTask(id: 'playlist-only', title: 'Playlist only'),
+      ];
+
+      final result = resolveSearchableProcessTasks(
+        inbox: allTasks.where((t) => t.status == TaskStatus.inbox).toList(),
+        someday: someday,
+        playlists: playlists,
+      );
+
+      expect(result.map((t) => t.id), containsAll(['inbox-1', 'someday-1', 'playlist-only']));
+      expect(result.length, 3);
+    });
+  });
+
+  group('resolveQueueSourceForTask', () {
+    Task _makeTask({
+      required String id,
+      TaskStatus status = TaskStatus.inbox,
+    }) {
+      return Task(
+        id: id,
+        title: 'Task',
+        status: status,
+        createdAt: DateTime(2026, 1, 1),
+        updatedAt: DateTime(2026, 1, 1),
+      );
+    }
+
+    test('returns someday queue for someday tasks', () {
+      final source = resolveQueueSourceForTask(
+        _makeTask(id: '1', status: TaskStatus.someday),
+        currentSource: const ProcessQueueSource.inbox(),
+        playlists: const [],
+      );
+
+      expect(source, const ProcessQueueSource(kind: ProcessQueueKind.someday));
+    });
+
+    test('returns sole playlist when task appears in one list', () {
+      final playlists = [
+        TaskPlaylist(
+          id: 'playlist-1',
+          title: 'Focus',
+          taskIds: ['task-1'],
+          createdAt: DateTime(2026, 1, 1),
+          updatedAt: DateTime(2026, 1, 1),
+        ),
+      ];
+
+      final source = resolveQueueSourceForTask(
+        _makeTask(id: 'task-1'),
+        currentSource: const ProcessQueueSource.inbox(),
+        playlists: playlists,
+      );
+
+      expect(
+        source,
+        const ProcessQueueSource(kind: ProcessQueueKind.playlist, playlistId: 'playlist-1'),
+      );
+    });
+
+    test('returns inbox when task appears in multiple playlists', () {
+      final playlists = [
+        TaskPlaylist(
+          id: 'playlist-1',
+          title: 'A',
+          taskIds: ['task-1'],
+          createdAt: DateTime(2026, 1, 1),
+          updatedAt: DateTime(2026, 1, 1),
+        ),
+        TaskPlaylist(
+          id: 'playlist-2',
+          title: 'B',
+          taskIds: ['task-1'],
+          createdAt: DateTime(2026, 1, 1),
+          updatedAt: DateTime(2026, 1, 1),
+        ),
+      ];
+
+      final source = resolveQueueSourceForTask(
+        _makeTask(id: 'task-1'),
+        currentSource: const ProcessQueueSource.inbox(),
+        playlists: playlists,
+      );
+
+      expect(source, const ProcessQueueSource.inbox());
+    });
+
+    test('keeps current playlist when it already contains the task', () {
+      const current = ProcessQueueSource(
+        kind: ProcessQueueKind.playlist,
+        playlistId: 'playlist-2',
+      );
+      final playlists = [
+        TaskPlaylist(
+          id: 'playlist-1',
+          title: 'A',
+          taskIds: ['task-1'],
+          createdAt: DateTime(2026, 1, 1),
+          updatedAt: DateTime(2026, 1, 1),
+        ),
+        TaskPlaylist(
+          id: 'playlist-2',
+          title: 'B',
+          taskIds: ['task-1'],
+          createdAt: DateTime(2026, 1, 1),
+          updatedAt: DateTime(2026, 1, 1),
+        ),
+      ];
+
+      final source = resolveQueueSourceForTask(
+        _makeTask(id: 'task-1'),
+        currentSource: current,
+        playlists: playlists,
+      );
+
+      expect(source, current);
+    });
   });
 }

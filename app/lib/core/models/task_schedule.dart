@@ -175,6 +175,7 @@ bool isOverdue(Task task, {DateTime? now}) {
 }
 
 bool shouldIncludeInSearch(Task task, {DateTime? now}) {
+  if (task.status == TaskStatus.someday) return true;
   if (task.status != TaskStatus.inbox) return false;
   final today = now ?? DateTime.now();
   if (isRecurring(task) && isPeriodCompleted(task, today)) return false;

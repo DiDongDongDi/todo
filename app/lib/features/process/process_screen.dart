@@ -12,6 +12,7 @@ import 'package:todo_app/core/models/task_display.dart';
 import 'package:todo_app/core/models/task_hierarchy.dart';
 import 'package:todo_app/core/models/task_schedule.dart';
 import 'package:todo_app/core/navigation/shell_navigation.dart';
+import 'package:todo_app/core/repositories/playlist_repository.dart';
 import 'package:todo_app/core/repositories/task_repository.dart';
 import 'package:todo_app/core/repositories/template_repository.dart';
 import 'package:todo_app/core/settings/process_queue_source_settings.dart';
@@ -603,6 +604,8 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     final tasksAsync = ref.watch(processTasksProvider);
     final queueSourceAsync = ref.watch(processQueueSourceProvider);
     final statsAsync = ref.watch(statsProvider);
+    final searchableAsync = ref.watch(searchableProcessTasksProvider);
+    final canSearch = (searchableAsync.value ?? []).isNotEmpty;
     final touchFirst = isTouchFirstPlatform;
     final queueSource = queueSourceAsync.value ?? const ProcessQueueSource.inbox();
 
@@ -619,6 +622,8 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
                   context,
                   taskCount: 0,
                   archivedToday: statsAsync.value?.archivedToday ?? 0,
+                  canSearch: canSearch,
+                  onSearch: () => _openTaskSearch(),
                 ),
                 Expanded(child: _buildDeckTransition()),
               ],
@@ -631,6 +636,8 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
                 context,
                 taskCount: 0,
                 archivedToday: statsAsync.value?.archivedToday ?? 0,
+                canSearch: canSearch,
+                onSearch: () => _openTaskSearch(),
               ),
               Expanded(
                 child: Center(
@@ -715,7 +722,8 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
               context,
               taskCount: tasks.length,
               archivedToday: archivedToday,
-              onSearch: () => _openTaskSearch(tasks, task),
+              canSearch: canSearch,
+              onSearch: () => _openTaskSearch(currentTask: task),
               onShuffle: () => _shuffleProcessQueue(tasks),
               onSaveTemplate: () => _saveCurrentAsTemplate(task),
               onDeleteCurrentTask:
@@ -1366,15 +1374,14 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     ]);
   }
 
-  Future<void> _openTaskSearch(List<Task> processTasks, Task currentTask) async {
-    final inbox = ref.read(inboxTasksProvider).value ?? [];
-    final searchable = inbox.where((t) => shouldIncludeInSearch(t)).toList();
+  Future<void> _openTaskSearch({Task? currentTask}) async {
+    final searchable = ref.read(searchableProcessTasksProvider).value ?? [];
     if (searchable.isEmpty) return;
 
     final selected = await showProcessTaskSearchSheet(
       context,
       tasks: searchable,
-      currentTaskId: currentTask.id,
+      currentTaskId: currentTask?.id,
     );
     if (selected == null || !mounted) return;
     await _jumpToTask(selected);
@@ -1388,11 +1395,14 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
       return;
     }
 
-    final neededSource = target.status == TaskStatus.someday
-        ? const ProcessQueueSource(kind: ProcessQueueKind.someday)
-        : const ProcessQueueSource.inbox();
     final currentSource =
         ref.read(processQueueSourceProvider).value ?? const ProcessQueueSource.inbox();
+    final playlists = ref.read(playlistsProvider).value ?? [];
+    final neededSource = resolveQueueSourceForTask(
+      target,
+      currentSource: currentSource,
+      playlists: playlists,
+    );
 
     if (currentSource != neededSource) {
       await ref.read(processQueueSourceProvider.notifier).setSource(neededSource);
@@ -1472,6 +1482,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     BuildContext context, {
     required int taskCount,
     required int archivedToday,
+    required bool canSearch,
     VoidCallback? onSearch,
     VoidCallback? onShuffle,
     VoidCallback? onSaveTemplate,
@@ -1498,7 +1509,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
           IconButton(
             icon: const Icon(Icons.search),
             tooltip: '搜索任务',
-            onPressed: taskCount > 0 ? onSearch : null,
+            onPressed: canSearch ? onSearch : null,
           ),
           IconButton(
             icon: const Icon(Icons.shuffle),
