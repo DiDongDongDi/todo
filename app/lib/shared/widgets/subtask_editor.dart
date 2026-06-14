@@ -81,32 +81,41 @@ class SubtaskTitleEditor extends StatefulWidget {
 
 class _SubtaskTitleEditorState extends State<SubtaskTitleEditor> {
   final List<FocusNode> _focusNodes = [];
+  final List<GlobalKey> _rowKeys = [];
   final List<_SubtaskPasteFallbackFormatter> _pasteFormatters = [];
   int? _pendingFocusIndex;
   bool _pasteHandling = false;
   bool _suppressFocusNotify = false;
   bool _awaitingSubmitFocus = false;
+  int _trackedControllerCount = 0;
 
   @override
   void initState() {
     super.initState();
+    _trackedControllerCount = widget.controllers.length;
     _syncFocusNodes();
   }
 
   @override
   void didUpdateWidget(SubtaskTitleEditor oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // 父级可能就地 mutate 同一 List，old/new widget 的 length 会相同。
-    if (_pendingFocusIndex == null) {
-      final oldCount = oldWidget.controllers.length;
-      final newCount = widget.controllers.length;
-      if (newCount == oldCount + 1 && widget.controllers.last.text.isEmpty) {
-        _pendingFocusIndex = newCount - 1;
-        _suppressFocusNotify = true;
-        _awaitingSubmitFocus = true;
-      }
-    }
+    // 父级可能在 setState 中就地 mutate 同一 List，old/new widget 的 length 会相同。
+    // 追加行的聚焦在 build() 里通过 _trackedControllerCount 检测。
     _syncFocusNodes();
+  }
+
+  void _maybeScheduleAppendFocus() {
+    final oldCount = _trackedControllerCount;
+    final newCount = widget.controllers.length;
+    if (_pendingFocusIndex == null &&
+        newCount == oldCount + 1 &&
+        newCount > 0 &&
+        widget.controllers.last.text.isEmpty) {
+      _pendingFocusIndex = newCount - 1;
+      _suppressFocusNotify = true;
+      _awaitingSubmitFocus = true;
+    }
+    _trackedControllerCount = newCount;
   }
 
   @override
@@ -116,6 +125,7 @@ class _SubtaskTitleEditorState extends State<SubtaskTitleEditor> {
       node.dispose();
     }
     _focusNodes.clear();
+    _rowKeys.clear();
     super.dispose();
   }
 
@@ -339,6 +349,44 @@ class _SubtaskTitleEditorState extends State<SubtaskTitleEditor> {
     return newText.substring(start, newText.length - suffix.length);
   }
 
+  void _syncRowKeys() {
+    while (_rowKeys.length < widget.controllers.length) {
+      _rowKeys.add(GlobalKey());
+    }
+    while (_rowKeys.length > widget.controllers.length) {
+      _rowKeys.removeLast();
+    }
+  }
+
+  void _scrollRowIntoView(int index) {
+    void doScroll() {
+      if (!mounted) return;
+      if (index < 0 || index >= _rowKeys.length) return;
+      final rowContext = _rowKeys[index].currentContext;
+      if (rowContext == null) return;
+      Scrollable.ensureVisible(
+        rowContext,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOutCubic,
+        alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
+      );
+    }
+
+    Future<void> scrollAfterLayout() async {
+      await WidgetsBinding.instance.endOfFrame;
+      if (!mounted) return;
+      doScroll();
+      // 对齐 KeyboardLift 280ms 动画，键盘 inset 稳定后再滚一次。
+      for (var i = 0; i < 18; i++) {
+        await WidgetsBinding.instance.endOfFrame;
+        if (!mounted) return;
+      }
+      doScroll();
+    }
+
+    unawaited(scrollAfterLayout());
+  }
+
   void _syncFocusNodes() {
     var changed = false;
     while (_focusNodes.length < widget.controllers.length) {
@@ -410,6 +458,7 @@ class _SubtaskTitleEditorState extends State<SubtaskTitleEditor> {
     }
     _pendingFocusIndex = null;
     _focusNodes[index].requestFocus();
+    _scrollRowIntoView(index);
     await WidgetsBinding.instance.endOfFrame;
     if (!mounted) return;
     _clearSubmitFocusSuppression();
@@ -439,9 +488,13 @@ class _SubtaskTitleEditorState extends State<SubtaskTitleEditor> {
 
   void _notifyFocusChanged() {
     if (!mounted || _suppressFocusNotify) return;
-    final anyFocused = _focusNodes.any((node) => node.hasFocus);
+    final focusedIndex = _focusNodes.indexWhere((node) => node.hasFocus);
+    final anyFocused = focusedIndex >= 0;
     if (_awaitingSubmitFocus && !anyFocused) return;
-    if (anyFocused) _awaitingSubmitFocus = false;
+    if (anyFocused) {
+      _awaitingSubmitFocus = false;
+      _scrollRowIntoView(focusedIndex);
+    }
     widget.onAnyFieldFocusChanged?.call(anyFocused);
   }
 
@@ -469,7 +522,9 @@ class _SubtaskTitleEditorState extends State<SubtaskTitleEditor> {
 
   @override
   Widget build(BuildContext context) {
+    _maybeScheduleAppendFocus();
     _syncFocusNodes();
+    _syncRowKeys();
     _syncPasteFormatters();
     if (widget.controllers.isEmpty) {
       return const SizedBox.shrink();
@@ -480,6 +535,7 @@ class _SubtaskTitleEditorState extends State<SubtaskTitleEditor> {
       mainAxisSize: MainAxisSize.min,
       children: List.generate(widget.controllers.length, (index) {
         return Padding(
+          key: _rowKeys[index],
           padding: const EdgeInsets.only(bottom: 6),
           child: Row(
             children: [

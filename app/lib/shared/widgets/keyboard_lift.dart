@@ -9,6 +9,12 @@ double shellBottomObstruction(BuildContext context) {
   return navHeight + MediaQuery.paddingOf(context).bottom;
 }
 
+/// BigTaskCard 等内容区在 [resizeToAvoidBottomInset] 为 false 时，
+/// [SingleChildScrollView] 需额外 bottom padding，才能把末尾内容滚到键盘上方。
+double keyboardContentScrollPadding(BuildContext context) {
+  return MediaQuery.viewInsetsOf(context).bottom;
+}
+
 /// 随键盘平滑上移 [child]，不改变父级布局尺寸（避免 expands TextField 逐帧重排）。
 class KeyboardLift extends StatefulWidget {
   const KeyboardLift({

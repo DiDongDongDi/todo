@@ -358,6 +358,9 @@ class BigTaskCard extends StatelessWidget {
         : IgnorePointer(child: titleField);
 
     final content = SingleChildScrollView(
+      padding: EdgeInsets.only(
+        bottom: keyboardContentScrollPadding(context),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -492,6 +495,9 @@ class BigTaskCard extends StatelessWidget {
         child: LayoutBuilder(
           builder: (context, constraints) {
             return SingleChildScrollView(
+              padding: EdgeInsets.only(
+                bottom: keyboardContentScrollPadding(context),
+              ),
               child: ConstrainedBox(
                 constraints: BoxConstraints(minHeight: constraints.maxHeight),
                 child: Column(
