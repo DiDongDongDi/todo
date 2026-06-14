@@ -5,7 +5,8 @@ import 'package:todo_app/shared/layout/app_layout.dart';
 
 enum CardDeckTransitionMode { delete, undoRestore }
 
-/// Dual-card transition for delete (center shrink out) and undo (slide down + scale in).
+/// Dual-card transition for delete (top shrink out + bottom slide up) and undo
+/// (top slide down + bottom scale in).
 class CardDeckTransition extends StatefulWidget {
   const CardDeckTransition({
     super.key,
@@ -70,7 +71,15 @@ class _CardDeckTransitionState extends State<CardDeckTransition>
         _topSlide = const AlwaysStoppedAnimation(Offset.zero);
         _bottomScale = const AlwaysStoppedAnimation(1);
         _bottomFade = const AlwaysStoppedAnimation(1);
-        _bottomSlide = const AlwaysStoppedAnimation(Offset.zero);
+        _bottomSlide = Tween<Offset>(
+          begin: const Offset(0, 1.2),
+          end: Offset.zero,
+        ).animate(
+          CurvedAnimation(
+            parent: _controller,
+            curve: const Interval(0.12, 1, curve: Curves.easeOut),
+          ),
+        );
         _topOverlayScrim = TweenSequence<double>([
           TweenSequenceItem(
             tween: Tween<double>(begin: 0.15, end: 0.35),
