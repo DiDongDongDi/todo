@@ -330,6 +330,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
   }
 
   Future<int> _submitEditSubtaskRow(int index) async {
+    _editPendingFocus = true;
     setState(() {
       _editSubtaskControllers.insert(index + 1, TextEditingController());
     });
@@ -357,9 +358,13 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     if (_editSubtaskFocused == focused) return;
     setState(() => _editSubtaskFocused = focused);
     _syncVolumeKeyHandler();
-    if (focused) return;
+    if (focused) {
+      _editPendingFocus = false;
+      return;
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      if (_editSubtaskFocused || _editPendingFocus) return;
       _scheduleEditSessionCleanup();
     });
   }
