@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:todo_app/core/navigation/shell_navigation.dart';
+import 'package:todo_app/features/ask_ai/ask_ai_screen.dart';
 import 'package:todo_app/features/collect/collect_screen.dart';
 import 'package:todo_app/features/process/process_screen.dart';
 import 'package:todo_app/features/settings/settings_screen.dart';
@@ -54,7 +55,8 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
                   isActive: _index == 1,
                 ),
               ),
-              _tabPage(2, const SettingsScreen(key: ValueKey('settings'))),
+              _tabPage(2, const AskAiScreen(key: ValueKey('ask_ai'))),
+              _tabPage(3, const SettingsScreen(key: ValueKey('settings'))),
             ],
           ),
         ),
@@ -74,6 +76,11 @@ class _ShellScreenState extends ConsumerState<ShellScreen> {
               icon: Icon(Icons.swipe_outlined),
               selectedIcon: Icon(Icons.swipe),
               label: '处理',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.auto_awesome_outlined),
+              selectedIcon: Icon(Icons.auto_awesome),
+              label: '问 AI',
             ),
             NavigationDestination(
               icon: Icon(Icons.settings_outlined),

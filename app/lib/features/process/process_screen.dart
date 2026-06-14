@@ -12,12 +12,10 @@ import 'package:todo_app/core/models/task_display.dart';
 import 'package:todo_app/core/models/task_hierarchy.dart';
 import 'package:todo_app/core/models/task_schedule.dart';
 import 'package:todo_app/core/navigation/shell_navigation.dart';
-import 'package:todo_app/core/repositories/playlist_repository.dart';
 import 'package:todo_app/core/repositories/task_repository.dart';
 import 'package:todo_app/core/repositories/template_repository.dart';
 import 'package:todo_app/core/settings/process_queue_source_settings.dart';
 import 'package:todo_app/core/settings/process_sound_settings.dart';
-import 'package:todo_app/features/ask_ai/ask_ai_sheet.dart';
 import 'package:todo_app/core/settings/volume_key_platform.dart';
 import 'package:todo_app/core/settings/volume_key_settings.dart';
 import 'package:todo_app/core/stats/stats_provider.dart';
@@ -36,9 +34,7 @@ import 'package:todo_app/shared/widgets/card_stage.dart';
 import 'package:todo_app/shared/widgets/process_queue_selector.dart';
 import 'package:todo_app/shared/widgets/process_task_search_sheet.dart';
 import 'package:todo_app/shared/widgets/progress_widgets.dart';
-import 'package:todo_app/shared/widgets/save_playlist_dialog.dart';
 import 'package:todo_app/shared/widgets/save_template_dialog.dart';
-import 'package:todo_app/shared/widgets/task_multi_select_sheet.dart';
 import 'package:todo_app/shared/widgets/subtask_editor.dart';
 import 'package:todo_app/shared/widgets/swipeable_card.dart';
 import 'package:todo_app/shared/widgets/tab_more_menu_button.dart';
@@ -713,7 +709,6 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
               archivedToday: archivedToday,
               onSearch: () => _openTaskSearch(tasks, task),
               onShuffle: () => _shuffleProcessQueue(tasks),
-              onAskAi: () => showAskAiSheet(context, ref),
               onSaveTemplate: () => _saveCurrentAsTemplate(task),
               onDeleteCurrentTask:
                   _deckTransitionActive ? null : () => _trash(task),
@@ -1448,63 +1443,12 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     };
   }
 
-  Future<void> _createPlaylistManually() async {
-    final inbox = ref.read(inboxTasksProvider).value ?? [];
-    final someday = ref.read(somedayTasksProvider).value ?? [];
-    final selectable = [
-      ...inbox.where((t) => t.parentId == null),
-      ...someday.where((t) => t.parentId == null),
-    ];
-    if (selectable.isEmpty) {
-      if (!mounted) return;
-      showAppSnackBar(
-        context,
-        message: '收集箱和将来也许中暂无任务',
-        icon: Icons.info_outline,
-        type: AppSnackType.info,
-      );
-      return;
-    }
-
-    final selected = await showTaskMultiSelectSheet(
-      context,
-      tasks: selectable,
-    );
-    if (selected == null || selected.isEmpty || !mounted) return;
-
-    final name = await showSavePlaylistDialog(context, defaultTitle: '我的清单');
-    if (name == null || !mounted) return;
-
-    final repo = await ref.read(playlistRepositoryProvider.future);
-    final playlist = await repo.createFromTaskIds(
-      title: name,
-      taskIds: selected.map((t) => t.id).toList(),
-    );
-    unawaited(triggerSyncIfSignedIn(ref));
-
-    await ref.read(processQueueSourceProvider.notifier).setSource(
-          ProcessQueueSource(
-            kind: ProcessQueueKind.playlist,
-            playlistId: playlist.id,
-          ),
-        );
-
-    if (!mounted) return;
-    showAppSnackBar(
-      context,
-      message: '已创建任务清单',
-      icon: Icons.playlist_add_check_outlined,
-      type: AppSnackType.success,
-    );
-  }
-
   Widget _buildTopBar(
     BuildContext context, {
     required int taskCount,
     required int archivedToday,
     VoidCallback? onSearch,
     VoidCallback? onShuffle,
-    VoidCallback? onAskAi,
     VoidCallback? onSaveTemplate,
     VoidCallback? onDeleteCurrentTask,
   }) {
@@ -1518,9 +1462,12 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
             total: archivedToday + taskCount,
           ),
           const SizedBox(width: 12),
-          Text(
-            '$taskCount 待处理',
-            style: theme.textTheme.bodyMedium,
+          Flexible(
+            child: Text(
+              '$taskCount 待处理',
+              style: theme.textTheme.bodyMedium,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
           const Spacer(),
           IconButton(
@@ -1538,25 +1485,9 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
                 ? onShuffle
                 : null,
           ),
-          if (onAskAi != null)
-            IconButton(
-              icon: const Icon(Icons.auto_awesome_outlined),
-              tooltip: '问 AI',
-              onPressed: onAskAi,
-            ),
           const ProcessQueueSelector(),
           TabMoreMenuButton<ProcessMoreAction>(
             items: [
-              TabMoreMenuEntry.item(
-                value: ProcessMoreAction.askAi,
-                icon: Icons.auto_awesome,
-                label: '问 AI',
-              ),
-              TabMoreMenuEntry.item(
-                value: ProcessMoreAction.createPlaylist,
-                icon: Icons.playlist_add,
-                label: '创建任务清单',
-              ),
               TabMoreMenuEntry.item(
                 value: ProcessMoreAction.someday,
                 icon: Icons.lightbulb_outline,
@@ -1571,11 +1502,6 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
                 value: ProcessMoreAction.trash,
                 icon: Icons.delete_outline,
                 label: '回收站',
-              ),
-              TabMoreMenuEntry.item(
-                value: ProcessMoreAction.sync,
-                icon: Icons.sync_outlined,
-                label: '同步配置',
               ),
               if (onSaveTemplate != null || onDeleteCurrentTask != null) ...[
                 const TabMoreMenuEntry.divider(),
@@ -1595,18 +1521,12 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
             ],
             onSelected: (action) {
               switch (action) {
-                case ProcessMoreAction.askAi:
-                  onAskAi?.call();
-                case ProcessMoreAction.createPlaylist:
-                  unawaited(_createPlaylistManually());
                 case ProcessMoreAction.someday:
                   context.push('/someday');
                 case ProcessMoreAction.archive:
                   context.push('/archive');
                 case ProcessMoreAction.trash:
                   context.push('/trash');
-                case ProcessMoreAction.sync:
-                  context.push('/auth');
                 case ProcessMoreAction.saveTemplate:
                   onSaveTemplate?.call();
                 case ProcessMoreAction.delete:
