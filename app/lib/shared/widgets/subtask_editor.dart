@@ -97,6 +97,13 @@ class _SubtaskTitleEditorState extends State<SubtaskTitleEditor> {
   void didUpdateWidget(SubtaskTitleEditor oldWidget) {
     super.didUpdateWidget(oldWidget);
     // 父级可能就地 mutate 同一 List，old/new widget 的 length 会相同。
+    if (_pendingFocusIndex == null) {
+      final oldCount = oldWidget.controllers.length;
+      final newCount = widget.controllers.length;
+      if (newCount == oldCount + 1 && widget.controllers.last.text.isEmpty) {
+        _pendingFocusIndex = newCount - 1;
+      }
+    }
     _syncFocusNodes();
   }
 
