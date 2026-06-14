@@ -19,50 +19,14 @@ const QUERY_MAX_LENGTH = Number(
   Deno.env.get("AI_RECOMMEND_QUERY_MAX") ?? "500",
 );
 
-type LLMProvider = {
-  recommend(query: string, tasks: TaskSummary[]): Promise<{
-    recommendedIds: string[];
-    playlistName: string;
-    summary?: string;
-  }>;
-};
-
-function createLLMProvider(): LLMProvider {
-  const provider = (Deno.env.get("LLM_PROVIDER") ?? "groq").toLowerCase();
-
-  if (provider === "openai") {
-    const apiKey = Deno.env.get("OPENAI_API_KEY");
-    if (!apiKey) throw new Error("OPENAI_API_KEY is not set");
-    const model = Deno.env.get("OPENAI_CHAT_MODEL") ?? "gpt-4o-mini";
-    return {
-      async recommend(query, tasks) {
-        return chatRecommend(
-          "https://api.openai.com/v1/chat/completions",
-          apiKey,
-          model,
-          query,
-          tasks,
-        );
-      },
-    };
-  }
-
-  const groqKey = Deno.env.get("GROQ_API_KEY");
-  if (!groqKey) {
-    throw new Error("GROQ_API_KEY is not set (default LLM provider is groq)");
-  }
-  const model = Deno.env.get("GROQ_CHAT_MODEL") ?? "llama-3.3-70b-versatile";
-  return {
-    async recommend(query, tasks) {
-      return chatRecommend(
-        "https://api.groq.com/openai/v1/chat/completions",
-        groqKey,
-        model,
-        query,
-        tasks,
-      );
-    },
-  };
+function createLLMClient(): { endpoint: string; apiKey: string; model: string } {
+  const endpoint = Deno.env.get("AI_CHAT_URL")?.trim();
+  const apiKey = Deno.env.get("AI_API_KEY")?.trim();
+  const model = Deno.env.get("AI_CHAT_MODEL")?.trim();
+  if (!endpoint) throw new Error("AI_CHAT_URL is not set");
+  if (!apiKey) throw new Error("AI_API_KEY is not set");
+  if (!model) throw new Error("AI_CHAT_MODEL is not set");
+  return { endpoint, apiKey, model };
 }
 
 async function chatRecommend(
@@ -220,8 +184,14 @@ Deno.serve(async (req) => {
       return jsonError("暂无任务可推荐", 400);
     }
 
-    const llm = createLLMProvider();
-    const result = await llm.recommend(trimmedQuery, tasks);
+    const { endpoint, apiKey, model } = createLLMClient();
+    const result = await chatRecommend(
+      endpoint,
+      apiKey,
+      model,
+      trimmedQuery,
+      tasks,
+    );
 
     return jsonResponse(result);
   } catch (e) {

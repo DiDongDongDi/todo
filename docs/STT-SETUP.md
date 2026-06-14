@@ -2,6 +2,8 @@
 
 收集 Tab 使用 **本地录音 + 云端异步转写**，不依赖手机厂商语音引擎。
 
+> **与「问 AI」配置独立：** 底部导航「问 AI」使用 `recommend-tasks`，Secrets 为 `AI_CHAT_URL` / `AI_API_KEY` / `AI_CHAT_MODEL`（见 [AI-SETUP.md](./AI-SETUP.md)）。本文档仅描述语音转写 `transcribe` 的 `STT_PROVIDER` / `GROQ_*` / `OPENAI_*` 配置，两套变量互不替代。
+
 ## 架构
 
 1. App 用 `record` 录制 m4a，保存为任务音频附件
