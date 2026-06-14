@@ -102,6 +102,108 @@ List<Task> resolveProcessQueueTasks({
   }
 }
 
+List<Task> resolveSearchableProcessTasks({
+  required List<Task> inbox,
+  required List<Task> someday,
+  required List<TaskPlaylist> playlists,
+  DateTime? now,
+}) {
+  final today = now ?? DateTime.now();
+  final byId = <String, Task>{};
+
+  for (final task in inbox) {
+    if (shouldIncludeInSearch(task, now: today)) {
+      byId[task.id] = task;
+    }
+  }
+  for (final task in someday) {
+    if (shouldIncludeInSearch(task, now: today)) {
+      byId[task.id] = task;
+    }
+  }
+
+  final activeById = <String, Task>{
+    for (final t in [...inbox, ...someday])
+      if (t.status == TaskStatus.inbox || t.status == TaskStatus.someday) t.id: t,
+  };
+  for (final playlist in playlists) {
+    for (final id in playlist.taskIds) {
+      final task = activeById[id];
+      if (task != null && shouldIncludeInSearch(task, now: today)) {
+        byId[task.id] = task;
+      }
+    }
+  }
+
+  return byId.values.toList();
+}
+
+ProcessQueueSource resolveQueueSourceForTask(
+  Task target, {
+  required ProcessQueueSource currentSource,
+  required List<TaskPlaylist> playlists,
+}) {
+  if (target.status == TaskStatus.someday) {
+    return const ProcessQueueSource(kind: ProcessQueueKind.someday);
+  }
+
+  if (currentSource.kind == ProcessQueueKind.playlist &&
+      currentSource.playlistId != null) {
+    for (final playlist in playlists) {
+      if (playlist.id == currentSource.playlistId &&
+          playlist.taskIds.contains(target.id)) {
+        return currentSource;
+      }
+    }
+  }
+
+  TaskPlaylist? solePlaylist;
+  for (final playlist in playlists) {
+    if (!playlist.taskIds.contains(target.id)) continue;
+    if (solePlaylist != null) {
+      return const ProcessQueueSource.inbox();
+    }
+    solePlaylist = playlist;
+  }
+  if (solePlaylist != null) {
+    return ProcessQueueSource(
+      kind: ProcessQueueKind.playlist,
+      playlistId: solePlaylist.id,
+    );
+  }
+
+  return const ProcessQueueSource.inbox();
+}
+
+final searchableProcessTasksProvider = Provider<AsyncValue<List<Task>>>((ref) {
+  final inboxAsync = ref.watch(inboxTasksProvider);
+  final somedayAsync = ref.watch(somedayTasksProvider);
+  final playlistsAsync = ref.watch(playlistsProvider);
+
+  if (inboxAsync.isLoading ||
+      somedayAsync.isLoading ||
+      playlistsAsync.isLoading) {
+    return const AsyncValue.loading();
+  }
+  if (inboxAsync.hasError) {
+    return AsyncValue.error(inboxAsync.error!, inboxAsync.stackTrace!);
+  }
+  if (somedayAsync.hasError) {
+    return AsyncValue.error(somedayAsync.error!, somedayAsync.stackTrace!);
+  }
+  if (playlistsAsync.hasError) {
+    return AsyncValue.error(playlistsAsync.error!, playlistsAsync.stackTrace!);
+  }
+
+  return AsyncValue.data(
+    resolveSearchableProcessTasks(
+      inbox: inboxAsync.value ?? [],
+      someday: somedayAsync.value ?? [],
+      playlists: playlistsAsync.value ?? [],
+    ),
+  );
+});
+
 final processTasksProvider = Provider<AsyncValue<List<Task>>>((ref) {
   final sourceAsync = ref.watch(processQueueSourceProvider);
   final inboxAsync = ref.watch(inboxTasksProvider);
