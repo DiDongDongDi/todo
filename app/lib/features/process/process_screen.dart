@@ -1237,6 +1237,8 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
 
     _deckTransitionCompleter = Completer<void>();
 
+    unawaited(_playTrashFeedback());
+
     setState(() {
       _deckTransitionActive = true;
       _deckMode = CardDeckTransitionMode.delete;
@@ -1269,7 +1271,6 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     );
 
     unawaited(triggerSyncIfSignedIn(ref));
-    unawaited(_playTrashFeedback());
   }
 
   Future<void> _moveToSomeday(Task task, {bool animated = false}) async {
