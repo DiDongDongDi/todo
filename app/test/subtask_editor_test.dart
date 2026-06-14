@@ -169,7 +169,45 @@ void main() {
 
     expect(controllers.length, 1);
     expect(find.byType(TextField), findsOneWidget);
-    expect(FocusManager.instance.primaryFocus?.hasFocus, isTrue);
+    final focusNode =
+        tester.widget<TextField>(find.byType(TextField)).focusNode!;
+    expect(focusNode.hasFocus, isTrue);
+  });
+
+  testWidgets(
+      'SubtaskTitleEditor focuses appended row when list mutates in place',
+      (tester) async {
+    final controllers = <TextEditingController>[];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SubtaskTitleEditor(
+            controllers: controllers,
+            onRemove: (_) {},
+          ),
+        ),
+      ),
+    );
+
+    controllers.add(TextEditingController());
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SubtaskTitleEditor(
+            controllers: controllers,
+            onRemove: (_) {},
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.byType(TextField), findsOneWidget);
+    final focusNode =
+        tester.widget<TextField>(find.byType(TextField)).focusNode!;
+    expect(focusNode.hasFocus, isTrue);
   });
 
   testWidgets('SubtaskTitleEditor inserts row and focuses on submit',

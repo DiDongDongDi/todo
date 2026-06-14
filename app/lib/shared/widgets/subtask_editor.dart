@@ -86,27 +86,35 @@ class _SubtaskTitleEditorState extends State<SubtaskTitleEditor> {
   bool _pasteHandling = false;
   bool _suppressFocusNotify = false;
   bool _awaitingSubmitFocus = false;
+  int _trackedControllerCount = 0;
 
   @override
   void initState() {
     super.initState();
+    _trackedControllerCount = widget.controllers.length;
     _syncFocusNodes();
   }
 
   @override
   void didUpdateWidget(SubtaskTitleEditor oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // 父级可能就地 mutate 同一 List，old/new widget 的 length 会相同。
-    if (_pendingFocusIndex == null) {
-      final oldCount = oldWidget.controllers.length;
-      final newCount = widget.controllers.length;
-      if (newCount == oldCount + 1 && widget.controllers.last.text.isEmpty) {
-        _pendingFocusIndex = newCount - 1;
-        _suppressFocusNotify = true;
-        _awaitingSubmitFocus = true;
-      }
-    }
+    // 父级可能在 setState 中就地 mutate 同一 List，old/new widget 的 length 会相同。
+    // 追加行的聚焦在 build() 里通过 _trackedControllerCount 检测。
     _syncFocusNodes();
+  }
+
+  void _maybeScheduleAppendFocus() {
+    final oldCount = _trackedControllerCount;
+    final newCount = widget.controllers.length;
+    if (_pendingFocusIndex == null &&
+        newCount == oldCount + 1 &&
+        newCount > 0 &&
+        widget.controllers.last.text.isEmpty) {
+      _pendingFocusIndex = newCount - 1;
+      _suppressFocusNotify = true;
+      _awaitingSubmitFocus = true;
+    }
+    _trackedControllerCount = newCount;
   }
 
   @override
@@ -469,6 +477,7 @@ class _SubtaskTitleEditorState extends State<SubtaskTitleEditor> {
 
   @override
   Widget build(BuildContext context) {
+    _maybeScheduleAppendFocus();
     _syncFocusNodes();
     _syncPasteFormatters();
     if (widget.controllers.isEmpty) {
