@@ -550,6 +550,22 @@ class TaskRepository {
     return updated;
   }
 
+  Future<Task> resetCheckInProgress(String id) async {
+    final task = await _require(id);
+    if (!hasResettableCheckInProgress(task)) return task;
+
+    final nowUtc = DateTime.now().toUtc();
+    final updated = task.copyWith(
+      checkInCount: 0,
+      updatedAt: nowUtc,
+      syncVersion: task.syncVersion + 1,
+      clearLastCheckInAt: true,
+      clearLastDailyCompletedAt: isRecurring(task),
+    );
+    await _store.upsert(updated);
+    return updated;
+  }
+
   Future<Task> trash(String id) async {
     final task = await _require(id);
     final now = DateTime.now().toUtc();

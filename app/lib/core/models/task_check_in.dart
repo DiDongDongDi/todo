@@ -80,3 +80,9 @@ int clampCheckInCount(int count, int target) {
   if (target < 1) return 0;
   return count.clamp(0, target);
 }
+
+bool hasResettableCheckInProgress(Task task, {DateTime? now}) {
+  if (!hasCheckInGoal(task)) return false;
+  if (effectiveCheckInCount(task, now: now) > 0) return true;
+  return isRecurring(task) && isPeriodCompleted(task, now ?? DateTime.now());
+}

@@ -496,6 +496,47 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
     );
   }
 
+  Future<void> _resetCheckInProgress() async {
+    final task = _task;
+    if (task == null || !hasResettableCheckInProgress(task)) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('重置打卡进度'),
+          content: Text(
+            '确定将「${task.displayTitle}」的打卡进度重置为 0/${task.checkInTarget}？',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('重置'),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed != true || !mounted) return;
+
+    await AppHaptics.light();
+    final repo = await ref.read(taskRepositoryProvider.future);
+    await repo.resetCheckInProgress(task.id);
+    unawaited(triggerSyncIfSignedIn(ref));
+    await _load();
+    if (!mounted) return;
+    showAppSnackBar(
+      context,
+      message: '打卡进度已重置',
+      icon: Icons.restart_alt,
+      type: AppSnackType.success,
+    );
+  }
+
   Future<void> _deleteParentTask() async {
     final task = _task;
     if (task == null || _editingTask || _editingSubtasks) return;
@@ -750,6 +791,15 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
               color: colorScheme.primary,
             ),
           ),
+          if (hasResettableCheckInProgress(task)) ...[
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                onPressed: _resetCheckInProgress,
+                child: const Text('重置进度'),
+              ),
+            ),
+          ],
         ],
         if (task.attachments.isNotEmpty) ...[
           const SizedBox(height: 16),

@@ -223,6 +223,85 @@ void main() {
     });
   });
 
+  group('resetCheckInProgress', () {
+    test('resets partial progress', () async {
+      final created = await repo.createInbox(
+        title: 'Workout',
+        checkInTarget: 3,
+      );
+      await repo.checkIn(created.id);
+      await repo.checkIn(created.id);
+
+      final reset = await repo.resetCheckInProgress(created.id);
+      expect(reset.checkInCount, 0);
+      expect(reset.lastCheckInAt, isNull);
+      expect(reset.checkInTarget, 3);
+      expect(reset.status, TaskStatus.inbox);
+    });
+
+    test('resets recurring period completion', () async {
+      final created = await repo.createInbox(
+        title: 'Daily habit',
+        recurrence: TaskRecurrence.daily,
+        checkInTarget: 2,
+      );
+      await repo.checkIn(created.id);
+      final completed = await repo.checkIn(created.id);
+      expect(isPeriodCompleted(completed.task, DateTime.now()), isTrue);
+
+      final reset = await repo.resetCheckInProgress(created.id);
+      expect(reset.checkInCount, 0);
+      expect(reset.lastCheckInAt, isNull);
+      expect(reset.lastDailyCompletedAt, isNull);
+      expect(isPeriodCompleted(reset, DateTime.now()), isFalse);
+    });
+
+    test('no-op when no progress', () async {
+      final created = await repo.createInbox(
+        title: 'Fresh',
+        checkInTarget: 3,
+      );
+
+      final reset = await repo.resetCheckInProgress(created.id);
+      expect(reset.checkInCount, 0);
+      expect(reset.lastCheckInAt, isNull);
+      expect(reset.syncVersion, created.syncVersion);
+    });
+
+    test('no-op when check-in not enabled', () async {
+      final created = await repo.createInbox(title: 'Simple');
+      await repo.checkIn(created.id);
+
+      final reset = await repo.resetCheckInProgress(created.id);
+      expect(reset.status, TaskStatus.archived);
+    });
+  });
+
+  group('hasResettableCheckInProgress', () {
+    test('true for partial progress', () {
+      final task = _task(checkInTarget: 3, checkInCount: 2);
+      expect(hasResettableCheckInProgress(task), isTrue);
+    });
+
+    test('true for completed recurring period with zero count', () {
+      final today = DateTime.now();
+      final task = _task(
+        recurrence: TaskRecurrence.daily,
+        checkInTarget: 2,
+        lastDailyCompletedAt: today,
+      );
+      expect(hasResettableCheckInProgress(task, now: today), isTrue);
+    });
+
+    test('false when no check-in goal', () {
+      expect(hasResettableCheckInProgress(_task()), isFalse);
+    });
+
+    test('false when no progress', () {
+      expect(hasResettableCheckInProgress(_task(checkInTarget: 3)), isFalse);
+    });
+  });
+
   group('labels', () {
     test('checkInLabel shows progress', () {
       final task = _task(checkInTarget: 3, checkInCount: 2);
