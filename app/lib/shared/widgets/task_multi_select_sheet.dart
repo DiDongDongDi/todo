@@ -81,11 +81,10 @@ class _TaskMultiSelectSheetState extends State<_TaskMultiSelectSheet> {
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: TextField(
                   controller: _queryController,
-                  decoration: const InputDecoration(
+                  style: taskSearchInputStyle(context),
+                  decoration: taskSearchInputDecoration(
+                    context,
                     hintText: '搜索任务…',
-                    prefixIcon: Icon(Icons.search),
-                    border: OutlineInputBorder(),
-                    isDense: true,
                   ),
                   onChanged: (_) => setState(() {}),
                 ),

@@ -13,6 +13,26 @@ List<Task> filterTasksForSearch(List<Task> tasks, String query) {
   }).toList();
 }
 
+TextStyle? taskSearchInputStyle(BuildContext context) {
+  return Theme.of(context).textTheme.bodyMedium;
+}
+
+InputDecoration taskSearchInputDecoration(
+  BuildContext context, {
+  String hintText = '搜索任务',
+}) {
+  final theme = Theme.of(context);
+  return InputDecoration(
+    hintText: hintText,
+    hintStyle: theme.textTheme.bodyMedium?.copyWith(
+      color: theme.colorScheme.onSurface.withValues(alpha: 0.35),
+    ),
+    prefixIcon: const Icon(Icons.search),
+    border: const OutlineInputBorder(),
+    isDense: true,
+  );
+}
+
 Future<Task?> showProcessTaskSearchSheet(
   BuildContext context, {
   required List<Task> tasks,
@@ -85,9 +105,6 @@ class _ProcessTaskSearchSheetState extends State<_ProcessTaskSearchSheet> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final hintStyle = theme.textTheme.bodyMedium?.copyWith(
-      color: theme.colorScheme.onSurface.withValues(alpha: 0.35),
-    );
 
     return Padding(
       padding: EdgeInsets.only(
@@ -106,14 +123,8 @@ class _ProcessTaskSearchSheetState extends State<_ProcessTaskSearchSheet> {
                 child: TextField(
                   controller: _queryController,
                   focusNode: _searchFocusNode,
-                  style: theme.textTheme.bodyMedium,
-                  decoration: InputDecoration(
-                    hintText: '搜索任务',
-                    hintStyle: hintStyle,
-                    prefixIcon: const Icon(Icons.search),
-                    border: const OutlineInputBorder(),
-                    isDense: true,
-                  ),
+                  style: taskSearchInputStyle(context),
+                  decoration: taskSearchInputDecoration(context),
                 ),
               ),
               Expanded(
