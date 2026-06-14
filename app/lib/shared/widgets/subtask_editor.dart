@@ -84,6 +84,8 @@ class _SubtaskTitleEditorState extends State<SubtaskTitleEditor> {
   final List<_SubtaskPasteFallbackFormatter> _pasteFormatters = [];
   int? _pendingFocusIndex;
   bool _pasteHandling = false;
+  bool _suppressFocusNotify = false;
+  bool _awaitingSubmitFocus = false;
 
   @override
   void initState() {
@@ -361,17 +363,43 @@ class _SubtaskTitleEditorState extends State<SubtaskTitleEditor> {
     }
   }
 
+  void _clearSubmitFocusSuppression({int retries = 5}) {
+    _suppressFocusNotify = false;
+    if (_focusNodes.any((node) => node.hasFocus) || retries <= 0) {
+      _awaitingSubmitFocus = false;
+      _notifyFocusChanged();
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _clearSubmitFocusSuppression(retries: retries - 1);
+    });
+  }
+
   void _applyPendingFocus() {
     final focusIndex = _pendingFocusIndex;
     if (focusIndex == null) return;
-    if (focusIndex < 0 || focusIndex >= _focusNodes.length) return;
+    if (focusIndex < 0 || focusIndex >= _focusNodes.length) {
+      _clearSubmitFocusSuppression();
+      return;
+    }
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
+      if (!mounted) {
+        _suppressFocusNotify = false;
+        return;
+      }
       final index = _pendingFocusIndex;
-      if (index == null || index < 0 || index >= _focusNodes.length) return;
+      if (index == null || index < 0 || index >= _focusNodes.length) {
+        _clearSubmitFocusSuppression();
+        return;
+      }
       _pendingFocusIndex = null;
       _focusNodes[index].requestFocus();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _clearSubmitFocusSuppression();
+      });
     });
   }
 
@@ -380,14 +408,28 @@ class _SubtaskTitleEditorState extends State<SubtaskTitleEditor> {
     final onSubmitRow = widget.onSubmitRow;
     if (onSubmitRow == null) return;
 
-    _pendingFocusIndex = await onSubmitRow(index);
-    if (!mounted) return;
-    _applyPendingFocus();
+    _suppressFocusNotify = true;
+    _awaitingSubmitFocus = true;
+    try {
+      _pendingFocusIndex = await onSubmitRow(index);
+      if (!mounted) {
+        _suppressFocusNotify = false;
+        _awaitingSubmitFocus = false;
+        return;
+      }
+      _applyPendingFocus();
+    } catch (_) {
+      _suppressFocusNotify = false;
+      _awaitingSubmitFocus = false;
+      rethrow;
+    }
   }
 
   void _notifyFocusChanged() {
-    if (!mounted) return;
+    if (!mounted || _suppressFocusNotify) return;
     final anyFocused = _focusNodes.any((node) => node.hasFocus);
+    if (_awaitingSubmitFocus && !anyFocused) return;
+    if (anyFocused) _awaitingSubmitFocus = false;
     widget.onAnyFieldFocusChanged?.call(anyFocused);
   }
 
@@ -440,7 +482,14 @@ class _SubtaskTitleEditorState extends State<SubtaskTitleEditor> {
                   inputFormatters: [_pasteFallbackFormatter(index)],
                   contextMenuBuilder: (context, editableTextState) =>
                       _buildContextMenu(context, editableTextState, index),
-                  onSubmitted: (_) => _handleSubmitted(index),
+                  onSubmitted: (_) {
+                    if (widget.controllers[index].text.trim().isNotEmpty &&
+                        widget.onSubmitRow != null) {
+                      _suppressFocusNotify = true;
+                      _awaitingSubmitFocus = true;
+                    }
+                    unawaited(_handleSubmitted(index));
+                  },
                 ),
               ),
               IconButton(

@@ -72,7 +72,11 @@ void main() {
 
     expect(FocusManager.instance.primaryFocus?.hasFocus, isTrue);
 
-    await tester.enterText(find.byType(TextField), '子任务内容');
+    controllers.first.value = const TextEditingValue(
+      text: '子任务内容',
+      selection: TextSelection.collapsed(offset: 5),
+    );
+    await tester.pump();
     expect(controllers.first.text, '子任务内容');
   });
 
@@ -109,7 +113,11 @@ void main() {
     await tester.pump();
 
     expect(FocusManager.instance.primaryFocus?.hasFocus, isTrue);
-    await tester.enterText(find.byType(TextField), '洗袜子');
+    controllers.first.value = const TextEditingValue(
+      text: '洗袜子',
+      selection: TextSelection.collapsed(offset: 3),
+    );
+    await tester.pump();
     expect(controllers.first.text, '洗袜子');
   });
 
@@ -134,7 +142,7 @@ void main() {
 
     await tester.tap(find.byType(TextField));
     await tester.pump();
-    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.testTextInput.receiveAction(TextInputAction.next);
     await tester.pump();
 
     expect(submitCount, 0);
@@ -153,8 +161,12 @@ void main() {
 
     await tester.tap(find.byType(TextField).first);
     await tester.pump();
-    await tester.enterText(find.byType(TextField).first, '第一项');
-    await tester.testTextInput.receiveAction(TextInputAction.done);
+    controllers.first.value = const TextEditingValue(
+      text: '第一项',
+      selection: TextSelection.collapsed(offset: 3),
+    );
+    await tester.pump();
+    await tester.testTextInput.receiveAction(TextInputAction.next);
     await tester.pump();
     await tester.pump();
 
@@ -164,12 +176,51 @@ void main() {
     expect(find.byType(TextField), findsNWidgets(2));
     expect(FocusManager.instance.primaryFocus?.hasFocus, isTrue);
   });
+
+  testWidgets('SubtaskTitleEditor keeps focus callback stable during submit',
+      (tester) async {
+    final controllers = [TextEditingController()];
+    final focusHistory = <bool>[];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: _SubtaskEditorHarness(
+          controllers: controllers,
+          onAnyFieldFocusChanged: focusHistory.add,
+        ),
+      ),
+    );
+
+    await tester.tap(find.byType(TextField).first);
+    await tester.pump();
+    focusHistory.clear();
+
+    controllers.first.value = const TextEditingValue(
+      text: '第一项',
+      selection: TextSelection.collapsed(offset: 3),
+    );
+    await tester.pump();
+    await tester.testTextInput.receiveAction(TextInputAction.next);
+    await tester.pump();
+    await tester.pump();
+
+    expect(controllers.length, 2);
+    expect(controllers.first.text, '第一项');
+    expect(controllers[1].text, isEmpty);
+    expect(focusHistory.contains(false), isFalse);
+    expect(find.byType(TextField), findsNWidgets(2));
+    expect(FocusManager.instance.primaryFocus?.hasFocus, isTrue);
+  });
 }
 
 class _SubtaskEditorHarness extends StatefulWidget {
-  const _SubtaskEditorHarness({required this.controllers});
+  const _SubtaskEditorHarness({
+    required this.controllers,
+    this.onAnyFieldFocusChanged,
+  });
 
   final List<TextEditingController> controllers;
+  final ValueChanged<bool>? onAnyFieldFocusChanged;
 
   @override
   State<_SubtaskEditorHarness> createState() => _SubtaskEditorHarnessState();
@@ -190,6 +241,7 @@ class _SubtaskEditorHarnessState extends State<_SubtaskEditorHarness> {
         controllers: widget.controllers,
         onRemove: (_) {},
         onSubmitRow: _submitRow,
+        onAnyFieldFocusChanged: widget.onAnyFieldFocusChanged,
       ),
     );
   }
