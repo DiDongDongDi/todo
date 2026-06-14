@@ -141,6 +141,28 @@ void main() {
     expect(controllers.length, 1);
   });
 
+  testWidgets(
+      'SubtaskTitleEditor focuses appended row when parent adds controller',
+      (tester) async {
+    final controllers = <TextEditingController>[];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: _SubtaskAppendHarness(controllers: controllers),
+      ),
+    );
+
+    expect(find.byType(TextField), findsNothing);
+
+    await tester.tap(find.byIcon(Icons.add));
+    await tester.pump();
+    await tester.pump();
+
+    expect(controllers.length, 1);
+    expect(find.byType(TextField), findsOneWidget);
+    expect(FocusManager.instance.primaryFocus?.hasFocus, isTrue);
+  });
+
   testWidgets('SubtaskTitleEditor inserts row and focuses on submit',
       (tester) async {
     final controllers = [TextEditingController()];
@@ -164,6 +186,36 @@ void main() {
     expect(find.byType(TextField), findsNWidgets(2));
     expect(FocusManager.instance.primaryFocus?.hasFocus, isTrue);
   });
+}
+
+class _SubtaskAppendHarness extends StatefulWidget {
+  const _SubtaskAppendHarness({required this.controllers});
+
+  final List<TextEditingController> controllers;
+
+  @override
+  State<_SubtaskAppendHarness> createState() => _SubtaskAppendHarnessState();
+}
+
+class _SubtaskAppendHarnessState extends State<_SubtaskAppendHarness> {
+  void _addRow() {
+    setState(() => widget.controllers.add(TextEditingController()));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Column(
+        children: [
+          IconButton(onPressed: _addRow, icon: const Icon(Icons.add)),
+          SubtaskTitleEditor(
+            controllers: widget.controllers,
+            onRemove: (_) {},
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _SubtaskEditorHarness extends StatefulWidget {
