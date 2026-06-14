@@ -203,9 +203,13 @@ class _AskAiScreenState extends ConsumerState<AskAiScreen> {
                 enabled: signedIn && !_loading,
                 maxLines: 4,
                 minLines: 3,
-                decoration: const InputDecoration(
+                style: theme.textTheme.bodyMedium,
+                decoration: InputDecoration(
                   hintText: '例如：今天想整理一下家里，有什么适合做的？',
-                  border: OutlineInputBorder(),
+                  hintStyle: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.35),
+                  ),
+                  border: const OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 12),
