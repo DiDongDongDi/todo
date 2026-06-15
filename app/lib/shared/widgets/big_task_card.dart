@@ -414,6 +414,10 @@ class BigTaskCard extends StatelessWidget {
                   alignment: Alignment.centerLeft,
                   child: TextButton(
                     onPressed: onResetCheckInProgress,
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      alignment: Alignment.centerLeft,
+                    ),
                     child: const Text('重置进度'),
                   ),
                 ),
