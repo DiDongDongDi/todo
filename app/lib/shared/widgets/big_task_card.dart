@@ -42,6 +42,7 @@ class BigTaskCard extends StatelessWidget {
     this.scheduleEditor,
     this.checkInEditor,
     this.checkInLabel,
+    this.onResetCheckInProgress,
     this.onCancelEdit,
     this.editing = false,
     this.onEnterEdit,
@@ -79,6 +80,7 @@ class BigTaskCard extends StatelessWidget {
   final Widget? scheduleEditor;
   final Widget? checkInEditor;
   final String? checkInLabel;
+  final VoidCallback? onResetCheckInProgress;
   final VoidCallback? onCancelEdit;
 
   /// 处理 tab：false 时标题为只读 [TextField]，true 时可编辑。
@@ -407,6 +409,15 @@ class BigTaskCard extends StatelessWidget {
                   color: colorScheme.primary,
                 ),
               ),
+              if (onResetCheckInProgress != null) ...[
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton(
+                    onPressed: onResetCheckInProgress,
+                    child: const Text('重置进度'),
+                  ),
+                ),
+              ],
             ],
             if (displayTask.attachments.isNotEmpty) ...[
               const SizedBox(height: 20),
