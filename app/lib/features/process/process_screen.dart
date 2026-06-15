@@ -1499,77 +1499,88 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
             total: archivedToday + taskCount,
           ),
           const SizedBox(width: 12),
-          Flexible(
-            child: Text(
-              '$taskCount 待处理',
-              style: theme.textTheme.bodyMedium,
-              overflow: TextOverflow.ellipsis,
+          Text(
+            '$taskCount 待处理',
+            style: theme.textTheme.bodyMedium,
+          ),
+          Expanded(
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerRight,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.search),
+                      tooltip: '搜索任务',
+                      onPressed: canSearch ? onSearch : null,
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.shuffle),
+                      tooltip: '随机打散',
+                      onPressed: taskCount > 1 &&
+                              onShuffle != null &&
+                              !_editUiVisible &&
+                              !_shuffling
+                          ? onShuffle
+                          : null,
+                    ),
+                    const ProcessQueueSelector(),
+                    TabMoreMenuButton<ProcessMoreAction>(
+                      items: [
+                        TabMoreMenuEntry.item(
+                          value: ProcessMoreAction.someday,
+                          icon: Icons.lightbulb_outline,
+                          label: '将来也许',
+                        ),
+                        TabMoreMenuEntry.item(
+                          value: ProcessMoreAction.archive,
+                          icon: Icons.task_alt_outlined,
+                          label: '已完成',
+                        ),
+                        TabMoreMenuEntry.item(
+                          value: ProcessMoreAction.trash,
+                          icon: Icons.delete_outline,
+                          label: '回收站',
+                        ),
+                        if (onSaveTemplate != null ||
+                            onDeleteCurrentTask != null) ...[
+                          const TabMoreMenuEntry.divider(),
+                          if (onSaveTemplate != null)
+                            TabMoreMenuEntry.item(
+                              value: ProcessMoreAction.saveTemplate,
+                              icon: Icons.bookmark_outline,
+                              label: '保存为模板',
+                            ),
+                          if (onDeleteCurrentTask != null)
+                            TabMoreMenuEntry.item(
+                              value: ProcessMoreAction.delete,
+                              icon: Icons.delete_outline,
+                              label: '删除当前任务',
+                            ),
+                        ],
+                      ],
+                      onSelected: (action) {
+                        switch (action) {
+                          case ProcessMoreAction.someday:
+                            context.push('/someday');
+                          case ProcessMoreAction.archive:
+                            context.push('/archive');
+                          case ProcessMoreAction.trash:
+                            context.push('/trash');
+                          case ProcessMoreAction.saveTemplate:
+                            onSaveTemplate?.call();
+                          case ProcessMoreAction.delete:
+                            onDeleteCurrentTask?.call();
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              ),
             ),
-          ),
-          const Spacer(),
-          IconButton(
-            icon: const Icon(Icons.search),
-            tooltip: '搜索任务',
-            onPressed: canSearch ? onSearch : null,
-          ),
-          IconButton(
-            icon: const Icon(Icons.shuffle),
-            tooltip: '随机打散',
-            onPressed: taskCount > 1 &&
-                    onShuffle != null &&
-                    !_editUiVisible &&
-                    !_shuffling
-                ? onShuffle
-                : null,
-          ),
-          const ProcessQueueSelector(),
-          TabMoreMenuButton<ProcessMoreAction>(
-            items: [
-              TabMoreMenuEntry.item(
-                value: ProcessMoreAction.someday,
-                icon: Icons.lightbulb_outline,
-                label: '将来也许',
-              ),
-              TabMoreMenuEntry.item(
-                value: ProcessMoreAction.archive,
-                icon: Icons.task_alt_outlined,
-                label: '已完成',
-              ),
-              TabMoreMenuEntry.item(
-                value: ProcessMoreAction.trash,
-                icon: Icons.delete_outline,
-                label: '回收站',
-              ),
-              if (onSaveTemplate != null || onDeleteCurrentTask != null) ...[
-                const TabMoreMenuEntry.divider(),
-                if (onSaveTemplate != null)
-                  TabMoreMenuEntry.item(
-                    value: ProcessMoreAction.saveTemplate,
-                    icon: Icons.bookmark_outline,
-                    label: '保存为模板',
-                  ),
-                if (onDeleteCurrentTask != null)
-                  TabMoreMenuEntry.item(
-                    value: ProcessMoreAction.delete,
-                    icon: Icons.delete_outline,
-                    label: '删除当前任务',
-                  ),
-              ],
-            ],
-            onSelected: (action) {
-              switch (action) {
-                case ProcessMoreAction.someday:
-                  context.push('/someday');
-                case ProcessMoreAction.archive:
-                  context.push('/archive');
-                case ProcessMoreAction.trash:
-                  context.push('/trash');
-                case ProcessMoreAction.saveTemplate:
-                  onSaveTemplate?.call();
-                case ProcessMoreAction.delete:
-                  onDeleteCurrentTask?.call();
-              }
-            },
           ),
         ],
       ),

@@ -60,4 +60,21 @@ void main() {
 
     expect(hasEmpty || hasTasks, isTrue);
   });
+
+  testWidgets('Process tab shows full pending label on narrow screen',
+      (WidgetTester tester) async {
+    await tester.binding.setSurfaceSize(const Size(360, 640));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(const ProviderScope(child: TodoApp()));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 2));
+
+    await tester.tap(find.byIcon(Icons.swipe_outlined));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 2));
+
+    expect(find.textContaining('待处理'), findsOneWidget);
+    expect(find.textContaining('待...'), findsNothing);
+  });
 }
