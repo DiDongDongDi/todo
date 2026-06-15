@@ -12,6 +12,7 @@ import 'package:todo_app/core/sync/sync_engine.dart';
 import 'package:todo_app/shared/utils/app_audio_recorder.dart';
 import 'package:todo_app/shared/utils/attachment_storage.dart';
 import 'package:todo_app/shared/utils/audio_storage.dart';
+import 'package:todo_app/shared/utils/haptics.dart';
 import 'package:todo_app/shared/widgets/app_snackbar.dart';
 import 'package:todo_app/shared/widgets/attachment_image.dart';
 import 'package:todo_app/shared/widgets/audio_preview.dart';
@@ -86,6 +87,7 @@ class _TemplateEditScreenState extends ConsumerState<TemplateEditScreen> {
   }
 
   void _addSubtaskField() {
+    unawaited(AppHaptics.light());
     setState(() => _subtaskControllers.add(TextEditingController()));
   }
 
@@ -111,6 +113,7 @@ class _TemplateEditScreenState extends ConsumerState<TemplateEditScreen> {
   }
 
   Future<void> _pickImage() async {
+    unawaited(AppHaptics.light());
     final picker = ImagePicker();
     final file = await picker.pickImage(source: ImageSource.gallery);
     if (file == null) return;
@@ -135,6 +138,7 @@ class _TemplateEditScreenState extends ConsumerState<TemplateEditScreen> {
   }
 
   Future<void> _toggleRecording() async {
+    unawaited(AppHaptics.light());
     if (kIsWeb) {
       if (!mounted) return;
       showAppSnackBar(

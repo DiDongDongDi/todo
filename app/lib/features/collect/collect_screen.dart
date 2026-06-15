@@ -190,6 +190,7 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
   }
 
   void _addSubtaskField() {
+    unawaited(AppHaptics.light());
     setState(() => _subtaskControllers.add(TextEditingController()));
   }
 
@@ -433,6 +434,7 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
   }
 
   Future<void> _pickImage() async {
+    unawaited(AppHaptics.light());
     if (_attachments.length >= ResourceLimits.maxAttachmentsPerTask) {
       if (!mounted) return;
       showAppSnackBar(
@@ -487,6 +489,7 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
   }
 
   Future<void> _toggleRecording() async {
+    unawaited(AppHaptics.light());
     if (kIsWeb) {
       if (!mounted) return;
       showAppSnackBar(

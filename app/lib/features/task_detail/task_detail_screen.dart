@@ -257,6 +257,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
   }
 
   Future<void> _pickEditImage() async {
+    unawaited(AppHaptics.light());
     _beginTransientEditUi();
     final picker = ImagePicker();
     try {
@@ -286,6 +287,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
   }
 
   Future<void> _toggleEditRecording() async {
+    unawaited(AppHaptics.light());
     if (_editRecording) {
       final result = await _editAudioRecorder.stop();
       if (!mounted) return;
@@ -354,6 +356,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
   }
 
   void _enterSubtaskEdit({bool addEmptyRow = false}) {
+    unawaited(AppHaptics.light());
     if (_editingTask) {
       _cancelTaskEdit();
     }
@@ -371,6 +374,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
   }
 
   void _addEditSubtaskField() {
+    unawaited(AppHaptics.light());
     setState(() {
       _editSubtaskControllers.add(TextEditingController());
       _editSubtaskIds.add(null);

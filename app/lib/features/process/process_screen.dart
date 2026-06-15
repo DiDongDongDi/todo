@@ -327,6 +327,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
   }
 
   void _addEditSubtaskField() {
+    unawaited(AppHaptics.light());
     _editPendingFocus = true;
     setState(() => _editSubtaskControllers.add(TextEditingController()));
   }
@@ -1076,6 +1077,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
   }
 
   Future<void> _pickEditImage() async {
+    unawaited(AppHaptics.light());
     _beginTransientEditUi();
     final picker = ImagePicker();
     try {
@@ -1105,6 +1107,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
   }
 
   Future<void> _toggleEditRecording() async {
+    unawaited(AppHaptics.light());
     if (_editRecording) {
       final result = await _editAudioRecorder.stop();
       if (!mounted) return;
