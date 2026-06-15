@@ -817,6 +817,10 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
                   scheduleLabel: scheduleLabel(task),
                   scheduleOverdue: isOverdue(task),
                   checkInLabel: checkInLabel(task),
+                  onResetCheckInProgress: !_editUiVisible &&
+                          hasResettableCheckInProgress(task)
+                      ? () => _resetCheckInProgress(task)
+                      : null,
                   completeLabel: completeLabelForCheckIn(task),
                   parentTitle: parentTitle,
                   onTapParent: task.parentId != null
@@ -1172,6 +1176,45 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     } else {
       await _performArchive(task);
     }
+  }
+
+  Future<void> _resetCheckInProgress(Task task) async {
+    if (!hasResettableCheckInProgress(task)) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('重置打卡进度'),
+          content: Text(
+            '确定将「${task.displayTitle}」的打卡进度重置为 0/${task.checkInTarget}？',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('重置'),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed != true || !mounted) return;
+
+    await AppHaptics.light();
+    final repo = await ref.read(taskRepositoryProvider.future);
+    await repo.resetCheckInProgress(task.id);
+    unawaited(triggerSyncIfSignedIn(ref));
+    if (!mounted) return;
+    showAppSnackBar(
+      context,
+      message: '打卡进度已重置',
+      icon: Icons.restart_alt,
+      type: AppSnackType.success,
+    );
   }
 
   Future<void> _performArchive(Task task) async {
