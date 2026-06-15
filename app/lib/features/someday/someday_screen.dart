@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:todo_app/core/models/task.dart';
 import 'package:todo_app/core/repositories/task_repository.dart';
 import 'package:todo_app/core/sync/sync_engine.dart';
 import 'package:todo_app/shared/widgets/app_snackbar.dart';
@@ -28,6 +29,7 @@ class SomedayScreen extends ConsumerWidget {
       ),
       body: RestoreTaskListView(
         tasksProvider: somedayTasksProvider,
+        revertStatus: TaskStatus.someday,
         emptyMessage: '暂无将来也许的任务',
         restoreIcon: Icons.restore,
         restoreTooltip: '恢复到收集箱',

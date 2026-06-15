@@ -12,16 +12,35 @@ import 'package:todo_app/shared/utils/sounds.dart';
 import 'package:todo_app/shared/widgets/app_snackbar.dart';
 import 'package:todo_app/shared/widgets/swipeable_restore_tile.dart';
 
+void _showRestoreUndoSnackBar(
+  BuildContext context, {
+  required String message,
+  required VoidCallback onUndo,
+}) {
+  showAppSnackBar(
+    context,
+    message: message,
+    icon: Icons.check_circle_outline,
+    type: AppSnackType.success,
+    action: SnackBarAction(
+      label: '撤销',
+      onPressed: onUndo,
+    ),
+  );
+}
+
 class RestoreTaskListView extends ConsumerStatefulWidget {
   const RestoreTaskListView({
     super.key,
     required this.tasksProvider,
+    required this.revertStatus,
     required this.emptyMessage,
     this.restoreIcon = Icons.undo,
     this.restoreTooltip = '恢复到收集箱',
   });
 
   final StreamProvider<List<Task>> tasksProvider;
+  final TaskStatus revertStatus;
   final String emptyMessage;
   final IconData restoreIcon;
   final String restoreTooltip;
@@ -40,6 +59,8 @@ class _RestoreTaskListViewState extends ConsumerState<RestoreTaskListView> {
 
   List<Task> _tasks = [];
   bool _removing = false;
+  Task? _lastUndoTask;
+  int _lastUndoIndex = -1;
 
   void _syncTasks(List<Task> tasks) {
     if (_removing) return;
@@ -56,10 +77,58 @@ class _RestoreTaskListViewState extends ConsumerState<RestoreTaskListView> {
     return _defaultRowHeight;
   }
 
+  Future<void> _insertTaskAt(int index, Task task) async {
+    final insertIndex = index.clamp(0, _tasks.length);
+
+    setState(() {
+      _removing = true;
+      _tasks.insert(insertIndex, task);
+    });
+
+    _listKey.currentState!.insertItem(
+      insertIndex,
+      duration: _collapseDuration,
+    );
+
+    await Future<void>.delayed(_collapseDuration);
+
+    if (!mounted) return;
+    setState(() => _removing = false);
+  }
+
+  Future<void> _undoRestore() async {
+    final task = _lastUndoTask;
+    final index = _lastUndoIndex;
+    if (task == null || index < 0) return;
+
+    final repo = await ref.read(taskRepositoryProvider.future);
+    final Task updated;
+    switch (widget.revertStatus) {
+      case TaskStatus.trashed:
+        updated = await repo.trash(task.id);
+      case TaskStatus.someday:
+        updated = await repo.moveToSomeday(task.id);
+      default:
+        return;
+    }
+    unawaited(triggerSyncIfSignedIn(ref));
+
+    if (!mounted) return;
+
+    _lastUndoTask = null;
+    _lastUndoIndex = -1;
+
+    final fresh = await repo.getById(task.id) ?? updated;
+    await _insertTaskAt(index, fresh);
+  }
+
   Future<void> _handleRestore(int index) async {
     if (_removing || index < 0 || index >= _tasks.length) return;
 
     final task = _tasks[index];
+    _lastUndoTask = task;
+    _lastUndoIndex = index;
+
     final rowHeight = _measureRowHeight(index);
     final slotHeight = rowHeight +
         (index < _tasks.length - 1 ? _separatorHeight : 0);
@@ -88,11 +157,10 @@ class _RestoreTaskListViewState extends ConsumerState<RestoreTaskListView> {
     unawaited(_playRestoreFeedback());
 
     if (!mounted) return;
-    showAppSnackBar(
+    _showRestoreUndoSnackBar(
       context,
       message: '已恢复',
-      icon: Icons.check_circle_outline,
-      type: AppSnackType.success,
+      onUndo: _undoRestore,
     );
   }
 
@@ -168,7 +236,11 @@ class _RestoreTaskListViewState extends ConsumerState<RestoreTaskListView> {
             if (index >= _tasks.length) {
               return const SizedBox.shrink();
             }
-            return _buildRow(_tasks[index], index, parentIds, allTasks);
+            return SizeTransition(
+              sizeFactor: animation,
+              axisAlignment: -1,
+              child: _buildRow(_tasks[index], index, parentIds, allTasks),
+            );
           },
         );
       },
@@ -199,6 +271,8 @@ class _CompletedTaskListViewState extends ConsumerState<CompletedTaskListView> {
 
   List<CompletedTaskEntry> _entries = [];
   bool _removing = false;
+  CompletedTaskEntry? _lastUndoEntry;
+  int _lastUndoIndex = -1;
 
   void _syncEntries(List<CompletedTaskEntry> entries) {
     if (_removing) return;
@@ -215,10 +289,61 @@ class _CompletedTaskListViewState extends ConsumerState<CompletedTaskListView> {
     return _defaultRowHeight;
   }
 
+  Future<void> _insertEntryAt(int index, CompletedTaskEntry entry) async {
+    final insertIndex = index.clamp(0, _entries.length);
+
+    setState(() {
+      _removing = true;
+      _entries.insert(insertIndex, entry);
+    });
+
+    _listKey.currentState!.insertItem(
+      insertIndex,
+      duration: _collapseDuration,
+    );
+
+    await Future<void>.delayed(_collapseDuration);
+
+    if (!mounted) return;
+    setState(() => _removing = false);
+  }
+
+  Future<void> _undoRestore() async {
+    final entry = _lastUndoEntry;
+    final index = _lastUndoIndex;
+    if (entry == null || index < 0) return;
+
+    final repo = await ref.read(taskRepositoryProvider.future);
+    final Task updated;
+    if (entry.isPeriodCompletion) {
+      updated = await repo.completeRecurringPeriod(entry.task.id);
+    } else {
+      updated = await repo.archive(entry.task.id);
+    }
+    unawaited(triggerSyncIfSignedIn(ref));
+
+    if (!mounted) return;
+
+    _lastUndoEntry = null;
+    _lastUndoIndex = -1;
+
+    final fresh = await repo.getById(entry.task.id) ?? updated;
+    await _insertEntryAt(
+      index,
+      CompletedTaskEntry(
+        task: fresh,
+        isPeriodCompletion: entry.isPeriodCompletion,
+      ),
+    );
+  }
+
   Future<void> _handleRestore(int index) async {
     if (_removing || index < 0 || index >= _entries.length) return;
 
     final entry = _entries[index];
+    _lastUndoEntry = entry;
+    _lastUndoIndex = index;
+
     final rowHeight = _measureRowHeight(index);
     final slotHeight = rowHeight +
         (index < _entries.length - 1 ? _separatorHeight : 0);
@@ -251,11 +376,10 @@ class _CompletedTaskListViewState extends ConsumerState<CompletedTaskListView> {
     unawaited(_playRestoreFeedback());
 
     if (!mounted) return;
-    showAppSnackBar(
+    _showRestoreUndoSnackBar(
       context,
       message: entry.isPeriodCompletion ? '已撤销本周期完成' : '已恢复',
-      icon: Icons.check_circle_outline,
-      type: AppSnackType.success,
+      onUndo: _undoRestore,
     );
   }
 
@@ -352,7 +476,11 @@ class _CompletedTaskListViewState extends ConsumerState<CompletedTaskListView> {
             if (index >= _entries.length) {
               return const SizedBox.shrink();
             }
-            return _buildRow(_entries[index], index, parentIds, allTasks);
+            return SizeTransition(
+              sizeFactor: animation,
+              axisAlignment: -1,
+              child: _buildRow(_entries[index], index, parentIds, allTasks),
+            );
           },
         );
       },

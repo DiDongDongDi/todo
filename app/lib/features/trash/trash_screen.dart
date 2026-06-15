@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:todo_app/core/models/task.dart';
 import 'package:todo_app/core/repositories/task_repository.dart';
 import 'package:todo_app/shared/widgets/restore_task_list.dart';
 
@@ -12,6 +13,7 @@ class TrashScreen extends ConsumerWidget {
       appBar: AppBar(title: const Text('回收站')),
       body: RestoreTaskListView(
         tasksProvider: trashedTasksProvider,
+        revertStatus: TaskStatus.trashed,
         emptyMessage: '回收站是空的',
         restoreIcon: Icons.restore,
         restoreTooltip: '恢复',
