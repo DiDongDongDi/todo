@@ -43,6 +43,70 @@
 
 常量定义：[`app/lib/core/limits/resource_limits.dart`](../app/lib/core/limits/resource_limits.dart)
 
+## 白名单（按邮箱）
+
+白名单用户会获得以下特权：
+
+- **问 AI**（`recommend-tasks`）：跳过每分钟/每日次数限制（但仍写入 `ai_usage_log` 便于统计）。
+- **语音转写**（`transcribe`）：跳过每分钟/每日次数限制（但仍写入 `ai_usage_log` 便于统计）。
+- **单任务附件数**：不限制（仍受单文件大小与 Storage 总量限制）。
+
+白名单存放在表：`public.ai_email_whitelist`（`email` 主键，统一小写）。
+
+### 如何管理白名单（Supabase Dashboard）
+
+需要 Supabase 项目 **Owner/Admin** 权限。普通 App 用户只允许读取“自己是否在白名单”，看不到全量列表。
+
+#### 查看列表
+
+1. 打开 https://supabase.com/dashboard → 选择项目
+2. **Table Editor** → `ai_email_whitelist`
+
+或在 **SQL Editor** 执行：
+
+```sql
+SELECT email, note, created_at
+FROM public.ai_email_whitelist
+ORDER BY created_at DESC;
+```
+
+#### 新增用户
+
+**Table Editor**：点 **Insert row**，填写：
+
+- `email`：用户登录邮箱（建议小写，如 `you@example.com`）
+- `note`：可选备注
+
+**SQL Editor**（自动转小写）：
+
+```sql
+INSERT INTO public.ai_email_whitelist (email, note)
+VALUES (lower('You@Example.com'), '创始人')
+ON CONFLICT (email) DO NOTHING;
+```
+
+#### 修改备注
+
+```sql
+UPDATE public.ai_email_whitelist
+SET note = '新备注'
+WHERE email = lower('you@example.com');
+```
+
+#### 删除用户
+
+```sql
+DELETE FROM public.ai_email_whitelist
+WHERE email = lower('you@example.com');
+```
+
+### 生效时机
+
+| 能力 | 何时生效 |
+|------|----------|
+| AI 限流 bypass | 立即：下次调用 Edge Function 时会实时查表 |
+| 附件数放开 | 重新登录或重启 App 后（客户端会拉取并缓存白名单状态） |
+
 ## AI 用量日志清理
 
 Edge Function [`cleanup-ai-usage`](../supabase/functions/cleanup-ai-usage/index.ts) 删除超过 7 天的 `ai_usage_log` 记录。

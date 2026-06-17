@@ -36,52 +36,83 @@ export function createAdminClient(): SupabaseClient {
   return createClient(supabaseUrl, serviceRoleKey);
 }
 
+export type RateLimitOptions = {
+  /** Skip minute/day caps but still log usage (whitelist users). */
+  bypass?: boolean;
+};
+
+export async function isEmailWhitelisted(
+  adminClient: SupabaseClient,
+  email: string | null | undefined,
+): Promise<boolean> {
+  const normalized = email?.trim().toLowerCase();
+  if (!normalized) return false;
+
+  const { data, error } = await adminClient
+    .from("ai_email_whitelist")
+    .select("email")
+    .eq("email", normalized)
+    .maybeSingle();
+
+  if (error) {
+    console.error("whitelist check error:", error);
+    return false;
+  }
+
+  return data != null;
+}
+
 export async function checkRateLimit(
   adminClient: SupabaseClient,
   userId: string,
   action: AiAction,
   config: RateLimitConfig,
+  options?: RateLimitOptions,
 ): Promise<RateLimitResult> {
-  const now = Date.now();
-  const minuteAgo = new Date(now - 60_000).toISOString();
-  const dayAgo = new Date(now - 86_400_000).toISOString();
+  const bypass = options?.bypass === true;
 
-  const { count: minuteCount, error: minuteError } = await adminClient
-    .from("ai_usage_log")
-    .select("id", { count: "exact", head: true })
-    .eq("user_id", userId)
-    .eq("action", action)
-    .gte("created_at", minuteAgo);
+  if (!bypass) {
+    const now = Date.now();
+    const minuteAgo = new Date(now - 60_000).toISOString();
+    const dayAgo = new Date(now - 86_400_000).toISOString();
 
-  if (minuteError) {
-    console.error("rate_limit minute count error:", minuteError);
-    throw new Error("Rate limit check failed");
-  }
+    const { count: minuteCount, error: minuteError } = await adminClient
+      .from("ai_usage_log")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .eq("action", action)
+      .gte("created_at", minuteAgo);
 
-  if ((minuteCount ?? 0) >= config.perMinute) {
-    return {
-      ok: false,
-      message: config.minuteMessage ?? DEFAULT_MESSAGES[action].minute,
-    };
-  }
+    if (minuteError) {
+      console.error("rate_limit minute count error:", minuteError);
+      throw new Error("Rate limit check failed");
+    }
 
-  const { count: dayCount, error: dayError } = await adminClient
-    .from("ai_usage_log")
-    .select("id", { count: "exact", head: true })
-    .eq("user_id", userId)
-    .eq("action", action)
-    .gte("created_at", dayAgo);
+    if ((minuteCount ?? 0) >= config.perMinute) {
+      return {
+        ok: false,
+        message: config.minuteMessage ?? DEFAULT_MESSAGES[action].minute,
+      };
+    }
 
-  if (dayError) {
-    console.error("rate_limit day count error:", dayError);
-    throw new Error("Rate limit check failed");
-  }
+    const { count: dayCount, error: dayError } = await adminClient
+      .from("ai_usage_log")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .eq("action", action)
+      .gte("created_at", dayAgo);
 
-  if ((dayCount ?? 0) >= config.perDay) {
-    return {
-      ok: false,
-      message: config.dayMessage ?? DEFAULT_MESSAGES[action].day,
-    };
+    if (dayError) {
+      console.error("rate_limit day count error:", dayError);
+      throw new Error("Rate limit check failed");
+    }
+
+    if ((dayCount ?? 0) >= config.perDay) {
+      return {
+        ok: false,
+        message: config.dayMessage ?? DEFAULT_MESSAGES[action].day,
+      };
+    }
   }
 
   const { error: insertError } = await adminClient.from("ai_usage_log").insert({

@@ -3,6 +3,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 import {
   checkRateLimit,
   createAdminClient,
+  isEmailWhitelisted,
   rateLimitConfigFor,
 } from "../_shared/rate_limit.ts";
 
@@ -176,11 +177,13 @@ Deno.serve(async (req) => {
     }
 
     const adminForRateLimit = createAdminClient();
+    const bypass = await isEmailWhitelisted(adminForRateLimit, user.email);
     const rateLimit = await checkRateLimit(
       adminForRateLimit,
       user.id,
       "transcribe",
       rateLimitConfigFor("transcribe"),
+      { bypass },
     );
     if (!rateLimit.ok) {
       return jsonError(rateLimit.message, 429);

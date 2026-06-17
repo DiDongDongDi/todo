@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:todo_app/core/limits/entitlement_service.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:todo_app/core/limits/resource_limits.dart';
 import 'package:todo_app/core/models/task.dart';
@@ -435,7 +436,8 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
 
   Future<void> _pickImage() async {
     unawaited(AppHaptics.light());
-    if (_attachments.length >= ResourceLimits.maxAttachmentsPerTask) {
+    final maxAttachments = ref.read(maxAttachmentsPerTaskProvider);
+    if (maxAttachments != null && _attachments.length >= maxAttachments) {
       if (!mounted) return;
       showAppSnackBar(
         context,
@@ -516,7 +518,8 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
         return;
       }
 
-      if (_attachments.length >= ResourceLimits.maxAttachmentsPerTask) {
+      final maxAttachments = ref.read(maxAttachmentsPerTaskProvider);
+      if (maxAttachments != null && _attachments.length >= maxAttachments) {
         showAppSnackBar(
           context,
           message: ResourceLimits.attachmentsPerTaskExceededMessage,

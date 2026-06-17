@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import {
   checkRateLimit,
   createAdminClient,
+  isEmailWhitelisted,
   rateLimitConfigFor,
 } from "../_shared/rate_limit.ts";
 import {
@@ -149,11 +150,13 @@ Deno.serve(async (req) => {
     }
 
     const adminClient = createAdminClient();
+    const bypass = await isEmailWhitelisted(adminClient, user.email);
     const rateLimit = await checkRateLimit(
       adminClient,
       user.id,
       "recommend",
       rateLimitConfigFor("recommend"),
+      { bypass },
     );
     if (!rateLimit.ok) {
       return jsonError(rateLimit.message, 429);
