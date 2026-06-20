@@ -11,6 +11,7 @@ import 'package:todo_app/core/models/task_playlist.dart';
 import 'package:todo_app/core/repositories/playlist_repository.dart';
 import 'package:todo_app/core/repositories/task_repository.dart';
 import 'package:todo_app/core/repositories/template_repository.dart';
+import 'package:todo_app/core/reminders/plan_reminder_provider.dart';
 import 'package:todo_app/core/sync/attachment_upload_service.dart';
 import 'package:todo_app/core/sync/sync_repository.dart';
 import 'package:todo_app/core/transcription/transcription_service.dart';
@@ -112,6 +113,7 @@ class SyncEngine {
       await _ref.read(transcriptionServiceProvider).processPendingTasks();
       _ref.read(lastSyncAtProvider.notifier).state = DateTime.now();
       _ref.read(syncStatusProvider.notifier).state = SyncStatus.idle;
+      await syncPlanRemindersFromProvider(_ref);
     } on TaskLimitExceededException catch (e) {
       debugPrint('Sync task limit: $e');
       _ref.read(syncLimitMessageProvider.notifier).state = e.message;

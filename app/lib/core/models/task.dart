@@ -60,6 +60,7 @@ class Task {
     this.checkInTarget = 1,
     this.checkInCount = 0,
     this.lastCheckInAt,
+    this.isStarred = false,
   });
 
   final String id;
@@ -84,6 +85,7 @@ class Task {
   final int checkInTarget;
   final int checkInCount;
   final DateTime? lastCheckInAt;
+  final bool isStarred;
 
   bool get isSubtask => parentId != null;
 
@@ -115,6 +117,7 @@ class Task {
     int? checkInTarget,
     int? checkInCount,
     DateTime? lastCheckInAt,
+    bool? isStarred,
     bool clearParentId = false,
     bool clearArchivedAt = false,
     bool clearTrashedAt = false,
@@ -151,6 +154,7 @@ class Task {
       lastCheckInAt: clearLastCheckInAt
           ? null
           : (lastCheckInAt ?? this.lastCheckInAt),
+      isStarred: isStarred ?? this.isStarred,
     );
   }
 
@@ -180,6 +184,7 @@ class Task {
         'check_in_count': checkInCount,
         if (lastCheckInAt != null)
           'last_check_in_at': _dateOnlyString(lastCheckInAt!),
+        'is_starred': isStarred,
       };
 
   static String _dateOnlyString(DateTime d) =>
@@ -226,6 +231,7 @@ class Task {
       checkInTarget: (json['check_in_target'] as num?)?.toInt() ?? 1,
       checkInCount: (json['check_in_count'] as num?)?.toInt() ?? 0,
       lastCheckInAt: _parseDateOnly(json['last_check_in_at']),
+      isStarred: json['is_starred'] as bool? ?? false,
     );
   }
 

@@ -337,6 +337,7 @@ class TaskRepository {
     DateTime? dueDate,
     String? parentId,
     int checkInTarget = 1,
+    bool isStarred = false,
   }) async {
     await _ensureTaskCapacity();
     final now = DateTime.now().toUtc();
@@ -361,6 +362,7 @@ class TaskRepository {
       dueDate: normalizedDue,
       parentId: parentId,
       checkInTarget: checkInTarget.clamp(1, 99),
+      isStarred: isStarred,
     );
     await _store.upsert(task);
     return task;
@@ -383,6 +385,7 @@ class TaskRepository {
     DateTime? dailyUntil,
     DateTime? dueDate,
     int checkInTarget = 1,
+    bool isStarred = false,
   }) async {
     final parent = await _require(parentId);
     if (parent.isSubtask) {
@@ -397,6 +400,7 @@ class TaskRepository {
       dueDate: dueDate,
       parentId: parentId,
       checkInTarget: checkInTarget,
+      isStarred: isStarred,
     );
   }
 
@@ -409,6 +413,7 @@ class TaskRepository {
     DateTime? dueDate,
     List<String> subtaskTitles = const [],
     int checkInTarget = 1,
+    bool isStarred = false,
   }) async {
     final parent = await createInbox(
       title: title,
@@ -418,6 +423,7 @@ class TaskRepository {
       dailyUntil: dailyUntil,
       dueDate: dueDate,
       checkInTarget: checkInTarget,
+      isStarred: isStarred,
     );
 
     final subtasks = <Task>[];

@@ -27,6 +27,7 @@ import 'package:todo_app/shared/widgets/save_template_dialog.dart';
 import 'package:todo_app/shared/widgets/subtask_editor.dart';
 import 'package:todo_app/shared/widgets/task_check_in_editor.dart';
 import 'package:todo_app/shared/widgets/task_schedule_editor.dart';
+import 'package:todo_app/shared/widgets/task_star_button.dart';
 
 class TaskDetailScreen extends ConsumerStatefulWidget {
   const TaskDetailScreen({super.key, required this.taskId});
@@ -93,6 +94,15 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
       _subtasks = subtasks;
       _loading = false;
     });
+  }
+
+  Future<void> _toggleStar(Task task) async {
+    await AppHaptics.light();
+    final repo = await ref.read(taskRepositoryProvider.future);
+    final updated = await repo.update(task.copyWith(isStarred: !task.isStarred));
+    unawaited(triggerSyncIfSignedIn(ref));
+    if (!mounted) return;
+    setState(() => _task = updated);
   }
 
   void _onEditFocusChange() {
@@ -731,9 +741,20 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
     final readOnlyContent = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          task.displayTitle,
-          style: theme.textTheme.headlineSmall,
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TaskStarButton(
+              isStarred: task.isStarred,
+              onToggle: () => _toggleStar(task),
+            ),
+            Expanded(
+              child: Text(
+                task.displayTitle,
+                style: theme.textTheme.headlineSmall,
+              ),
+            ),
+          ],
         ),
         if (scheduleLabel(task) != null) ...[
           const SizedBox(height: 8),
@@ -779,6 +800,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
   }
 
   Widget _buildTaskEditFooter(BuildContext context) {
+    final task = _task!;
     final colorScheme = Theme.of(context).colorScheme;
     const compact = VisualDensity.compact;
     const gap = SizedBox(width: 4);
@@ -796,6 +818,12 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
               children: [
               Row(
                 children: [
+                  TaskStarButton(
+                    isStarred: task.isStarred,
+                    onToggle: () => _toggleStar(task),
+                    compact: true,
+                  ),
+                  const SizedBox(width: 8),
                   TaskScheduleEditor(
                     recurrence: _editRecurrence,
                     dailyUntil: _editDailyUntil,
@@ -897,6 +925,10 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
         title: const Text('父任务'),
         actions: [
           if (!_editingTask && !_editingSubtasks) ...[
+            TaskStarButton(
+              isStarred: task.isStarred,
+              onToggle: () => _toggleStar(task),
+            ),
             IconButton(
               icon: const Icon(Icons.delete_outline),
               tooltip: '删除',

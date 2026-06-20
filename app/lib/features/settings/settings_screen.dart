@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:todo_app/core/reminders/plan_reminder_service.dart';
+import 'package:todo_app/core/reminders/plan_reminder_settings.dart';
 import 'package:todo_app/core/settings/volume_key_platform.dart';
 import 'package:todo_app/core/settings/volume_key_settings.dart';
 import 'package:todo_app/shared/layout/app_layout.dart';
@@ -32,6 +34,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final shortcutsAsync = ref.watch(volumeKeyShortcutsProvider);
+    final planReminderAsync = ref.watch(planReminderEnabledProvider);
+    final remindersSupported = PlanReminderService.instance.isSupported;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -55,6 +59,32 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       : (value) => ref
                           .read(volumeKeyShortcutsProvider.notifier)
                           .setEnabled(value),
+                ),
+                const SizedBox(height: 8),
+              ],
+              if (remindersSupported) ...[
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  secondary: const Icon(Icons.notifications_active_outlined),
+                  title: const Text('计划提醒'),
+                  subtitle: const Text(
+                    '已星标且设了计划的任务，在到期当天 8:00 于通知栏提醒。'
+                    'Android 为持久通知；iOS 可能被手动清除，打开 App 后会恢复。',
+                  ),
+                  value: planReminderAsync.value ?? true,
+                  onChanged: planReminderAsync.isLoading
+                      ? null
+                      : (value) async {
+                          if (value) {
+                            await PlanReminderService.instance
+                                .requestPermissions();
+                          } else {
+                            await PlanReminderService.instance.cancelAll();
+                          }
+                          await ref
+                              .read(planReminderEnabledProvider.notifier)
+                              .setEnabled(value);
+                        },
                 ),
                 const SizedBox(height: 8),
               ],
