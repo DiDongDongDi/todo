@@ -26,6 +26,7 @@ class Tasks extends Table {
   IntColumn get checkInTarget => integer().withDefault(const Constant(1))();
   IntColumn get checkInCount => integer().withDefault(const Constant(0))();
   DateTimeColumn get lastCheckInAt => dateTime().nullable()();
+  BoolColumn get isStarred => boolean().withDefault(const Constant(false))();
 
   @override
   Set<Column> get primaryKey => {id};

@@ -1,6 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:todo_app/core/auth/auth_service.dart';
+import 'package:todo_app/core/reminders/plan_reminder_provider.dart';
+import 'package:todo_app/core/reminders/plan_reminder_service.dart';
+import 'package:todo_app/core/reminders/plan_reminder_settings.dart';
 import 'package:todo_app/core/sync/sync_engine.dart';
 import 'package:todo_app/router/app_router.dart';
 import 'package:todo_app/shared/theme/app_theme.dart';
@@ -13,11 +18,45 @@ class TodoApp extends ConsumerStatefulWidget {
   ConsumerState<TodoApp> createState() => _TodoAppState();
 }
 
-class _TodoAppState extends ConsumerState<TodoApp> {
+class _TodoAppState extends ConsumerState<TodoApp> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _onAuthReady());
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _bootstrap());
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_syncPlanReminders());
+    }
+  }
+
+  Future<void> _bootstrap() async {
+    await PlanReminderService.instance.initialize(
+      onTap: (taskId) {
+        if (!mounted) return;
+        handlePlanReminderTap(taskId, ref);
+      },
+    );
+    await PlanReminderService.instance.handleLaunchNotification();
+    await ref.read(planReminderEnabledProvider.future);
+    if (ref.read(planReminderEnabledProvider).value ?? true) {
+      await PlanReminderService.instance.requestPermissions();
+    }
+    await _syncPlanReminders();
+    await _onAuthReady();
+  }
+
+  Future<void> _syncPlanReminders() async {
+    await syncPlanRemindersFromRef(ref);
   }
 
   Future<void> _onAuthReady() async {
@@ -30,6 +69,8 @@ class _TodoAppState extends ConsumerState<TodoApp> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(planReminderCoordinatorProvider);
+
     ref.listen(authStateProvider, (prev, next) {
       final signedIn = next.value?.session != null;
       if (signedIn) {

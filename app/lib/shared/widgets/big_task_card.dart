@@ -8,6 +8,7 @@ import 'package:todo_app/shared/widgets/audio_preview.dart';
 import 'package:todo_app/shared/widgets/haptic_tap_scope.dart';
 import 'package:todo_app/shared/widgets/image_preview.dart';
 import 'package:todo_app/shared/widgets/keyboard_lift.dart';
+import 'package:todo_app/shared/widgets/task_star_button.dart';
 enum BigTaskCardMode { collect, process }
 
 enum CollectCardFeedback { none, emptyHint, listening }
@@ -51,6 +52,8 @@ class BigTaskCard extends StatelessWidget {
     this.subtaskEditor,
     this.subtaskSection,
     this.onAddSubtask,
+    this.isStarred = false,
+    this.onToggleStar,
   });
 
   final BigTaskCardMode mode;
@@ -100,6 +103,9 @@ class BigTaskCard extends StatelessWidget {
 
   /// 底部工具栏「添加子任务」按钮。
   final VoidCallback? onAddSubtask;
+
+  final bool isStarred;
+  final VoidCallback? onToggleStar;
 
   @override
   Widget build(BuildContext context) {
@@ -216,11 +222,22 @@ class BigTaskCard extends StatelessWidget {
     required Widget? scheduleEditor,
     required Widget? checkInEditor,
   }) {
-    if (scheduleEditor == null && checkInEditor == null) {
+    if (scheduleEditor == null &&
+        checkInEditor == null &&
+        onToggleStar == null) {
       return const SizedBox.shrink();
     }
     return Row(
       children: [
+        if (onToggleStar != null) ...[
+          TaskStarButton(
+            isStarred: isStarred,
+            onToggle: onToggleStar!,
+            compact: true,
+          ),
+          if (scheduleEditor != null || checkInEditor != null)
+            const SizedBox(width: 8),
+        ],
         if (scheduleEditor != null) scheduleEditor,
         if (scheduleEditor != null && checkInEditor != null)
           const SizedBox(width: 8),
@@ -390,15 +407,29 @@ class BigTaskCard extends StatelessWidget {
             subtaskEditor!,
           ],
           if (!editing) ...[
-            if (scheduleLabel != null) ...[
+            if (onToggleStar != null || scheduleLabel != null) ...[
               const SizedBox(height: 8),
-              Text(
-                scheduleLabel!,
-                style: theme.textTheme.labelLarge?.copyWith(
-                  color: scheduleOverdue
-                      ? colorScheme.error
-                      : colorScheme.primary,
-                ),
+              Row(
+                children: [
+                  if (onToggleStar != null)
+                    TaskStarButton(
+                      isStarred: isStarred,
+                      onToggle: onToggleStar!,
+                    ),
+                  if (onToggleStar != null && scheduleLabel != null)
+                    const SizedBox(width: 8),
+                  if (scheduleLabel != null)
+                    Expanded(
+                      child: Text(
+                        scheduleLabel!,
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          color: scheduleOverdue
+                              ? colorScheme.error
+                              : colorScheme.primary,
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ],
             if (checkInLabel != null) ...[

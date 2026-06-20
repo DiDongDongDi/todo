@@ -61,6 +61,7 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
   DateTime? _dailyUntil;
   DateTime? _dueDate;
   int _checkInTarget = 1;
+  bool _isStarred = false;
   final List<TextEditingController> _subtaskControllers = [];
 
   /// 拖拽/保存开始前输入法是否打开。
@@ -357,6 +358,7 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
         dueDate: _recurrence == TaskRecurrence.daily ? null : _dueDate,
         subtaskTitles: _subtaskTitles,
         checkInTarget: _checkInTarget,
+        isStarred: _isStarred,
       );
       final task = result.parent;
 
@@ -375,6 +377,7 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
         _dailyUntil = null;
         _dueDate = null;
         _checkInTarget = 1;
+        _isStarred = false;
         _clearSubtaskFields();
         _lastUndoTask = task;
       });
@@ -649,6 +652,8 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
               onCancelEdit: _cancelInput,
               editing: _inputUiVisible,
               onAddSubtask: _addSubtaskField,
+              isStarred: _isStarred,
+              onToggleStar: () => setState(() => _isStarred = !_isStarred),
               scheduleEditor: TaskScheduleEditor(
                 recurrence: _recurrence,
                 dailyUntil: _dailyUntil,
