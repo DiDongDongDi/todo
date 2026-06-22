@@ -70,6 +70,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
   DateTime? _editDailyUntil;
   DateTime? _editDueDate;
   int _editCheckInTarget = 1;
+  bool _editIsStarred = false;
   final List<TaskAttachment> _editAttachments = [];
   bool _editRecording = false;
   final _editAudioRecorder = AppAudioRecorder();
@@ -845,7 +846,10 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
                   onAddSubtask: !task.isSubtask && _editUiVisible
                       ? _addEditSubtaskField
                       : null,
-                  isStarred: task.isStarred,
+                  isStarred: _editUiVisible ? _editIsStarred : task.isStarred,
+                  onToggleStar: _editUiVisible
+                      ? () => setState(() => _editIsStarred = !_editIsStarred)
+                      : null,
                 ),
               ),
             ),
@@ -925,6 +929,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     _editDailyUntil = task.dailyUntil;
     _editDueDate = task.dueDate;
     _editCheckInTarget = task.checkInTarget;
+    _editIsStarred = task.isStarred;
     _editAttachments
       ..clear()
       ..addAll(task.attachments);
@@ -962,6 +967,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     _editDailyUntil = task.dailyUntil;
     _editDueDate = task.dueDate;
     _editCheckInTarget = task.checkInTarget;
+    _editIsStarred = task.isStarred;
     _editAttachments
       ..clear()
       ..addAll(task.attachments);
@@ -1035,6 +1041,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
           clearDueDate:
               _editRecurrence == TaskRecurrence.daily || editDue == null,
           checkInTarget: _editCheckInTarget.clamp(1, 99),
+          isStarred: _editIsStarred,
         ),
       );
 
