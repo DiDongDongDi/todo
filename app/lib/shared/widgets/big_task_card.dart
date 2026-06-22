@@ -407,31 +407,22 @@ class BigTaskCard extends StatelessWidget {
             subtaskEditor!,
           ],
           if (!editing) ...[
-            if ((isStarred && onToggleStar != null) ||
-                scheduleLabel != null) ...[
+            if (isStarred) ...[
               const SizedBox(height: 8),
-              Row(
-                children: [
-                  if (isStarred && onToggleStar != null)
-                    TaskStarButton(
-                      isStarred: isStarred,
-                      onToggle: onToggleStar!,
-                      showWhenUnstarred: false,
-                    ),
-                  if (isStarred && onToggleStar != null && scheduleLabel != null)
-                    const SizedBox(width: 8),
-                  if (scheduleLabel != null)
-                    Expanded(
-                      child: Text(
-                        scheduleLabel!,
-                        style: theme.textTheme.labelLarge?.copyWith(
-                          color: scheduleOverdue
-                              ? colorScheme.error
-                              : colorScheme.primary,
-                        ),
-                      ),
-                    ),
-                ],
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Icon(Icons.star, color: Colors.amber, size: 24),
+              ),
+            ],
+            if (scheduleLabel != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                scheduleLabel!,
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: scheduleOverdue
+                      ? colorScheme.error
+                      : colorScheme.primary,
+                ),
               ),
             ],
             if (checkInLabel != null) ...[

@@ -593,13 +593,6 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     }
   }
 
-  Future<void> _toggleStar(Task task) async {
-    await AppHaptics.light();
-    final repo = await ref.read(taskRepositoryProvider.future);
-    await repo.update(task.copyWith(isStarred: !task.isStarred));
-    unawaited(triggerSyncIfSignedIn(ref));
-  }
-
   @override
   Widget build(BuildContext context) {
     ref.listen(volumeKeyShortcutsProvider, (_, __) => _syncVolumeKeyHandler());
@@ -853,7 +846,6 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
                       ? _addEditSubtaskField
                       : null,
                   isStarred: task.isStarred,
-                  onToggleStar: () => _toggleStar(task),
                 ),
               ),
             ),
