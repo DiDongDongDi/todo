@@ -741,21 +741,9 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
     final readOnlyContent = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            TaskStarButton(
-              isStarred: task.isStarred,
-              onToggle: () => _toggleStar(task),
-              showWhenUnstarred: false,
-            ),
-            Expanded(
-              child: Text(
-                task.displayTitle,
-                style: theme.textTheme.headlineSmall,
-              ),
-            ),
-          ],
+        Text(
+          task.displayTitle,
+          style: theme.textTheme.headlineSmall,
         ),
         if (scheduleLabel(task) != null) ...[
           const SizedBox(height: 8),
