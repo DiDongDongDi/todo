@@ -747,6 +747,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
             TaskStarButton(
               isStarred: task.isStarred,
               onToggle: () => _toggleStar(task),
+              showWhenUnstarred: false,
             ),
             Expanded(
               child: Text(
@@ -928,6 +929,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
             TaskStarButton(
               isStarred: task.isStarred,
               onToggle: () => _toggleStar(task),
+              showWhenUnstarred: false,
             ),
             IconButton(
               icon: const Icon(Icons.delete_outline),
