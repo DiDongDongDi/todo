@@ -812,7 +812,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
         child: ColoredBox(
           color: colorScheme.surface,
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,

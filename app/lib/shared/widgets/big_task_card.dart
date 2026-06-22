@@ -402,18 +402,18 @@ class BigTaskCard extends StatelessWidget {
             const SizedBox(height: 8),
           ],
           titleWidget,
+          if (isStarred) ...[
+            const SizedBox(height: 8),
+            const Align(
+              alignment: Alignment.centerLeft,
+              child: Icon(Icons.star, color: Colors.amber, size: 24),
+            ),
+          ],
           if (editing && subtaskEditor != null) ...[
             const SizedBox(height: 20),
             subtaskEditor!,
           ],
           if (!editing) ...[
-            if (isStarred) ...[
-              const SizedBox(height: 8),
-              const Align(
-                alignment: Alignment.centerLeft,
-                child: Icon(Icons.star, color: Colors.amber, size: 24),
-              ),
-            ],
             if (scheduleLabel != null) ...[
               const SizedBox(height: 8),
               Text(
