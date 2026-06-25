@@ -27,6 +27,7 @@ class PlanReminderService {
 
   bool _initialized = false;
   PlanReminderTapHandler? _onTap;
+  Set<int> _lastSyncedActiveIds = {};
 
   bool get isSupported =>
       !kIsWeb && (Platform.isAndroid || Platform.isIOS);
@@ -148,12 +149,20 @@ class PlanReminderService {
       }
     }
 
+    for (final id in _lastSyncedActiveIds) {
+      if (!activeIds.contains(id)) {
+        await _plugin.cancel(id);
+      }
+    }
+    _lastSyncedActiveIds = Set<int>.from(activeIds);
+
     await _cancelOrphans(inboxTasks, activeIds);
   }
 
   Future<void> cancelAll() async {
     if (!isSupported) return;
     await _plugin.cancelAll();
+    _lastSyncedActiveIds = {};
   }
 
   Future<void> handleLaunchNotification() async {
