@@ -42,9 +42,9 @@ void main() {
       expect(shouldShowPlanReminder(task, today), isFalse);
     });
 
-    test('starred + no schedule → no remind', () {
+    test('starred + no schedule → remind', () {
       final task = _task(isStarred: true);
-      expect(shouldShowPlanReminder(task, today), isFalse);
+      expect(shouldShowPlanReminder(task, today), isTrue);
     });
 
     test('starred + future due date → no immediate remind', () {
@@ -84,6 +84,11 @@ void main() {
   });
 
   group('nextPlanReminderAt', () {
+    test('starred + no schedule returns null (show immediately)', () {
+      final task = _task(isStarred: true);
+      expect(nextPlanReminderAt(task, today), isNull);
+    });
+
     test('before 8:00 on due day schedules today 8:00', () {
       final task = _task(isStarred: true, dueDate: today);
       final now = DateTime(2026, 6, 7, 7, 30);

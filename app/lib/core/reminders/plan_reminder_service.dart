@@ -196,7 +196,7 @@ class PlanReminderService {
   }
 
   Future<void> _showOngoing(Task task) async {
-    final body = scheduleLabel(task) ?? '今日计划';
+    final body = scheduleLabel(task) ?? '星标任务';
     final title = '★ ${task.title}';
 
     await _plugin.show(
@@ -212,7 +212,7 @@ class PlanReminderService {
     final scheduled = tz.TZDateTime.from(localDateTime, tz.local);
     if (scheduled.isBefore(tz.TZDateTime.now(tz.local))) return;
 
-    final body = scheduleLabel(task) ?? '今日计划';
+    final body = scheduleLabel(task) ?? '星标任务';
     final title = '★ ${task.title}';
 
     await _plugin.zonedSchedule(

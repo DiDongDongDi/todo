@@ -68,7 +68,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   secondary: const Icon(Icons.notifications_active_outlined),
                   title: const Text('计划提醒'),
                   subtitle: const Text(
-                    '已星标且设了计划的任务，在到期当天 8:00 于通知栏提醒。'
+                    '已星标任务在通知栏显示；设了计划的到期当天 8:00 提醒。'
                     'Android 为持久通知；iOS 可能被手动清除，打开 App 后会恢复。',
                   ),
                   value: planReminderAsync.value ?? true,
