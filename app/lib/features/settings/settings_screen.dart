@@ -1,10 +1,14 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:todo_app/core/reminders/plan_reminder_permissions.dart';
 import 'package:todo_app/core/reminders/plan_reminder_service.dart';
 import 'package:todo_app/core/reminders/plan_reminder_settings.dart';
+import 'package:todo_app/core/reminders/plan_reminder_workmanager.dart';
+import 'package:todo_app/core/reminders/reminder_guardian_service.dart';
 import 'package:todo_app/core/settings/volume_key_platform.dart';
 import 'package:todo_app/core/settings/volume_key_settings.dart';
 import 'package:todo_app/shared/layout/app_layout.dart';
@@ -31,11 +35,24 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (mounted) setState(() => _volumeKeySupported = supported);
   }
 
+  String _planReminderSubtitle() {
+    if (Platform.isAndroid) {
+      return '已星标任务在通知栏显示；设了计划的到期当天 8:00 提醒。'
+          '开启后会显示守护通知与各任务通知，并在后台保持同步。';
+    }
+    if (Platform.isIOS) {
+      return '已星标任务在通知栏显示；设了计划的到期当天 8:00 提醒。'
+          'iOS 不支持常驻通知与开机自启；依赖系统调度与后台刷新，打开 App 后会恢复。';
+    }
+    return '已星标任务在通知栏显示；设了计划的到期当天 8:00 提醒。';
+  }
+
   @override
   Widget build(BuildContext context) {
     final shortcutsAsync = ref.watch(volumeKeyShortcutsProvider);
     final planReminderAsync = ref.watch(planReminderEnabledProvider);
     final remindersSupported = PlanReminderService.instance.isSupported;
+    final planReminderEnabled = planReminderAsync.value ?? false;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -67,10 +84,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   contentPadding: EdgeInsets.zero,
                   secondary: const Icon(Icons.notifications_active_outlined),
                   title: const Text('计划提醒'),
-                  subtitle: const Text(
-                    '已星标任务在通知栏显示；设了计划的到期当天 8:00 提醒。'
-                    'Android 为持久通知；iOS 可能被手动清除，打开 App 后会恢复。',
-                  ),
+                  subtitle: Text(_planReminderSubtitle()),
                   value: planReminderAsync.value ?? true,
                   onChanged: planReminderAsync.isLoading
                       ? null
@@ -78,14 +92,43 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           if (value) {
                             await PlanReminderService.instance
                                 .requestPermissions();
+                            if (Platform.isAndroid) {
+                              await PlanReminderPermissions
+                                  .requestBatteryOptimizationExemption();
+                            }
                           } else {
                             await PlanReminderService.instance.cancelAll();
+                            await ReminderGuardianService.instance.stop();
+                            await registerPlanReminderBackgroundTasks(
+                              enabled: false,
+                            );
                           }
                           await ref
                               .read(planReminderEnabledProvider.notifier)
                               .setEnabled(value);
                         },
                 ),
+                if (Platform.isAndroid && planReminderEnabled) ...[
+                  const SizedBox(height: 4),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.battery_saver_outlined),
+                    title: const Text('允许后台运行'),
+                    subtitle: const Text('关闭电池优化，避免守护通知被系统清理'),
+                    trailing: const Icon(Icons.open_in_new),
+                    onTap: PlanReminderPermissions.openBatteryOptimizationSettings,
+                  ),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.power_settings_new_outlined),
+                    title: const Text('自启动权限'),
+                    subtitle: const Text(
+                      '请在系统设置中为 Todo 开启自启动（小米/华为/OPPO 等需在应用详情中手动设置）',
+                    ),
+                    trailing: const Icon(Icons.open_in_new),
+                    onTap: PlanReminderPermissions.openBatteryOptimizationSettings,
+                  ),
+                ],
                 const SizedBox(height: 8),
               ],
               ListTile(
