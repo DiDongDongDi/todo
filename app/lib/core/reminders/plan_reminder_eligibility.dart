@@ -2,11 +2,11 @@ import 'package:todo_app/core/models/task.dart';
 import 'package:todo_app/core/models/task_schedule.dart';
 import 'package:todo_app/core/reminders/plan_reminder_constants.dart';
 
-/// 是否应在通知栏显示持久提醒（当天 8:00 后或 App 打开时立即 show）。
+/// 是否应在通知栏显示持久提醒（无计划星标立即 show；有计划则当天 8:00 后或 App 打开时 show）。
 bool shouldShowPlanReminder(Task task, DateTime now) {
   if (!task.isStarred) return false;
   if (task.status != TaskStatus.inbox) return false;
-  if (!isScheduled(task)) return false;
+  if (!isScheduled(task)) return true;
   if (isRecurring(task) && isPeriodCompleted(task, now)) return false;
   return isDueToday(task, now);
 }
@@ -15,7 +15,7 @@ bool shouldShowPlanReminder(Task task, DateTime now) {
 bool shouldSchedulePlanReminder(Task task, DateTime now) {
   if (!task.isStarred) return false;
   if (task.status != TaskStatus.inbox) return false;
-  if (!isScheduled(task)) return false;
+  if (!isScheduled(task)) return true;
   if (isRecurrenceExpired(task, now)) return false;
   if (isRecurring(task) && isPeriodCompleted(task, now)) {
     return _hasFutureReminder(task, now);
@@ -49,9 +49,10 @@ bool _hasFutureReminder(Task task, DateTime now) {
   }
 }
 
-/// 下一次应触发提醒的本地时间（当天 8:00）。
+/// 下一次应触发提醒的本地时间（当天 8:00）；无计划星标任务返回 null 以立即 show。
 DateTime? nextPlanReminderAt(Task task, DateTime now) {
   if (!shouldSchedulePlanReminder(task, now)) return null;
+  if (!isScheduled(task)) return null;
 
   final today = localDate(now);
   DateTime atEight(DateTime date) => DateTime(
