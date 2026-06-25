@@ -2,7 +2,7 @@ import 'package:todo_app/core/models/task.dart';
 import 'package:todo_app/core/models/task_schedule.dart';
 import 'package:todo_app/core/reminders/plan_reminder_constants.dart';
 
-/// 是否应在通知栏显示持久提醒（无计划星标立即 show；有计划则当天 8:00 后或 App 打开时 show）。
+/// 是否应在通知栏显示持久提醒（无计划星标立即 show；有计划则计划日零点起或 App 打开时 show）。
 bool shouldShowPlanReminder(Task task, DateTime now) {
   if (!task.isStarred) return false;
   if (task.status != TaskStatus.inbox) return false;
@@ -49,13 +49,13 @@ bool _hasFutureReminder(Task task, DateTime now) {
   }
 }
 
-/// 下一次应触发提醒的本地时间（当天 8:00）；无计划星标任务返回 null 以立即 show。
+/// 下一次应触发提醒的本地时间（计划日 00:00）；无计划星标任务返回 null 以立即 show。
 DateTime? nextPlanReminderAt(Task task, DateTime now) {
   if (!shouldSchedulePlanReminder(task, now)) return null;
   if (!isScheduled(task)) return null;
 
   final today = localDate(now);
-  DateTime atEight(DateTime date) => DateTime(
+  DateTime atReminderTime(DateTime date) => DateTime(
         date.year,
         date.month,
         date.day,
@@ -63,26 +63,22 @@ DateTime? nextPlanReminderAt(Task task, DateTime now) {
         planReminderMinute,
       );
 
-  if (shouldShowPlanReminder(task, now)) {
-    final todayAtEight = atEight(today);
-    if (now.isBefore(todayAtEight)) return todayAtEight;
-    return null;
-  }
+  if (shouldShowPlanReminder(task, now)) return null;
 
   switch (task.recurrence) {
     case TaskRecurrence.none:
       if (task.dueDate == null) return null;
       final due = localDate(task.dueDate!);
-      if (due.isAfter(today)) return atEight(due);
+      if (due.isAfter(today)) return atReminderTime(due);
       return null;
     case TaskRecurrence.daily:
       final tomorrow = today.add(const Duration(days: 1));
-      return atEight(tomorrow);
+      return atReminderTime(tomorrow);
     case TaskRecurrence.monthly:
     case TaskRecurrence.yearly:
       if (task.dueDate == null) return null;
       if (!isRecurrenceStarted(task, now)) {
-        return atEight(localDate(task.dueDate!));
+        return atReminderTime(localDate(task.dueDate!));
       }
       if (isPeriodCompleted(task, now)) {
         final next = nextPeriodDueDate(
@@ -90,7 +86,7 @@ DateTime? nextPlanReminderAt(Task task, DateTime now) {
           dueDate: task.dueDate!,
           today: today,
         );
-        if (next != null) return atEight(next);
+        if (next != null) return atReminderTime(next);
       }
       return null;
   }

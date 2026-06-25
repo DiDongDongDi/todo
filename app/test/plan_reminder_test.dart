@@ -92,24 +92,24 @@ void main() {
       expect(nextPlanReminderAt(task, today), isNull);
     });
 
-    test('before 8:00 on due day schedules today 8:00', () {
+    test('on due day before midnight returns null (show immediately)', () {
       final task = _task(isStarred: true, dueDate: today);
       final now = DateTime(2026, 6, 7, 7, 30);
-      final next = nextPlanReminderAt(task, now);
-      expect(next, DateTime(2026, 6, 7, 8, 0));
+      expect(nextPlanReminderAt(task, now), isNull);
+      expect(shouldShowPlanReminder(task, now), isTrue);
     });
 
-    test('after 8:00 on due day returns null (show immediately)', () {
+    test('after midnight on due day returns null (show immediately)', () {
       final task = _task(isStarred: true, dueDate: today);
       final now = DateTime(2026, 6, 7, 9, 0);
       expect(nextPlanReminderAt(task, now), isNull);
       expect(shouldShowPlanReminder(task, now), isTrue);
     });
 
-    test('future due date schedules on that day 8:00', () {
+    test('future due date schedules on that day 00:00', () {
       final task = _task(isStarred: true, dueDate: tomorrow);
       final next = nextPlanReminderAt(task, today);
-      expect(next, DateTime(2026, 6, 8, 8, 0));
+      expect(next, DateTime(2026, 6, 8, 0, 0));
     });
   });
 
@@ -123,7 +123,7 @@ void main() {
       expect(actions, isEmpty);
     });
 
-    test('due today after 8:00 → show action', () {
+    test('due today → show action', () {
       final task = _task(isStarred: true, dueDate: today);
       final now = DateTime(2026, 6, 7, 9);
       final actions = planReminderActions(
@@ -145,7 +145,7 @@ void main() {
       );
       expect(actions, hasLength(1));
       expect(actions.single.kind, PlanReminderActionKind.schedule);
-      expect(actions.single.scheduleAt, DateTime(2026, 6, 8, 8, 0));
+      expect(actions.single.scheduleAt, DateTime(2026, 6, 8, 0, 0));
     });
 
     test('unstarred task → cancel action', () {
