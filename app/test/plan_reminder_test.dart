@@ -1,8 +1,11 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:todo_app/core/models/task.dart';
 import 'package:todo_app/core/reminders/plan_reminder_eligibility.dart';
+import 'package:todo_app/core/reminders/plan_reminder_ids.dart';
+import 'package:todo_app/core/reminders/plan_reminder_planner.dart';
 
 Task _task({
+  String id = '1',
   bool isStarred = false,
   TaskRecurrence recurrence = TaskRecurrence.none,
   DateTime? dailyUntil,
@@ -11,7 +14,7 @@ Task _task({
   TaskStatus status = TaskStatus.inbox,
 }) {
   return Task(
-    id: '1',
+    id: id,
     title: 'test',
     status: status,
     createdAt: DateTime(2025, 1, 1),
@@ -102,6 +105,71 @@ void main() {
       final task = _task(isStarred: true, dueDate: tomorrow);
       final next = nextPlanReminderAt(task, today);
       expect(next, DateTime(2026, 6, 8, 8, 0));
+    });
+  });
+
+  group('planReminderActions', () {
+    test('disabled returns no actions', () {
+      final actions = planReminderActions(
+        inboxTasks: [_task(isStarred: true, dueDate: today)],
+        enabled: false,
+        now: DateTime(2026, 6, 7, 9),
+      );
+      expect(actions, isEmpty);
+    });
+
+    test('due today after 8:00 → show action', () {
+      final task = _task(isStarred: true, dueDate: today);
+      final now = DateTime(2026, 6, 7, 9);
+      final actions = planReminderActions(
+        inboxTasks: [task],
+        enabled: true,
+        now: now,
+      );
+      expect(actions, hasLength(1));
+      expect(actions.single.kind, PlanReminderActionKind.show);
+      expect(actions.single.notificationId, notificationIdForTask(task.id));
+    });
+
+    test('future due date → schedule action', () {
+      final task = _task(isStarred: true, dueDate: tomorrow);
+      final actions = planReminderActions(
+        inboxTasks: [task],
+        enabled: true,
+        now: today,
+      );
+      expect(actions, hasLength(1));
+      expect(actions.single.kind, PlanReminderActionKind.schedule);
+      expect(actions.single.scheduleAt, DateTime(2026, 6, 8, 8, 0));
+    });
+
+    test('unstarred task → cancel action', () {
+      final task = _task(dueDate: today);
+      final actions = planReminderActions(
+        inboxTasks: [task],
+        enabled: true,
+        now: DateTime(2026, 6, 7, 9),
+      );
+      expect(actions, hasLength(1));
+      expect(actions.single.kind, PlanReminderActionKind.cancel);
+    });
+
+    test('mixed inbox picks correct actions per task', () {
+      final dueToday = _task(id: 'a', isStarred: true, dueDate: today);
+      final future = _task(id: 'b', isStarred: true, dueDate: tomorrow);
+      final plain = _task(id: 'c', dueDate: today);
+      final now = DateTime(2026, 6, 7, 9);
+
+      final actions = planReminderActions(
+        inboxTasks: [dueToday, future, plain],
+        enabled: true,
+        now: now,
+      );
+
+      final byId = {for (final a in actions) a.notificationId: a.kind};
+      expect(byId[notificationIdForTask('a')], PlanReminderActionKind.show);
+      expect(byId[notificationIdForTask('b')], PlanReminderActionKind.schedule);
+      expect(byId[notificationIdForTask('c')], PlanReminderActionKind.cancel);
     });
   });
 }
