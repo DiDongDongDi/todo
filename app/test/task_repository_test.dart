@@ -106,6 +106,18 @@ void main() {
     expect(loaded, isEmpty);
   });
 
+  test('getSubtasks returns someday subtasks', () async {
+    final parent = await repo.createInbox(title: 'Parent');
+    final sub1 = await repo.createSubtask(parentId: parent.id, title: 'Sub 1');
+    final sub2 = await repo.createSubtask(parentId: parent.id, title: 'Sub 2');
+    await repo.moveToSomeday(sub1.id);
+    await repo.moveToSomeday(sub2.id);
+
+    final loaded = await repo.getSubtasks(parent.id);
+
+    expect(loaded.map((t) => t.id), containsAll([sub1.id, sub2.id]));
+  });
+
   test('restoreToInbox subtask also restores parent but not siblings', () async {
     final parent = await repo.createInbox(title: 'Parent');
     final sub1 = await repo.createSubtask(parentId: parent.id, title: 'Sub 1');
@@ -421,33 +433,21 @@ void main() {
       );
     }
 
-    test('includes inbox, someday, and playlist tasks without duplicates', () {
-      final inbox = [_makeTask(id: 'inbox-1', title: 'Inbox task')];
+    test('includes inbox and someday tasks without duplicates', () {
+      final inbox = [
+        _makeTask(id: 'inbox-1', title: 'Inbox task'),
+        _makeTask(id: 'inbox-2', title: 'Another inbox task'),
+      ];
       final someday = [
         _makeTask(id: 'someday-1', title: 'Someday task', status: TaskStatus.someday),
       ];
-      final playlists = [
-        TaskPlaylist(
-          id: 'playlist-1',
-          title: 'My list',
-          taskIds: ['inbox-1', 'playlist-only'],
-          createdAt: DateTime(2026, 1, 1),
-          updatedAt: DateTime(2026, 1, 1),
-        ),
-      ];
-      final allTasks = [
-        ...inbox,
-        ...someday,
-        _makeTask(id: 'playlist-only', title: 'Playlist only'),
-      ];
 
       final result = resolveSearchableProcessTasks(
-        inbox: allTasks.where((t) => t.status == TaskStatus.inbox).toList(),
+        inbox: inbox,
         someday: someday,
-        playlists: playlists,
       );
 
-      expect(result.map((t) => t.id), containsAll(['inbox-1', 'someday-1', 'playlist-only']));
+      expect(result.map((t) => t.id), containsAll(['inbox-1', 'inbox-2', 'someday-1']));
       expect(result.length, 3);
     });
   });

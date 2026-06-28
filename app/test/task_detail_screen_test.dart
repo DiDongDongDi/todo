@@ -286,4 +286,24 @@ void main() {
     expect(find.text('编辑子任务'), findsNothing);
     expect(find.byType(SubtaskListSection), findsNothing);
   });
+
+  testWidgets('parent with someday-only subtasks shows parent title and list',
+      (tester) async {
+    final result = await repo.createInboxWithSubtasks(
+      title: 'Proposal prep',
+      subtaskTitles: ['Sub 1', 'Sub 2', 'Sub 3'],
+    );
+    for (final sub in result.subtasks) {
+      await repo.moveToSomeday(sub.id);
+    }
+
+    await _pumpTaskDetail(tester, repo: repo, taskId: result.parent.id);
+
+    expect(find.text('父任务'), findsOneWidget);
+    expect(find.text('Sub 1'), findsOneWidget);
+    expect(find.text('Sub 2'), findsOneWidget);
+    expect(find.text('Sub 3'), findsOneWidget);
+    expect(find.text('暂无子任务'), findsNothing);
+    expect(find.byType(SubtaskListSection), findsOneWidget);
+  });
 }

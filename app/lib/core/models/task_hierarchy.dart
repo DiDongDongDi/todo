@@ -76,16 +76,25 @@ Task? parentOf(Task task, Map<String, Task> byId) {
   return byId[parentId];
 }
 
-/// 返回至少有一条未软删子任务的父任务 id 集合。
+/// 可管理子任务：inbox / someday / archived，排除 trashed 与软删。
+bool isManagedSubtask(Task task) {
+  if (task.parentId == null) return false;
+  if (task.deletedAt != null) return false;
+  return task.status != TaskStatus.trashed;
+}
+
+/// 返回至少有一条可管理子任务的父任务 id 集合。
 Set<String> parentIdsWithSubtasks(Iterable<Task> all) {
   return all
-      .where((t) => t.parentId != null && t.deletedAt == null)
+      .where(isManagedSubtask)
       .map((t) => t.parentId!)
       .toSet();
 }
 
 int countSubtasks(String parentId, Iterable<Task> all) {
-  return all.where((t) => t.parentId == parentId && t.deletedAt == null).length;
+  return all
+      .where((t) => t.parentId == parentId && isManagedSubtask(t))
+      .length;
 }
 
 String parentTaskSubtitleLabel(Task task, Iterable<Task> all) {

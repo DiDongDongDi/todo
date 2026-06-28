@@ -412,13 +412,7 @@ class TaskRepository {
   Future<List<Task>> getSubtasks(String parentId) async {
     final all = await _store.getAll();
     return all
-        .where(
-          (t) =>
-              t.parentId == parentId &&
-              t.deletedAt == null &&
-              t.status != TaskStatus.trashed &&
-              t.status != TaskStatus.someday,
-        )
+        .where((t) => t.parentId == parentId && isManagedSubtask(t))
         .toList()
       ..sort((a, b) => b.sortOrder.compareTo(a.sortOrder));
   }

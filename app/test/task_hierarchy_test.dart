@@ -108,10 +108,16 @@ void main() {
       expect(parentIdsWithSubtasks([parent, sub]), {'p'});
     });
 
-    test('includes parent with trashed subtask', () {
-      final parent = _task(id: 'p', status: TaskStatus.trashed);
-      final sub = _task(id: 's', parentId: 'p', status: TaskStatus.trashed);
+    test('includes parent with someday subtask', () {
+      final parent = _task(id: 'p');
+      final sub = _task(id: 's', parentId: 'p', status: TaskStatus.someday);
       expect(parentIdsWithSubtasks([parent, sub]), {'p'});
+    });
+
+    test('excludes parent with only trashed subtasks', () {
+      final parent = _task(id: 'p');
+      final sub = _task(id: 's', parentId: 'p', status: TaskStatus.trashed);
+      expect(parentIdsWithSubtasks([parent, sub]), isEmpty);
     });
 
     test('excludes standalone task', () {
@@ -120,15 +126,54 @@ void main() {
     });
   });
 
+  group('isManagedSubtask', () {
+    test('true for inbox, someday, and archived subtasks', () {
+      expect(isManagedSubtask(_task(id: 'a', parentId: 'p')), isTrue);
+      expect(
+        isManagedSubtask(_task(id: 'b', parentId: 'p', status: TaskStatus.someday)),
+        isTrue,
+      );
+      expect(
+        isManagedSubtask(_task(id: 'c', parentId: 'p', status: TaskStatus.archived)),
+        isTrue,
+      );
+    });
+
+    test('false for trashed subtask and top-level task', () {
+      expect(
+        isManagedSubtask(_task(id: 't', parentId: 'p', status: TaskStatus.trashed)),
+        isFalse,
+      );
+      expect(isManagedSubtask(_task(id: 't')), isFalse);
+    });
+  });
+
   group('countSubtasks and parentTaskSubtitleLabel', () {
-    test('counts active subtasks across statuses', () {
+    test('counts managed subtasks and excludes trashed', () {
       final parent = _task(id: 'p');
       final sub1 = _task(id: 's1', parentId: 'p');
       final sub2 = _task(id: 's2', parentId: 'p', status: TaskStatus.trashed);
       final all = [parent, sub1, sub2];
 
-      expect(countSubtasks('p', all), 2);
-      expect(parentTaskSubtitleLabel(parent, all), '父任务 · 2 个子任务');
+      expect(countSubtasks('p', all), 1);
+      expect(parentTaskSubtitleLabel(parent, all), '父任务 · 1 个子任务');
+    });
+
+    test('counts someday subtasks', () {
+      final parent = _task(id: 'p');
+      final subs = List.generate(
+        5,
+        (i) => _task(
+          id: 's$i',
+          parentId: 'p',
+          status: TaskStatus.someday,
+          title: 'Sub $i',
+        ),
+      );
+      final all = [parent, ...subs];
+
+      expect(countSubtasks('p', all), 5);
+      expect(parentTaskSubtitleLabel(parent, all), '父任务 · 5 个子任务');
     });
   });
 
