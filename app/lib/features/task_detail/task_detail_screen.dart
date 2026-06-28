@@ -634,7 +634,10 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const SizedBox(height: 20),
-          SubtaskListSection(subtasks: _subtasks),
+          SubtaskListSection(
+            subtasks: _subtasks,
+            onSubtaskTap: (sub) => context.push('/task/${sub.id}'),
+          ),
           if (!_editingTask) ...[
             const SizedBox(height: 12),
             Align(
