@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:todo_app/core/models/task.dart';
 import 'package:todo_app/core/models/task_check_in.dart';
 import 'package:todo_app/core/models/task_display.dart';
+import 'package:todo_app/core/models/task_hierarchy.dart';
 import 'package:todo_app/core/models/task_schedule.dart';
 import 'package:todo_app/core/repositories/task_repository.dart';
 import 'package:todo_app/core/repositories/template_repository.dart';
@@ -43,6 +44,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
   bool _editingSubtasks = false;
   bool _editingTask = false;
   Task? _task;
+  Task? _parentTask;
   List<Task> _subtasks = const [];
   List<Task> _subtaskSnapshot = const [];
   final List<TextEditingController> _editSubtaskControllers = [];
@@ -87,10 +89,15 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
     final repo = await ref.read(taskRepositoryProvider.future);
     final task = await repo.getById(widget.taskId);
     final subtasks =
-        task != null ? await repo.getSubtasks(widget.taskId) : <Task>[];
+        task != null && !task.isSubtask ? await repo.getSubtasks(widget.taskId) : <Task>[];
+    Task? parent;
+    if (task?.isSubtask == true) {
+      parent = await repo.getById(task!.parentId!);
+    }
     if (!mounted) return;
     setState(() {
       _task = task;
+      _parentTask = parent;
       _subtasks = subtasks;
       _loading = false;
     });
@@ -515,15 +522,19 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
     if (task == null || _editingTask || _editingSubtasks) return;
 
     final subtaskCount = _subtasks.length;
+    final deleteTitle = taskDetailDeleteDialogTitle(
+      task,
+      subtaskCount: subtaskCount,
+    );
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) {
         final theme = Theme.of(context);
         final colorScheme = theme.colorScheme;
         return AlertDialog(
-          title: const Text('删除父任务'),
+          title: Text(deleteTitle),
           content: Text(
-            subtaskCount > 0
+            !task.isSubtask && subtaskCount > 0
                 ? '确定删除「${task.displayTitle}」？其 $subtaskCount 条子任务也将一并删除。'
                 : '确定删除「${task.displayTitle}」？',
           ),
@@ -741,6 +752,26 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
     final readOnlyContent = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (task.isSubtask && _parentTask != null) ...[
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton(
+              onPressed: () => context.push('/task/${_parentTask!.id}'),
+              style: TextButton.styleFrom(
+                padding: EdgeInsets.zero,
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: Text(
+                _parentTask!.displayTitle,
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: colorScheme.primary,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
         Text(
           task.displayTitle,
           style: theme.textTheme.headlineSmall,
@@ -911,7 +942,9 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('父任务'),
+        title: Text(
+          taskDetailAppBarTitle(task, subtaskCount: _subtasks.length),
+        ),
         actions: [
           if (!_editingTask && !_editingSubtasks) ...[
             TaskStarButton(
@@ -940,7 +973,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
               children: [
                 _buildTaskHeader(context, task),
-                _buildSubtaskSection(context),
+                if (!task.isSubtask) _buildSubtaskSection(context),
               ],
             ),
           ),

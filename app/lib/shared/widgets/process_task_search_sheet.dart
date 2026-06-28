@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:todo_app/core/models/task.dart';
 import 'package:todo_app/core/models/task_display.dart';
+import 'package:todo_app/core/models/task_hierarchy.dart';
 import 'package:todo_app/core/models/task_schedule.dart';
 
 List<Task> filterTasksForSearch(List<Task> tasks, String query) {
@@ -11,6 +12,19 @@ List<Task> filterTasksForSearch(List<Task> tasks, String query) {
   return tasks.where((task) {
     return task.displayTitle.toLowerCase().contains(lower);
   }).toList();
+}
+
+String? taskSearchSubtitle(Task task, Iterable<Task> all, {DateTime? now}) {
+  final parts = <String>[];
+  if (parentIdsWithSubtasks(all).contains(task.id)) {
+    parts.add(parentTaskSubtitleLabel(task, all));
+  }
+  final schedule = scheduleLabel(task, now: now);
+  if (schedule != null) {
+    parts.add(schedule);
+  }
+  if (parts.isEmpty) return null;
+  return parts.join(' · ');
 }
 
 TextStyle? taskSearchInputStyle(BuildContext context) {
@@ -36,6 +50,7 @@ InputDecoration taskSearchInputDecoration(
 Future<Task?> showProcessTaskSearchSheet(
   BuildContext context, {
   required List<Task> tasks,
+  required List<Task> allTasks,
   required String? currentTaskId,
 }) {
   return showModalBottomSheet<Task>(
@@ -45,6 +60,7 @@ Future<Task?> showProcessTaskSearchSheet(
     useSafeArea: true,
     builder: (context) => _ProcessTaskSearchSheet(
       tasks: tasks,
+      allTasks: allTasks,
       currentTaskId: currentTaskId,
     ),
   );
@@ -53,10 +69,12 @@ Future<Task?> showProcessTaskSearchSheet(
 class _ProcessTaskSearchSheet extends StatefulWidget {
   const _ProcessTaskSearchSheet({
     required this.tasks,
+    required this.allTasks,
     required this.currentTaskId,
   });
 
   final List<Task> tasks;
+  final List<Task> allTasks;
   final String? currentTaskId;
 
   @override
@@ -153,7 +171,7 @@ class _ProcessTaskSearchSheetState extends State<_ProcessTaskSearchSheet> {
                       itemBuilder: (context, index) {
                         final task = filtered[index];
                         final isCurrent = task.id == widget.currentTaskId;
-                        final subtitle = scheduleLabel(task);
+                        final subtitle = taskSearchSubtitle(task, widget.allTasks);
 
                         return ListTile(
                           title: Text(task.displayTitle),

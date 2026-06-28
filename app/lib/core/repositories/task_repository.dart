@@ -105,33 +105,13 @@ List<Task> resolveProcessQueueTasks({
 List<Task> resolveSearchableProcessTasks({
   required List<Task> inbox,
   required List<Task> someday,
-  required List<TaskPlaylist> playlists,
   DateTime? now,
 }) {
-  final today = now ?? DateTime.now();
   final byId = <String, Task>{};
 
-  for (final task in inbox) {
-    if (shouldIncludeInSearch(task, now: today)) {
+  for (final task in [...inbox, ...someday]) {
+    if (shouldIncludeInSearch(task, now: now)) {
       byId[task.id] = task;
-    }
-  }
-  for (final task in someday) {
-    if (shouldIncludeInSearch(task, now: today)) {
-      byId[task.id] = task;
-    }
-  }
-
-  final activeById = <String, Task>{
-    for (final t in [...inbox, ...someday])
-      if (t.status == TaskStatus.inbox || t.status == TaskStatus.someday) t.id: t,
-  };
-  for (final playlist in playlists) {
-    for (final id in playlist.taskIds) {
-      final task = activeById[id];
-      if (task != null && shouldIncludeInSearch(task, now: today)) {
-        byId[task.id] = task;
-      }
     }
   }
 
@@ -178,11 +158,8 @@ ProcessQueueSource resolveQueueSourceForTask(
 final searchableProcessTasksProvider = Provider<AsyncValue<List<Task>>>((ref) {
   final inboxAsync = ref.watch(inboxTasksProvider);
   final somedayAsync = ref.watch(somedayTasksProvider);
-  final playlistsAsync = ref.watch(playlistsProvider);
 
-  if (inboxAsync.isLoading ||
-      somedayAsync.isLoading ||
-      playlistsAsync.isLoading) {
+  if (inboxAsync.isLoading || somedayAsync.isLoading) {
     return const AsyncValue.loading();
   }
   if (inboxAsync.hasError) {
@@ -191,15 +168,11 @@ final searchableProcessTasksProvider = Provider<AsyncValue<List<Task>>>((ref) {
   if (somedayAsync.hasError) {
     return AsyncValue.error(somedayAsync.error!, somedayAsync.stackTrace!);
   }
-  if (playlistsAsync.hasError) {
-    return AsyncValue.error(playlistsAsync.error!, playlistsAsync.stackTrace!);
-  }
 
   return AsyncValue.data(
     resolveSearchableProcessTasks(
       inbox: inboxAsync.value ?? [],
       someday: somedayAsync.value ?? [],
-      playlists: playlistsAsync.value ?? [],
     ),
   );
 });

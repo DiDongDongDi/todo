@@ -106,6 +106,7 @@ void main() {
   testWidgets('shows read-only subtask list with edit entry', (tester) async {
     await _pumpTaskDetail(tester, repo: repo, taskId: parentId);
 
+    expect(find.text('父任务'), findsOneWidget);
     expect(find.byType(SubtaskListSection), findsOneWidget);
     expect(find.text('Sub A'), findsOneWidget);
     expect(find.text('Sub B'), findsOneWidget);
@@ -202,6 +203,7 @@ void main() {
 
     await _pumpTaskDetail(tester, repo: repo, taskId: emptyParent.id);
 
+    expect(find.text('任务详情'), findsOneWidget);
     expect(find.text('暂无子任务'), findsOneWidget);
     expect(find.text('添加子任务'), findsOneWidget);
 
@@ -269,5 +271,19 @@ void main() {
 
     expect(find.text('编辑子任务'), findsOneWidget);
     expect(find.byType(SubtaskListSection), findsOneWidget);
+  });
+
+  testWidgets('subtask detail shows subtask title and parent link', (tester) async {
+    final subtasks = await repo.getSubtasks(parentId);
+    expect(subtasks, isNotEmpty);
+
+    await _pumpTaskDetail(tester, repo: repo, taskId: subtasks.first.id);
+
+    expect(find.text('子任务'), findsOneWidget);
+    expect(find.text('Parent task'), findsOneWidget);
+    expect(find.text('Sub A'), findsOneWidget);
+    expect(find.text('添加子任务'), findsNothing);
+    expect(find.text('编辑子任务'), findsNothing);
+    expect(find.byType(SubtaskListSection), findsNothing);
   });
 }
