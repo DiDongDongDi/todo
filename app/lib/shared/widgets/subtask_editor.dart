@@ -611,9 +611,11 @@ class SubtaskListSection extends StatelessWidget {
   const SubtaskListSection({
     super.key,
     required this.subtasks,
+    this.onSubtaskTap,
   });
 
   final List<Task> subtasks;
+  final void Function(Task subtask)? onSubtaskTap;
 
   @override
   Widget build(BuildContext context) {
@@ -640,30 +642,40 @@ class SubtaskListSection extends StatelessWidget {
         const SizedBox(height: 8),
         ...subtasks.map((sub) {
           final done = sub.status == TaskStatus.archived;
+          final row = Row(
+            children: [
+              Icon(
+                done ? Icons.check_circle : Icons.radio_button_unchecked,
+                size: 18,
+                color: done ? colorScheme.primary : colorScheme.outline,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  sub.title,
+                  style: done
+                      ? theme.textTheme.bodyMedium?.copyWith(
+                          decoration: TextDecoration.lineThrough,
+                          color: colorScheme.onSurface.withValues(alpha: 0.5),
+                        )
+                      : theme.textTheme.bodyMedium,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          );
           return Padding(
             padding: const EdgeInsets.only(bottom: 4),
-            child: Row(
-              children: [
-                Icon(
-                  done ? Icons.check_circle : Icons.radio_button_unchecked,
-                  size: 18,
-                  color: done ? colorScheme.primary : colorScheme.outline,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    sub.title,
-                    style: done
-                        ? theme.textTheme.bodyMedium?.copyWith(
-                            decoration: TextDecoration.lineThrough,
-                            color: colorScheme.onSurface.withValues(alpha: 0.5),
-                          )
-                        : theme.textTheme.bodyMedium,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
+            child: onSubtaskTap != null
+                ? InkWell(
+                    onTap: () => onSubtaskTap!(sub),
+                    borderRadius: BorderRadius.circular(4),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: row,
+                    ),
+                  )
+                : row,
           );
         }),
       ],
