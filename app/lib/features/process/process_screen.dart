@@ -9,7 +9,6 @@ import 'package:image_picker/image_picker.dart';
 import 'package:todo_app/core/models/task.dart';
 import 'package:todo_app/core/models/task_check_in.dart';
 import 'package:todo_app/core/models/task_display.dart';
-import 'package:todo_app/core/models/task_hierarchy.dart';
 import 'package:todo_app/core/models/task_schedule.dart';
 import 'package:todo_app/core/navigation/shell_navigation.dart';
 import 'package:todo_app/core/repositories/playlist_repository.dart';
@@ -1434,9 +1433,15 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     final searchable = ref.read(searchableProcessTasksProvider).value ?? [];
     if (searchable.isEmpty) return;
 
+    final allTasks = <Task>[
+      ...ref.read(inboxTasksProvider).value ?? [],
+      ...ref.read(somedayTasksProvider).value ?? [],
+    ];
+
     final selected = await showProcessTaskSearchSheet(
       context,
       tasks: searchable,
+      allTasks: allTasks,
       currentTaskId: currentTask?.id,
     );
     if (selected == null || !mounted) return;
@@ -1490,26 +1495,8 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
       }
     }
 
-    if (target.parentId == null) {
-      final allTasks = <Task>[
-        ...ref.read(inboxTasksProvider).value ?? [],
-        ...ref.read(somedayTasksProvider).value ?? [],
-      ];
-      final todayOnly = queueSource.kind == ProcessQueueKind.daily;
-      if (hasOpenSubtasks(target, allTasks, todayOnly: todayOnly)) {
-        if (!mounted) return;
-        context.push('/task/${target.id}');
-        return;
-      }
-    }
-
     if (!mounted) return;
-    showAppSnackBar(
-      context,
-      message: '该任务当前不在处理队列中',
-      icon: Icons.info_outline,
-      type: AppSnackType.info,
-    );
+    context.push('/task/${target.id}');
   }
 
   Future<void> _handleNavigationIntent(ProcessNavigationIntent intent) async {

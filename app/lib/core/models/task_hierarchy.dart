@@ -93,6 +93,18 @@ String parentTaskSubtitleLabel(Task task, Iterable<Task> all) {
   return '父任务 · $count 个子任务';
 }
 
+String taskDetailAppBarTitle(Task task, {required int subtaskCount}) {
+  if (task.isSubtask) return '子任务';
+  if (subtaskCount > 0) return '父任务';
+  return '任务详情';
+}
+
+String taskDetailDeleteDialogTitle(Task task, {required int subtaskCount}) {
+  if (task.isSubtask) return '删除子任务';
+  if (subtaskCount > 0) return '删除父任务';
+  return '删除任务';
+}
+
 List<Task> filterProcessTasks(
   List<Task> inbox, {
   required bool todayOnly,

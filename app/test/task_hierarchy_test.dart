@@ -132,6 +132,40 @@ void main() {
     });
   });
 
+  group('taskDetailAppBarTitle', () {
+    test('subtask title', () {
+      final sub = _task(id: 's', parentId: 'p');
+      expect(taskDetailAppBarTitle(sub, subtaskCount: 0), '子任务');
+    });
+
+    test('parent title', () {
+      final parent = _task(id: 'p');
+      expect(taskDetailAppBarTitle(parent, subtaskCount: 2), '父任务');
+    });
+
+    test('standalone title', () {
+      final task = _task(id: 't');
+      expect(taskDetailAppBarTitle(task, subtaskCount: 0), '任务详情');
+    });
+  });
+
+  group('taskDetailDeleteDialogTitle', () {
+    test('subtask delete title', () {
+      final sub = _task(id: 's', parentId: 'p');
+      expect(taskDetailDeleteDialogTitle(sub, subtaskCount: 0), '删除子任务');
+    });
+
+    test('parent delete title', () {
+      final parent = _task(id: 'p');
+      expect(taskDetailDeleteDialogTitle(parent, subtaskCount: 2), '删除父任务');
+    });
+
+    test('standalone delete title', () {
+      final task = _task(id: 't');
+      expect(taskDetailDeleteDialogTitle(task, subtaskCount: 0), '删除任务');
+    });
+  });
+
   group('taskSchedulesEqual', () {
     test('true when all schedule fields match', () {
       final due = DateTime(2026, 6, 1);
