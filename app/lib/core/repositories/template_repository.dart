@@ -21,8 +21,8 @@ final templateStoreInitProvider = FutureProvider<TemplateStore>((ref) async {
 });
 
 final templatesProvider = StreamProvider<List<TaskTemplate>>((ref) async* {
-  final store = await ref.watch(templateStoreInitProvider.future);
-  yield* store.watchAll();
+  final repo = await ref.watch(templateRepositoryProvider.future);
+  yield* repo.watchAll();
 });
 
 class TemplateRepository {
@@ -32,11 +32,29 @@ class TemplateRepository {
   final TaskRepository _taskRepo;
   final Uuid _uuid;
 
-  Stream<List<TaskTemplate>> watchAll() => _store.watchAll();
+  Stream<List<TaskTemplate>> watchAll() async* {
+    await for (final list in _store.watchAll()) {
+      yield _activeOnly(list);
+    }
+  }
 
-  Future<List<TaskTemplate>> getAll() => _store.getAll();
+  Future<List<TaskTemplate>> getAll() async {
+    return _activeOnly(await _store.getAll());
+  }
 
-  Future<TaskTemplate?> getById(String id) => _store.getById(id);
+  Future<List<TaskTemplate>> getAllForSync() => _store.getAll();
+
+  Future<TaskTemplate?> getById(String id) async {
+    final template = await _store.getById(id);
+    if (template == null || template.deletedAt != null) return null;
+    return template;
+  }
+
+  List<TaskTemplate> _activeOnly(List<TaskTemplate> list) {
+    final active = list.where((t) => t.deletedAt == null).toList();
+    active.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    return active;
+  }
 
   Future<TaskTemplate?> findByTitle(String title, {String? excludeId}) async {
     final normalized = title.trim();
@@ -116,7 +134,18 @@ class TemplateRepository {
     await _store.upsert(template);
   }
 
-  Future<void> delete(String id) => _store.delete(id);
+  Future<void> delete(String id) async {
+    final template = await _store.getById(id);
+    if (template == null || template.deletedAt != null) return;
+    final now = DateTime.now().toUtc();
+    await _store.upsert(
+      template.copyWith(
+        deletedAt: now,
+        updatedAt: now,
+        syncVersion: template.syncVersion + 1,
+      ),
+    );
+  }
 
   Future<TaskTemplate> saveFromTask(
     String taskId, {
@@ -170,7 +199,9 @@ class TemplateRepository {
 
   Future<List<Task>> createTasksFromTemplate(String templateId) async {
     final template = await _store.getById(templateId);
-    if (template == null) throw StateError('Template not found: $templateId');
+    if (template == null || template.deletedAt != null) {
+      throw StateError('Template not found: $templateId');
+    }
 
     final parent = await _taskRepo.createInbox(
       title: template.title,

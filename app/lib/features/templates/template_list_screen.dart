@@ -73,7 +73,7 @@ class _TemplateTile extends ConsumerWidget {
         ),
       ),
       confirmDismiss: (_) async {
-        return await showDialog<bool>(
+        final confirmed = await showDialog<bool>(
               context: context,
               builder: (context) => AlertDialog(
                 title: const Text('删除模板'),
@@ -91,11 +91,14 @@ class _TemplateTile extends ConsumerWidget {
               ),
             ) ??
             false;
-      },
-      onDismissed: (_) async {
+        if (!confirmed) return false;
+
         final repo = await ref.read(templateRepositoryProvider.future);
         await repo.delete(template.id);
         unawaited(triggerSyncIfSignedIn(ref));
+        return true;
+      },
+      onDismissed: (_) {
         if (context.mounted) {
           showAppSnackBar(
             context,

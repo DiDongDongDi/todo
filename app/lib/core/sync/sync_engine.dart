@@ -14,6 +14,7 @@ import 'package:todo_app/core/repositories/template_repository.dart';
 import 'package:todo_app/core/reminders/plan_reminder_provider.dart';
 import 'package:todo_app/core/sync/attachment_upload_service.dart';
 import 'package:todo_app/core/sync/sync_repository.dart';
+import 'package:todo_app/core/sync/template_sync_merge.dart';
 import 'package:todo_app/core/transcription/transcription_service.dart';
 
 final syncEngineProvider = Provider<SyncEngine>((ref) {
@@ -99,10 +100,10 @@ class SyncEngine {
       await _mergeRemoteTasks(taskRepo, remote);
 
       final templateRepo = await _ref.read(templateRepositoryProvider.future);
-      final localTemplates = await templateRepo.getAll();
+      final localTemplates = await templateRepo.getAllForSync();
       await repo.pushTemplates(localTemplates);
       final remoteTemplates = await repo.pullTemplates();
-      await _mergeRemoteTemplates(templateRepo, remoteTemplates);
+      await mergeRemoteTaskTemplates(templateRepo, remoteTemplates);
 
       final playlistRepo = await _ref.read(playlistRepositoryProvider.future);
       final localPlaylists = await playlistRepo.getAll();
@@ -179,23 +180,6 @@ class SyncEngine {
         await taskRepo.update(r);
       } else if (l.updatedAt.isAfter(r.updatedAt)) {
         // local wins — will push on next sync
-      }
-    }
-  }
-
-  Future<void> _mergeRemoteTemplates(
-    TemplateRepository templateRepo,
-    List<TaskTemplate> remote,
-  ) async {
-    final local = await templateRepo.getAll();
-    final localMap = {for (final t in local) t.id: t};
-
-    for (final r in remote) {
-      final l = localMap[r.id];
-      if (l == null) {
-        await templateRepo.upsertRemote(r);
-      } else if (r.updatedAt.isAfter(l.updatedAt)) {
-        await templateRepo.upsertRemote(r);
       }
     }
   }
