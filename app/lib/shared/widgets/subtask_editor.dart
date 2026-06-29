@@ -37,6 +37,47 @@ InputDecoration subtaskTitleInputDecoration(BuildContext context) {
   );
 }
 
+String extractSubtaskInsertedText(
+  TextEditingValue oldValue,
+  TextEditingValue newValue,
+) {
+  final oldText = oldValue.text;
+  final newText = newValue.text;
+  if (newText.length <= oldText.length) return '';
+
+  final selection = oldValue.selection;
+  final start = selection.start.clamp(0, oldText.length);
+  final end = selection.end.clamp(0, oldText.length);
+  final prefix = oldText.substring(0, start);
+  final suffix = oldText.substring(end);
+
+  if (!newText.startsWith(prefix) || !newText.endsWith(suffix)) {
+    return newText.substring(start, newText.length - suffix.length);
+  }
+
+  return newText.substring(start, newText.length - suffix.length);
+}
+
+String collapseClipboardForPasteMatch(String raw) {
+  return raw
+      .replaceAll('\r\n', ' ')
+      .replaceAll('\r', ' ')
+      .replaceAll('\n', ' ')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim();
+}
+
+bool insertedMatchesCollapsedClipboard(String inserted, String clipboardRaw) {
+  if (inserted.isEmpty) return false;
+  final collapsed = collapseClipboardForPasteMatch(clipboardRaw);
+  final normalizedInserted = inserted.replaceAll(RegExp(r'\s+'), ' ').trim();
+  return collapsed == normalizedInserted;
+}
+
+bool _insertedContainsWhitespace(String inserted) {
+  return inserted.contains(RegExp(r'\s'));
+}
+
 /// 草稿态子任务标题编辑（收集页保存前、处理页编辑态使用）。
 class SubtaskTitleEditor extends StatefulWidget {
   const SubtaskTitleEditor({
@@ -223,9 +264,20 @@ class _SubtaskTitleEditorState extends State<SubtaskTitleEditor> {
         return;
       }
 
+      final inserted = extractSubtaskInsertedText(oldValue, newValue);
+      if (!_insertedContainsWhitespace(inserted)) {
+        if (mounted) widget.controllers[index].value = newValue;
+        return;
+      }
+
       final data = await Clipboard.getData(Clipboard.kTextPlain);
       final raw = data?.text;
       if (raw == null || (!raw.contains('\n') && !raw.contains('\r'))) {
+        if (mounted) widget.controllers[index].value = newValue;
+        return;
+      }
+
+      if (!insertedMatchesCollapsedClipboard(inserted, raw)) {
         if (mounted) widget.controllers[index].value = newValue;
         return;
       }
@@ -289,7 +341,7 @@ class _SubtaskTitleEditorState extends State<SubtaskTitleEditor> {
     if (!mounted) return;
     if (index < 0 || index >= widget.controllers.length) return;
 
-    final inserted = _extractInsertedText(oldValue, newValue);
+    final inserted = extractSubtaskInsertedText(oldValue, newValue);
     final source =
         inserted.contains('\n') || inserted.contains('\r')
             ? inserted
@@ -326,27 +378,6 @@ class _SubtaskTitleEditorState extends State<SubtaskTitleEditor> {
 
     widget.controllers[index].value = oldValue;
     widget.onImportLines?.call(index, lines);
-  }
-
-  String _extractInsertedText(
-    TextEditingValue oldValue,
-    TextEditingValue newValue,
-  ) {
-    final oldText = oldValue.text;
-    final newText = newValue.text;
-    if (newText.length <= oldText.length) return '';
-
-    final selection = oldValue.selection;
-    final start = selection.start.clamp(0, oldText.length);
-    final end = selection.end.clamp(0, oldText.length);
-    final prefix = oldText.substring(0, start);
-    final suffix = oldText.substring(end);
-
-    if (!newText.startsWith(prefix) || !newText.endsWith(suffix)) {
-      return newText.substring(start, newText.length - suffix.length);
-    }
-
-    return newText.substring(start, newText.length - suffix.length);
   }
 
   void _syncRowKeys() {
@@ -594,11 +625,18 @@ class _SubtaskPasteFallbackFormatter extends TextInputFormatter {
   ) {
     if (newValue.text == oldValue.text) return newValue;
 
+    final hasNewlines =
+        newValue.text.contains('\n') || newValue.text.contains('\r');
     final insertedLen = newValue.text.length - oldValue.text.length;
-    if (insertedLen < 2 &&
-        !newValue.text.contains('\n') &&
-        !newValue.text.contains('\r')) {
+    if (insertedLen < 2 && !hasNewlines) {
       return newValue;
+    }
+
+    if (!hasNewlines) {
+      final inserted = extractSubtaskInsertedText(oldValue, newValue);
+      if (!_insertedContainsWhitespace(inserted)) {
+        return newValue;
+      }
     }
 
     unawaited(onPossiblePaste(oldValue, newValue));

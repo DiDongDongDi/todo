@@ -1,8 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:todo_app/shared/widgets/subtask_editor.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  tearDown(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(SystemChannels.platform, null);
+  });
+
+  test('insertedMatchesCollapsedClipboard matches Android collapsed paste', () {
+    const clipboard = '买牛奶\n写报告';
+    expect(
+      insertedMatchesCollapsedClipboard('买牛奶 写报告', clipboard),
+      isTrue,
+    );
+    expect(insertedMatchesCollapsedClipboard('你好', clipboard), isFalse);
+  });
+
   testWidgets('subtaskTitleInputDecoration uses compact subtask styling',
       (tester) async {
     InputDecoration? decoration;
@@ -297,6 +314,115 @@ void main() {
     expect(controllers.length, 1);
     expect(scrollController.offset, greaterThan(0));
   });
+
+  testWidgets(
+      'SubtaskTitleEditor does not batch import when IME commits two chars',
+      (tester) async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+      if (call.method == 'Clipboard.getData') {
+        return {'text': '行1\n行2\n行3'};
+      }
+      return null;
+    });
+
+    final controllers = [TextEditingController()];
+    var importCount = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SubtaskTitleEditor(
+            controllers: controllers,
+            onRemove: (_) {},
+            onImportLines: (_, __) => importCount++,
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byType(TextField));
+    await tester.pump();
+    tester.testTextInput.updateEditingValue(
+      const TextEditingValue(
+        text: '你好',
+        selection: TextSelection.collapsed(offset: 2),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(controllers.first.text, '你好');
+    expect(importCount, 0);
+    expect(controllers.length, 1);
+  });
+
+  testWidgets(
+      'SubtaskTitleEditor batch imports collapsed multiline paste on Android',
+      (tester) async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+      if (call.method == 'Clipboard.getData') {
+        return {'text': '买牛奶\n写报告'};
+      }
+      return null;
+    });
+
+    final controllers = [TextEditingController()];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: _SubtaskImportHarness(controllers: controllers),
+      ),
+    );
+
+    await tester.tap(find.byType(TextField));
+    await tester.pump();
+    tester.testTextInput.updateEditingValue(
+      const TextEditingValue(
+        text: '买牛奶 写报告',
+        selection: TextSelection.collapsed(offset: 7),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(controllers.length, 2);
+    expect(controllers[0].text, '买牛奶');
+    expect(controllers[1].text, '写报告');
+  });
+}
+
+class _SubtaskImportHarness extends StatefulWidget {
+  const _SubtaskImportHarness({required this.controllers});
+
+  final List<TextEditingController> controllers;
+
+  @override
+  State<_SubtaskImportHarness> createState() => _SubtaskImportHarnessState();
+}
+
+class _SubtaskImportHarnessState extends State<_SubtaskImportHarness> {
+  void _onImportLines(int index, List<String> lines) {
+    setState(() {
+      SubtaskTitleEditor.importLinesIntoControllers(
+        controllers: widget.controllers,
+        index: index,
+        lines: lines,
+      );
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: SubtaskTitleEditor(
+        controllers: widget.controllers,
+        onRemove: (_) {},
+        onImportLines: _onImportLines,
+      ),
+    );
+  }
 }
 
 class _ScrollableSubtaskHarness extends StatefulWidget {
