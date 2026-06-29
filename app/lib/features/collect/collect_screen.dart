@@ -24,6 +24,7 @@ import 'package:todo_app/shared/widgets/app_snackbar.dart';
 import 'package:todo_app/shared/widgets/batch_import_dialog.dart';
 import 'package:todo_app/shared/widgets/big_task_card.dart';
 import 'package:todo_app/shared/widgets/card_stage.dart';
+import 'package:todo_app/shared/utils/template_save_flow.dart';
 import 'package:todo_app/shared/widgets/save_template_dialog.dart';
 import 'package:todo_app/shared/widgets/swipeable_card.dart';
 import 'package:todo_app/shared/widgets/subtask_editor.dart';
@@ -711,21 +712,28 @@ class _CollectScreenState extends ConsumerState<CollectScreen> {
     );
     if (name == null || !mounted) return;
 
-    final templateRepo = await ref.read(templateRepositoryProvider.future);
-    await templateRepo.saveFromDraft(
-      title: _controller.text.trim(),
-      attachments: List.from(_attachments),
-      recurrence: _recurrence,
-      dailyUntil: _dailyUntil,
-      dueDate: _dueDate,
-      subtaskTitles: _subtaskTitles,
-      titleOverride: name,
+    final result = await confirmAndSaveTemplate(
+      context: context,
+      ref: ref,
+      name: name,
+      save: ({replaceTemplateId}) async {
+        final templateRepo = await ref.read(templateRepositoryProvider.future);
+        await templateRepo.saveFromDraft(
+          title: _controller.text.trim(),
+          attachments: List.from(_attachments),
+          recurrence: _recurrence,
+          dailyUntil: _dailyUntil,
+          dueDate: _dueDate,
+          subtaskTitles: _subtaskTitles,
+          titleOverride: name,
+          replaceTemplateId: replaceTemplateId,
+        );
+      },
     );
-    unawaited(triggerSyncIfSignedIn(ref));
-    if (!mounted) return;
+    if (!result.saved || !mounted) return;
     showAppSnackBar(
       context,
-      message: '已保存为模板',
+      message: result.replaced ? '已替换模板' : '已保存为模板',
       icon: Icons.bookmark_outline,
       type: AppSnackType.success,
     );

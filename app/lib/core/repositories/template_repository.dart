@@ -38,6 +38,18 @@ class TemplateRepository {
 
   Future<TaskTemplate?> getById(String id) => _store.getById(id);
 
+  Future<TaskTemplate?> findByTitle(String title, {String? excludeId}) async {
+    final normalized = title.trim();
+    if (normalized.isEmpty) return null;
+
+    final all = await _store.getAll();
+    for (final template in all) {
+      if (excludeId != null && template.id == excludeId) continue;
+      if (template.title == normalized) return template;
+    }
+    return null;
+  }
+
   Future<TaskTemplate> create({
     required String title,
     List<TaskAttachment> attachments = const [],
@@ -46,16 +58,42 @@ class TemplateRepository {
     DateTime? dueDate,
     List<String> subtaskTitles = const [],
     int checkInTarget = 1,
+    String? replaceTemplateId,
   }) async {
     final now = DateTime.now().toUtc();
+    final trimmedTitle = title.trim();
+    final normalizedSubtasks =
+        subtaskTitles.map((t) => t.trim()).where((t) => t.isNotEmpty).toList();
+
+    if (replaceTemplateId != null) {
+      final existing = await _store.getById(replaceTemplateId);
+      if (existing != null) {
+        final template = existing.copyWith(
+          title: trimmedTitle,
+          attachments: attachments,
+          recurrence: recurrence,
+          dailyUntil: recurrence != TaskRecurrence.none ? dailyUntil : null,
+          dueDate: recurrence == TaskRecurrence.daily ? null : dueDate,
+          clearDailyUntil: recurrence == TaskRecurrence.none,
+          clearDueDate: recurrence == TaskRecurrence.daily,
+          subtaskTitles: normalizedSubtasks,
+          updatedAt: now,
+          syncVersion: existing.syncVersion + 1,
+          checkInTarget: checkInTarget.clamp(1, 99),
+        );
+        await _store.upsert(template);
+        return template;
+      }
+    }
+
     final template = TaskTemplate(
       id: _uuid.v4(),
-      title: title.trim(),
+      title: trimmedTitle,
       attachments: attachments,
       recurrence: recurrence,
       dailyUntil: recurrence != TaskRecurrence.none ? dailyUntil : null,
       dueDate: recurrence == TaskRecurrence.daily ? null : dueDate,
-      subtaskTitles: subtaskTitles.map((t) => t.trim()).where((t) => t.isNotEmpty).toList(),
+      subtaskTitles: normalizedSubtasks,
       createdAt: now,
       updatedAt: now,
       syncVersion: 1,
@@ -80,7 +118,11 @@ class TemplateRepository {
 
   Future<void> delete(String id) => _store.delete(id);
 
-  Future<TaskTemplate> saveFromTask(String taskId, {String? titleOverride}) async {
+  Future<TaskTemplate> saveFromTask(
+    String taskId, {
+    String? titleOverride,
+    String? replaceTemplateId,
+  }) async {
     final task = await _taskRepo.getById(taskId);
     if (task == null) throw StateError('Task not found: $taskId');
 
@@ -99,6 +141,7 @@ class TemplateRepository {
       dueDate: task.dueDate,
       subtaskTitles: subtaskTitles,
       checkInTarget: task.checkInTarget,
+      replaceTemplateId: replaceTemplateId,
     );
   }
 
@@ -111,6 +154,7 @@ class TemplateRepository {
     List<String> subtaskTitles = const [],
     String? titleOverride,
     int checkInTarget = 1,
+    String? replaceTemplateId,
   }) async {
     return create(
       title: titleOverride ?? title,
@@ -120,6 +164,7 @@ class TemplateRepository {
       dueDate: dueDate,
       subtaskTitles: subtaskTitles,
       checkInTarget: checkInTarget,
+      replaceTemplateId: replaceTemplateId,
     );
   }
 

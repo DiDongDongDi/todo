@@ -17,6 +17,7 @@ import 'package:todo_app/shared/widgets/app_snackbar.dart';
 import 'package:todo_app/shared/widgets/attachment_image.dart';
 import 'package:todo_app/shared/widgets/audio_preview.dart';
 import 'package:todo_app/shared/widgets/image_preview.dart';
+import 'package:todo_app/shared/widgets/replace_template_confirm_dialog.dart';
 import 'package:todo_app/shared/widgets/subtask_editor.dart';
 import 'package:todo_app/shared/widgets/task_check_in_editor.dart';
 import 'package:todo_app/shared/widgets/task_schedule_editor.dart';
@@ -223,6 +224,16 @@ class _TemplateEditScreenState extends ConsumerState<TemplateEditScreen> {
     setState(() => _saving = true);
     try {
       final repo = await ref.read(templateRepositoryProvider.future);
+      final conflict = await repo.findByTitle(title, excludeId: template.id);
+      if (conflict != null) {
+        final confirmed = await showReplaceTemplateConfirmDialog(context, title);
+        if (!confirmed || !mounted) {
+          setState(() => _saving = false);
+          return false;
+        }
+        await repo.delete(conflict.id);
+      }
+
       final updated = await repo.update(
         template.copyWith(
           title: title,

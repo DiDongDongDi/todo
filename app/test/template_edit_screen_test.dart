@@ -237,4 +237,78 @@ void main() {
 
     await tester.pump(const Duration(seconds: 3));
   });
+
+  testWidgets('rename to duplicate title without confirm keeps conflict template',
+      (tester) async {
+    await templateStore.upsert(
+      TaskTemplate(
+        id: 'tpl-2',
+        title: '冲突名称',
+        createdAt: DateTime.utc(2026, 1, 2),
+        updatedAt: DateTime.utc(2026, 1, 2),
+      ),
+    );
+
+    await _pumpTemplateEdit(
+      tester,
+      templateStore: templateStore,
+      templateId: template.id,
+    );
+
+    await tester.enterText(
+      find.ancestor(
+        of: find.text('标题'),
+        matching: find.byType(TextField),
+      ),
+      '冲突名称',
+    );
+    await tester.tap(find.text('保存'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('替换模板'), findsOneWidget);
+
+    await tester.tap(find.text('取消'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('编辑模板'), findsOneWidget);
+    expect(await templateStore.getById('tpl-2'), isNotNull);
+  });
+
+  testWidgets('rename to duplicate title with confirm deletes conflict template',
+      (tester) async {
+    await templateStore.upsert(
+      TaskTemplate(
+        id: 'tpl-2',
+        title: '冲突名称',
+        createdAt: DateTime.utc(2026, 1, 2),
+        updatedAt: DateTime.utc(2026, 1, 2),
+      ),
+    );
+
+    await _pumpTemplateEdit(
+      tester,
+      templateStore: templateStore,
+      templateId: template.id,
+    );
+
+    await tester.enterText(
+      find.ancestor(
+        of: find.text('标题'),
+        matching: find.byType(TextField),
+      ),
+      '冲突名称',
+    );
+    await tester.tap(find.text('保存'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('替换模板'), findsOneWidget);
+
+    await tester.tap(find.text('替换'));
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 3));
+
+    expect(await templateStore.getById('tpl-2'), isNull);
+    final updated = await templateStore.getById('tpl-1');
+    expect(updated?.title, '冲突名称');
+  });
 }
