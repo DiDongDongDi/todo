@@ -83,18 +83,18 @@ class JsonTemplateStore implements TemplateStore {
     } else {
       _templates.add(template);
     }
-    _notifyChanged();
+    await _notifyChanged();
   }
 
   @override
   Future<void> delete(String id) async {
     _templates.removeWhere((t) => t.id == id);
-    _notifyChanged();
+    await _notifyChanged();
   }
 
-  void _notifyChanged() {
+  Future<void> _notifyChanged() async {
     _changeController.add(null);
-    unawaited(_persistQueued());
+    await _persistQueued();
   }
 
   Future<void> _persistQueued() {

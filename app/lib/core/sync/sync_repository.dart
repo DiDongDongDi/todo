@@ -163,6 +163,7 @@ class SyncRepository {
       'updated_at': migrated['updated_at'],
       'sync_version': migrated['sync_version'] ?? 0,
       'check_in_target': migrated['check_in_target'] ?? 1,
+      'deleted_at': migrated['deleted_at'],
     };
   }
 
