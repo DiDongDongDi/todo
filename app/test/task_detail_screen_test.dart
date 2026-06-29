@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:todo_app/core/database/task_store.dart';
 import 'package:todo_app/core/models/task.dart';
 import 'package:todo_app/core/repositories/task_repository.dart';
@@ -63,17 +65,56 @@ Future<void> _pumpTaskDetail(
   await tester.binding.setSurfaceSize(const Size(400, 800));
   addTearDown(() => tester.binding.setSurfaceSize(null));
 
+  final router = GoRouter(
+    initialLocation: '/home',
+    routes: [
+      GoRoute(
+        path: '/home',
+        builder: (context, state) => Scaffold(
+          body: Center(
+            child: TextButton(
+              onPressed: () => context.push('/task/$taskId'),
+              child: const Text('Open task'),
+            ),
+          ),
+        ),
+      ),
+      GoRoute(
+        path: '/task/:id',
+        builder: (context, state) => TaskDetailScreen(
+          taskId: state.pathParameters['id']!,
+        ),
+      ),
+    ],
+  );
+
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
         taskRepositoryProvider.overrideWith((ref) async => repo),
       ],
-      child: MaterialApp(
-        home: TaskDetailScreen(taskId: taskId),
+      child: MaterialApp.router(
+        routerConfig: router,
       ),
     ),
   );
   await tester.pumpAndSettle();
+  await tester.tap(find.text('Open task'));
+  await tester.pumpAndSettle();
+}
+
+Future<void> _tapComplete(WidgetTester tester) async {
+  await tester.tap(
+    find.widgetWithIcon(IconButton, Icons.check_circle_outline),
+  );
+  await tester.pump();
+  await tester.runAsync(() async {
+    await Future<void>.delayed(const Duration(milliseconds: 500));
+  });
+}
+
+Future<void> _flushSnackBarTimer(WidgetTester tester) async {
+  await tester.pump(const Duration(seconds: 4));
 }
 
 void main() {
@@ -81,6 +122,7 @@ void main() {
   late String parentId;
 
   setUp(() async {
+    SharedPreferences.setMockInitialValues({});
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(
       const MethodChannel('com.llfbandit.record/messages'),
@@ -305,5 +347,93 @@ void main() {
     expect(find.text('Sub 3'), findsOneWidget);
     expect(find.text('暂无子任务'), findsNothing);
     expect(find.byType(SubtaskListSection), findsOneWidget);
+  });
+
+  testWidgets('standalone task shows complete button and archives on tap',
+      (tester) async {
+    final task = await repo.createInbox(title: 'Standalone');
+
+    await _pumpTaskDetail(tester, repo: repo, taskId: task.id);
+
+    expect(find.byTooltip('完成'), findsOneWidget);
+
+    await _tapComplete(tester);
+
+    final updated = await repo.getById(task.id);
+    expect(updated?.status, TaskStatus.archived);
+    await _flushSnackBarTimer(tester);
+  });
+
+  testWidgets('parent task complete archives only parent', (tester) async {
+    await _pumpTaskDetail(tester, repo: repo, taskId: parentId);
+
+    expect(find.byTooltip('完成'), findsOneWidget);
+
+    await _tapComplete(tester);
+
+    final parent = await repo.getById(parentId);
+    expect(parent?.status, TaskStatus.archived);
+    final subtasks = await repo.getSubtasks(parentId);
+    expect(subtasks.every((s) => s.status == TaskStatus.inbox), isTrue);
+    await _flushSnackBarTimer(tester);
+  });
+
+  testWidgets('subtask complete archives only subtask', (tester) async {
+    final subtasks = await repo.getSubtasks(parentId);
+    expect(subtasks, isNotEmpty);
+
+    await _pumpTaskDetail(tester, repo: repo, taskId: subtasks.first.id);
+
+    expect(find.byTooltip('完成'), findsOneWidget);
+
+    await _tapComplete(tester);
+
+    final sub = await repo.getById(subtasks.first.id);
+    expect(sub?.status, TaskStatus.archived);
+    final parent = await repo.getById(parentId);
+    expect(parent?.status, TaskStatus.inbox);
+    await _flushSnackBarTimer(tester);
+  });
+
+  testWidgets('partial check-in stays on page and updates count', (tester) async {
+    final task = await repo.createInbox(title: 'Workout', checkInTarget: 3);
+
+    await _pumpTaskDetail(tester, repo: repo, taskId: task.id);
+
+    expect(find.byTooltip('打卡'), findsOneWidget);
+
+    await _tapComplete(tester);
+    await tester.pumpAndSettle();
+
+    final updated = await repo.getById(task.id);
+    expect(updated?.status, TaskStatus.inbox);
+    expect(updated?.checkInCount, 1);
+    expect(find.byType(TaskDetailScreen), findsOneWidget);
+    expect(find.byTooltip('打卡'), findsOneWidget);
+    await _flushSnackBarTimer(tester);
+  });
+
+  testWidgets('daily task completed today hides complete button', (tester) async {
+    final task = await repo.createInbox(
+      title: 'Daily',
+      recurrence: TaskRecurrence.daily,
+    );
+    await repo.completeDailyToday(task.id);
+
+    await _pumpTaskDetail(tester, repo: repo, taskId: task.id);
+
+    expect(find.byIcon(Icons.check_circle_outline), findsNothing);
+  });
+
+  testWidgets('edit mode hides complete button', (tester) async {
+    await _pumpTaskDetail(tester, repo: repo, taskId: parentId);
+
+    expect(find.byTooltip('完成'), findsOneWidget);
+
+    await tester.tap(find.text('编辑任务'));
+    await tester.pumpAndSettle();
+
+    expect(find.byTooltip('完成'), findsNothing);
+    expect(find.byTooltip('删除'), findsNothing);
   });
 }

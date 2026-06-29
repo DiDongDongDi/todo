@@ -12,12 +12,16 @@ import 'package:todo_app/core/models/task_hierarchy.dart';
 import 'package:todo_app/core/models/task_schedule.dart';
 import 'package:todo_app/core/repositories/task_repository.dart';
 import 'package:todo_app/core/repositories/template_repository.dart';
+import 'package:todo_app/core/settings/process_sound_settings.dart';
+import 'package:todo_app/core/stats/stats_provider.dart';
 import 'package:todo_app/core/sync/sync_engine.dart';
 import 'package:todo_app/core/transcription/transcription_service.dart';
+import 'package:todo_app/shared/theme/app_semantic_colors.dart';
 import 'package:todo_app/shared/utils/app_audio_recorder.dart';
 import 'package:todo_app/shared/utils/attachment_storage.dart';
 import 'package:todo_app/shared/utils/audio_storage.dart';
 import 'package:todo_app/shared/utils/haptics.dart';
+import 'package:todo_app/shared/utils/sounds.dart';
 import 'package:todo_app/shared/widgets/app_snackbar.dart';
 import 'package:todo_app/shared/widgets/attachment_image.dart';
 import 'package:todo_app/shared/widgets/audio_preview.dart';
@@ -517,6 +521,65 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
     );
   }
 
+  bool _canCompleteTask(Task task) {
+    if (task.deletedAt != null) return false;
+    if (task.status == TaskStatus.trashed || task.status == TaskStatus.archived) {
+      return false;
+    }
+    if (task.status != TaskStatus.inbox && task.status != TaskStatus.someday) {
+      return false;
+    }
+    final now = DateTime.now();
+    if (isRecurring(task) && isPeriodCompleted(task, now)) return false;
+    if (isRecurring(task) && isRecurrenceExpired(task, now)) return false;
+    return true;
+  }
+
+  Future<void> _playCompleteFeedback() async {
+    final settings = await ref.read(processSoundProvider.future);
+    await Future.wait([
+      AppHaptics.medium(),
+      AppSounds.play(settings.complete),
+    ]);
+  }
+
+  Future<void> _completeTask() async {
+    final task = _task;
+    if (task == null || !_canCompleteTask(task)) return;
+
+    unawaited(AppHaptics.light());
+    final repo = await ref.read(taskRepositoryProvider.future);
+    final result = await repo.checkIn(task.id);
+    final updated = result.task;
+    final partial = result.result == CheckInResult.partial;
+
+    unawaited(triggerSyncIfSignedIn(ref));
+    if (!partial) {
+      unawaited(ref.read(statsProvider.notifier).recordArchive());
+      unawaited(_playCompleteFeedback());
+    } else {
+      unawaited(AppHaptics.medium());
+    }
+
+    if (!mounted) return;
+
+    final message = partial
+        ? checkInSnackbar(task, updated.checkInCount)
+        : completeSnackbarFor(task);
+    showAppSnackBar(
+      context,
+      message: message,
+      icon: Icons.check_circle_outline,
+      type: AppSnackType.success,
+    );
+
+    if (partial) {
+      setState(() => _task = updated);
+    } else {
+      context.pop();
+    }
+  }
+
   Future<void> _deleteParentTask() async {
     final task = _task;
     if (task == null || _editingTask || _editingSubtasks) return;
@@ -955,6 +1018,15 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
               onToggle: () => _toggleStar(task),
               showWhenUnstarred: false,
             ),
+            if (_canCompleteTask(task))
+              IconButton(
+                icon: Icon(
+                  Icons.check_circle_outline,
+                  color: context.semanticColors.success,
+                ),
+                tooltip: completeLabelForCheckIn(task),
+                onPressed: _completeTask,
+              ),
             IconButton(
               icon: const Icon(Icons.delete_outline),
               tooltip: '删除',
