@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:todo_app/core/models/task.dart';
 import 'package:todo_app/core/models/task_check_in.dart';
+import 'package:todo_app/core/models/task_hierarchy.dart';
 import 'package:todo_app/core/models/task_display.dart';
 import 'package:todo_app/core/models/task_schedule.dart';
 import 'package:todo_app/core/navigation/shell_navigation.dart';
@@ -681,15 +682,9 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
         final archivedToday = statsAsync.value?.archivedToday ?? 0;
         final progress = inboxProgress(archivedToday, tasks.length);
         final allInbox = ref.watch(inboxTasksProvider).value ?? [];
-        String? parentTitle;
-        if (task.parentId != null) {
-          for (final t in allInbox) {
-            if (t.id == task.parentId) {
-              parentTitle = t.title;
-              break;
-            }
-          }
-        }
+        final allSomeday = ref.watch(somedayTasksProvider).value ?? [];
+        final byId = {for (final t in [...allInbox, ...allSomeday]) t.id: t};
+        final parentTitle = parentOf(task, byId)?.title;
 
         final isSomedayQueue = queueSource.kind == ProcessQueueKind.someday;
 

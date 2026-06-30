@@ -344,6 +344,25 @@ void main() {
     expect(movedSub2?.status, TaskStatus.someday);
   });
 
+  test('moveToSomeday preserves archived subtasks', () async {
+    final parent = await repo.createInbox(title: 'Parent');
+    final open = await repo.createSubtask(parentId: parent.id, title: 'Open');
+    final done = await repo.createSubtask(parentId: parent.id, title: 'Done');
+    await repo.archive(done.id);
+
+    final archivedAt = (await repo.getById(done.id))!.archivedAt;
+    expect(archivedAt, isNotNull);
+
+    await repo.moveToSomeday(parent.id);
+
+    final movedOpen = await repo.getById(open.id);
+    final movedDone = await repo.getById(done.id);
+
+    expect(movedOpen?.status, TaskStatus.someday);
+    expect(movedDone?.status, TaskStatus.archived);
+    expect(movedDone?.archivedAt, archivedAt);
+  });
+
   test('restoreToInbox clears someday status', () async {
     final task = await repo.createInbox(title: 'Later');
     await repo.moveToSomeday(task.id);

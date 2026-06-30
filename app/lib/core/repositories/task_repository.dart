@@ -681,7 +681,8 @@ class TaskRepository {
 
     final subtasks = await getSubtasks(id);
     for (final sub in subtasks) {
-      if (sub.status != TaskStatus.someday) {
+      if (sub.status != TaskStatus.someday &&
+          sub.status != TaskStatus.archived) {
         await _moveToSomedaySingle(sub, now);
       }
     }
