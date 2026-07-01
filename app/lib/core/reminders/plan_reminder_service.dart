@@ -29,9 +29,10 @@ class PlanReminderService {
   late final PlanReminderSyncEngine _engine = PlanReminderSyncEngine(_plugin);
 
   bool _initialized = false;
-  Completer<void>? _initCompleter;
+  Future<void>? _initFuture;
   PlanReminderTapHandler? _onTap;
   Set<int> _lastSyncedActiveIds = {};
+  Future<void>? _syncChain;
 
   bool get isSupported =>
       !kIsWeb && (Platform.isAndroid || Platform.isIOS);
@@ -41,18 +42,17 @@ class PlanReminderService {
   /// Waits until [initialize] has completed (no-op if unsupported).
   Future<void> ensureInitialized() async {
     if (!isSupported || _initialized) return;
-    await _initCompleter?.future;
+    await _initFuture;
   }
 
   Future<void> initialize({PlanReminderTapHandler? onTap}) async {
     if (onTap != null) _onTap = onTap;
     if (!isSupported || _initialized) return;
-    if (_initCompleter != null) {
-      await _initCompleter!.future;
-      return;
-    }
-    _initCompleter = Completer<void>();
+    _initFuture ??= _runInitialize();
+    await _initFuture;
+  }
 
+  Future<void> _runInitialize() async {
     tz_data.initializeTimeZones();
     try {
       final timezone = await FlutterTimezone.getLocalTimezone();
@@ -95,8 +95,6 @@ class PlanReminderService {
     }
 
     _initialized = true;
-    _initCompleter?.complete();
-    _initCompleter = null;
   }
 
   Future<bool> requestPermissions() async {
@@ -126,6 +124,17 @@ class PlanReminderService {
   }
 
   Future<PlanReminderSyncResult> syncAll(
+    List<Task> inboxTasks, {
+    required bool enabled,
+  }) async {
+    final previous = _syncChain ?? Future<void>.value();
+    late final Future<PlanReminderSyncResult> current;
+    current = previous.then((_) => _syncAllImpl(inboxTasks, enabled: enabled));
+    _syncChain = current.then((_) {}, onError: (_) {});
+    return current;
+  }
+
+  Future<PlanReminderSyncResult> _syncAllImpl(
     List<Task> inboxTasks, {
     required bool enabled,
   }) async {

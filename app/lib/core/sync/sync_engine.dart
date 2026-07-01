@@ -14,6 +14,7 @@ import 'package:todo_app/core/repositories/template_repository.dart';
 import 'package:todo_app/core/reminders/plan_reminder_provider.dart';
 import 'package:todo_app/core/sync/attachment_upload_service.dart';
 import 'package:todo_app/core/sync/sync_repository.dart';
+import 'package:todo_app/core/sync/task_sync_merge.dart';
 import 'package:todo_app/core/sync/template_sync_merge.dart';
 import 'package:todo_app/core/transcription/transcription_service.dart';
 
@@ -114,6 +115,7 @@ class SyncEngine {
       await _ref.read(transcriptionServiceProvider).processPendingTasks();
       _ref.read(lastSyncAtProvider.notifier).state = DateTime.now();
       _ref.read(syncStatusProvider.notifier).state = SyncStatus.idle;
+      await taskRepo.awaitPersisted();
       await syncPlanRemindersFromProvider(_ref);
     } on TaskLimitExceededException catch (e) {
       debugPrint('Sync task limit: $e');
@@ -176,10 +178,11 @@ class SyncEngine {
       final l = localMap[r.id];
       if (l == null) {
         await taskRepo.update(r);
-      } else if (r.updatedAt.isAfter(l.updatedAt)) {
-        await taskRepo.update(r);
-      } else if (l.updatedAt.isAfter(r.updatedAt)) {
-        // local wins — will push on next sync
+        continue;
+      }
+      final merged = resolveRemoteTaskMerge(l, r);
+      if (merged != null) {
+        await taskRepo.update(merged);
       }
     }
   }

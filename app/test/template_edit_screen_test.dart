@@ -97,6 +97,9 @@ class _MemoryTaskStore implements TaskStore {
 
   @override
   Future<List<Task>> getAll() async => List.from(_tasks);
+
+  @override
+  Future<void> awaitPersisted() async {}
 }
 
 Future<void> _pumpTemplateEdit(

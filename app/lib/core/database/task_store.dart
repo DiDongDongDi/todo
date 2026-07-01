@@ -12,6 +12,9 @@ abstract class TaskStore {
   Future<void> upsert(Task task);
   Future<void> delete(String id);
   Future<List<Task>> getAll();
+
+  /// 等待进行中的持久化完成（供后台通知 sync 读取 Prefs 前使用）。
+  Future<void> awaitPersisted();
 }
 
 class JsonTaskStore implements TaskStore {
@@ -128,19 +131,19 @@ class JsonTaskStore implements TaskStore {
     } else {
       _tasks.add(task);
     }
-    _notifyChanged();
+    await _persistQueued();
+    _changeController.add(null);
   }
 
   @override
   Future<void> delete(String id) async {
     _tasks.removeWhere((t) => t.id == id);
-    _notifyChanged();
+    await _persistQueued();
+    _changeController.add(null);
   }
 
-  void _notifyChanged() {
-    _changeController.add(null);
-    unawaited(_persistQueued());
-  }
+  @override
+  Future<void> awaitPersisted() => _persistQueued();
 
   Future<void> _persistQueued() {
     _saveInFlight ??= _save().whenComplete(() => _saveInFlight = null);

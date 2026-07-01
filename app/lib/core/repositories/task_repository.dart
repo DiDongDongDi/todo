@@ -767,6 +767,8 @@ class TaskRepository {
 
   Future<List<Task>> getAll() => _store.getAll();
 
+  Future<void> awaitPersisted() => _store.awaitPersisted();
+
   Future<Task?> getById(String id) => _store.getById(id);
 
   /// Persists [orderedTasks] as inbox queue order (index 0 = front).

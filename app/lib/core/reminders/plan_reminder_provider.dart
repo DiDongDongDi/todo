@@ -27,12 +27,18 @@ Future<void> _syncPlanReminders({
 /// 监听 inbox 变更并同步计划提醒；在 [TodoApp] 中 watch 以保持活跃。
 final planReminderCoordinatorProvider = Provider<void>((ref) {
   ref.listen(inboxTasksProvider, (previous, next) {
-    next.whenData((_) => unawaited(syncPlanReminders(ref)));
+    next.whenData((_) {
+      if (PlanReminderService.instance.isInitialized) {
+        unawaited(syncPlanReminders(ref));
+      }
+    });
   });
 
   ref.listen(planReminderEnabledProvider, (previous, next) {
-    next.whenData((_) => unawaited(syncPlanReminders(ref)));
+    next.whenData((_) {
+      if (PlanReminderService.instance.isInitialized) {
+        unawaited(syncPlanReminders(ref));
+      }
+    });
   });
-
-  unawaited(syncPlanReminders(ref));
 });
