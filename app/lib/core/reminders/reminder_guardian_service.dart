@@ -2,7 +2,6 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
-import 'package:todo_app/core/reminders/plan_reminder_background_sync.dart';
 import 'package:todo_app/core/reminders/plan_reminder_guardian_constants.dart';
 import 'package:todo_app/core/reminders/reminder_guardian_task.dart';
 
@@ -63,15 +62,11 @@ class ReminderGuardianService {
       return;
     }
 
-    final result = await planReminderBackgroundSync();
-    final count = result.showingTodayCount;
-    final body = count > 0 ? '今日 $count 项待提醒' : '正在监听计划任务';
-
     await FlutterForegroundTask.startService(
       serviceId: planReminderGuardianNotificationId,
       serviceTypes: const [ForegroundServiceTypes.specialUse],
       notificationTitle: '计划提醒运行中',
-      notificationText: body,
+      notificationText: '正在监听计划任务',
       callback: reminderGuardianStartCallback,
     );
   }
