@@ -9,18 +9,22 @@ import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:todo_app/core/models/task.dart';
 import 'package:todo_app/core/reminders/plan_reminder_constants.dart';
+import 'package:todo_app/core/reminders/plan_reminder_eligibility.dart';
 import 'package:todo_app/core/reminders/plan_reminder_storage.dart';
 import 'package:todo_app/core/reminders/plan_reminder_sync_engine.dart';
 
-/// Loads inbox tasks from SharedPreferences for background sync.
-Future<List<Task>> loadInboxTasksFromPrefs(SharedPreferences prefs) async {
+/// Loads reminder-eligible tasks (inbox + someday) from SharedPreferences for background sync.
+Future<List<Task>> loadReminderTasksFromPrefs(SharedPreferences prefs) async {
   final raw = prefs.getString(planReminderTasksStorageKey);
   if (raw == null || raw.isEmpty) return [];
 
   final list = jsonDecode(raw) as List<dynamic>;
   return list
       .map((e) => Task.fromJson(Map<String, dynamic>.from(e as Map)))
-      .where((t) => t.status == TaskStatus.inbox && t.deletedAt == null)
+      .where(
+        (t) =>
+            isPlanReminderEligibleStatus(t.status) && t.deletedAt == null,
+      )
       .toList();
 }
 
@@ -91,8 +95,8 @@ Future<PlanReminderSyncResult> planReminderBackgroundSync() async {
       );
     }
 
-    final inboxTasks = await loadInboxTasksFromPrefs(prefs);
-    return engine.sync(inboxTasks: inboxTasks, enabled: enabled);
+    final reminderTasks = await loadReminderTasksFromPrefs(prefs);
+    return engine.sync(inboxTasks: reminderTasks, enabled: enabled);
   } catch (e, st) {
     debugPrint('planReminderBackgroundSync failed: $e\n$st');
     return const PlanReminderSyncResult(

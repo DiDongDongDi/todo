@@ -2,10 +2,14 @@ import 'package:todo_app/core/models/task.dart';
 import 'package:todo_app/core/models/task_schedule.dart';
 import 'package:todo_app/core/reminders/plan_reminder_constants.dart';
 
+/// 可参与计划提醒的任务状态（收集箱 + 将来也许）。
+bool isPlanReminderEligibleStatus(TaskStatus status) =>
+    status == TaskStatus.inbox || status == TaskStatus.someday;
+
 /// 是否应在通知栏显示持久提醒（无计划星标立即 show；有计划则计划日零点起或 App 打开时 show）。
 bool shouldShowPlanReminder(Task task, DateTime now) {
   if (!task.isStarred) return false;
-  if (task.status != TaskStatus.inbox) return false;
+  if (!isPlanReminderEligibleStatus(task.status)) return false;
   if (!isScheduled(task)) return true;
   if (isRecurring(task) && isPeriodCompleted(task, now)) return false;
   return isDueToday(task, now);
@@ -14,7 +18,7 @@ bool shouldShowPlanReminder(Task task, DateTime now) {
 /// 是否应参与提醒调度（含未来到期日的预约）。
 bool shouldSchedulePlanReminder(Task task, DateTime now) {
   if (!task.isStarred) return false;
-  if (task.status != TaskStatus.inbox) return false;
+  if (!isPlanReminderEligibleStatus(task.status)) return false;
   if (!isScheduled(task)) return true;
   if (isRecurrenceExpired(task, now)) return false;
   if (isRecurring(task) && isPeriodCompleted(task, now)) {

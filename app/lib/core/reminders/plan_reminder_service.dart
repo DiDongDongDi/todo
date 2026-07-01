@@ -9,6 +9,7 @@ import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:todo_app/core/models/task.dart';
 import 'package:todo_app/core/navigation/shell_navigation.dart';
+import 'package:todo_app/core/repositories/task_repository.dart';
 import 'package:todo_app/core/reminders/plan_reminder_constants.dart';
 import 'package:todo_app/core/reminders/plan_reminder_eligibility.dart';
 import 'package:todo_app/core/reminders/plan_reminder_ids.dart';
@@ -198,10 +199,26 @@ class PlanReminderService {
 }
 
 void handlePlanReminderTap(String taskId, WidgetRef ref) {
+  unawaited(_handlePlanReminderTap(taskId, ref));
+}
+
+Future<void> _handlePlanReminderTap(String taskId, WidgetRef ref) async {
   ref.read(shellTabIndexProvider.notifier).state = 1;
+
+  ProcessQueueSource queueSource = const ProcessQueueSource.inbox();
+  try {
+    final repo = await ref.read(taskRepositoryProvider.future);
+    final task = await repo.getById(taskId);
+    if (task?.status == TaskStatus.someday) {
+      queueSource = const ProcessQueueSource(kind: ProcessQueueKind.someday);
+    }
+  } catch (e) {
+    debugPrint('handlePlanReminderTap: $e');
+  }
+
   ref.read(processNavigationIntentProvider.notifier).state =
       ProcessNavigationIntent(
-    queueSource: const ProcessQueueSource.inbox(),
+    queueSource: queueSource,
     taskId: taskId,
   );
 }
