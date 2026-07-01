@@ -136,6 +136,18 @@ void main() {
       expect(actions.single.notificationId, notificationIdForTask(task.id));
     });
 
+    test('starred + no schedule → show action', () {
+      final task = _task(isStarred: true);
+      final actions = planReminderActions(
+        inboxTasks: [task],
+        enabled: true,
+        now: today,
+      );
+      expect(actions, hasLength(1));
+      expect(actions.single.kind, PlanReminderActionKind.show);
+      expect(actions.single.notificationId, notificationIdForTask(task.id));
+    });
+
     test('future due date → schedule action', () {
       final task = _task(isStarred: true, dueDate: tomorrow);
       final actions = planReminderActions(

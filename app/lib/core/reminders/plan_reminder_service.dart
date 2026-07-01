@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -28,15 +29,29 @@ class PlanReminderService {
   late final PlanReminderSyncEngine _engine = PlanReminderSyncEngine(_plugin);
 
   bool _initialized = false;
+  Completer<void>? _initCompleter;
   PlanReminderTapHandler? _onTap;
   Set<int> _lastSyncedActiveIds = {};
 
   bool get isSupported =>
       !kIsWeb && (Platform.isAndroid || Platform.isIOS);
 
+  bool get isInitialized => _initialized;
+
+  /// Waits until [initialize] has completed (no-op if unsupported).
+  Future<void> ensureInitialized() async {
+    if (!isSupported || _initialized) return;
+    await _initCompleter?.future;
+  }
+
   Future<void> initialize({PlanReminderTapHandler? onTap}) async {
     if (onTap != null) _onTap = onTap;
     if (!isSupported || _initialized) return;
+    if (_initCompleter != null) {
+      await _initCompleter!.future;
+      return;
+    }
+    _initCompleter = Completer<void>();
 
     tz_data.initializeTimeZones();
     try {
@@ -80,6 +95,8 @@ class PlanReminderService {
     }
 
     _initialized = true;
+    _initCompleter?.complete();
+    _initCompleter = null;
   }
 
   Future<bool> requestPermissions() async {

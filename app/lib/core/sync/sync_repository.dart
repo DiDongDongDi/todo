@@ -144,6 +144,7 @@ class SyncRepository {
       'check_in_target': migrated['check_in_target'] ?? 1,
       'check_in_count': migrated['check_in_count'] ?? 0,
       'last_check_in_at': migrated['last_check_in_at'],
+      'is_starred': migrated['is_starred'] ?? false,
     };
   }
 
