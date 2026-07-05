@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:todo_app/shared/utils/haptics.dart';
 import 'package:todo_app/shared/widgets/task_check_in_sheet.dart';
+import 'package:todo_app/shared/widgets/task_editor_chip.dart';
 
 /// 任务打卡配置入口：点击打开底部面板设置完成所需打卡次数。
 class TaskCheckInEditor extends StatelessWidget {
@@ -31,26 +32,15 @@ class TaskCheckInEditor extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final label = checkInEditorSummary(checkInTarget);
 
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: ActionChip(
-        label: Text(label, style: theme.textTheme.labelMedium),
-        avatar: Icon(
-          Icons.repeat_outlined,
-          size: 16,
-          color: theme.colorScheme.primary,
-        ),
-        onPressed: () {
-          unawaited(AppHaptics.light());
-          _openSheet(context);
-        },
-        visualDensity: VisualDensity.compact,
-        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        padding: const EdgeInsets.symmetric(horizontal: 4),
-      ),
+    return TaskEditorChip(
+      icon: Icons.repeat_outlined,
+      label: label,
+      onPressed: () {
+        unawaited(AppHaptics.light());
+        _openSheet(context);
+      },
     );
   }
 }

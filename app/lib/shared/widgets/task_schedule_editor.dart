@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:todo_app/core/models/task.dart';
 import 'package:todo_app/core/models/task_schedule.dart';
 import 'package:todo_app/shared/utils/haptics.dart';
+import 'package:todo_app/shared/widgets/task_editor_chip.dart';
 import 'package:todo_app/shared/widgets/task_schedule_sheet.dart';
 
 /// 任务计划配置入口：点击打开底部面板设置一次性 / 每日 / 每月 / 每年计划。
@@ -45,30 +46,19 @@ class TaskScheduleEditor extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final label = scheduleEditorSummary(
       recurrence: recurrence,
       dailyUntil: dailyUntil,
       dueDate: dueDate,
     );
 
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: ActionChip(
-        label: Text(label, style: theme.textTheme.labelMedium),
-        avatar: Icon(
-          Icons.event_outlined,
-          size: 16,
-          color: theme.colorScheme.primary,
-        ),
-        onPressed: () {
-          unawaited(AppHaptics.light());
-          _openSheet(context);
-        },
-        visualDensity: VisualDensity.compact,
-        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        padding: const EdgeInsets.symmetric(horizontal: 4),
-      ),
+    return TaskEditorChip(
+      icon: Icons.event_outlined,
+      label: label,
+      onPressed: () {
+        unawaited(AppHaptics.light());
+        _openSheet(context);
+      },
     );
   }
 }

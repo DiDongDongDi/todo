@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -79,14 +80,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => context.push('/templates'),
               ),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.volume_up_outlined),
-                title: const Text('音效'),
-                subtitle: const Text('配置收集、处理、恢复等操作的提示音'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => context.push('/sounds'),
-              ),
+              if (!kIsWeb) ...[
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.volume_up_outlined),
+                  title: const Text('音效'),
+                  subtitle: const Text('配置收集、处理、恢复等操作的提示音'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => context.push('/sounds'),
+                ),
+              ],
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.sync_outlined),
