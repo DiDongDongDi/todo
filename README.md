@@ -12,16 +12,27 @@ Android · iOS · macOS · Windows · Web
 - **处理** — 大卡片逐条分拣：左滑放弃、右滑归档、上下切换
 - **同步** — 离线优先，Supabase 多设备同步
 
+## 下载与在线体验
+
+| 平台 | 链接 |
+|------|------|
+| **Android APK** | [GitHub Releases 最新版](https://github.com/DiDongDongDi/todo/releases/latest) |
+| **Web** | [todo-app.pages.dev](https://todo-app.pages.dev)（Cloudflare Pages，推送到 `master` 自动部署） |
+
+发版流程、Secrets 配置与签名说明见 [docs/RELEASE.md](docs/RELEASE.md)。
+
 ## 文档
 
 - [产品文档](docs/PRODUCT.md)
 - [交互与手势](docs/UX-GESTURES.md)
 - [架构设计](docs/ARCHITECTURE.md)
 - [路线图](docs/ROADMAP.md)
+- [发版与部署](docs/RELEASE.md) — APK Release、Cloudflare Web、Secrets 清单
+- [Android 签名说明](docs/ANDROID-SIGNING.md) — release keystore 用途与保管
+- [FCM 推送简介](docs/FCM.md) — Firebase 云消息（未来可选）
 - [Web 调试分工清单](docs/WEB-SETUP-CHECKLIST.md) — Chrome 日常开发，几乎即开即用
 - [Web 局限说明](docs/WEB-LIMITATIONS.md)
 - [Android 真机分工清单](docs/ANDROID-SETUP-CHECKLIST.md) — 手势 / 动效打磨
-- [Android 真机分工清单](docs/ANDROID-SETUP-CHECKLIST.md) — Agent / 用户各自事项，逐项攻克
 - [Android Studio 版本命名说明](docs/ANDROID-STUDIO-VERSION-NAMES.md) — Panda / Panda 4 等代号含义
 
 ## 环境要求
@@ -276,8 +287,8 @@ flutter run -d ios
 1. 进入 **Authentication → Providers**
 2. 确认 **Email** 已启用
 3. 在 **Authentication → URL Configuration** 中配置回调地址：
-   - **Site URL** 建议设为 `com.todo.app.todo_app://login-callback/`（避免回退到 `http://localhost`）
-   - **Redirect URLs** 添加（建议两条都加）：
+   - **Site URL** 建议设为线上 Web 地址（如 `https://todo-app.pages.dev`）；仅 Android 时可设 `com.todo.app.todo_app://login-callback/`
+   - **Redirect URLs** 添加线上域名；Android 深链另加：
      ```
      com.todo.app.todo_app://login-callback
      com.todo.app.todo_app://login-callback/

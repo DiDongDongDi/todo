@@ -28,6 +28,10 @@ desktop.ini
 .env
 .env.*
 *.pem
+*.keystore
+*.jks
+app/android/key.properties
+app/android/app/todo-release.keystore
 
 # Supabase local
 supabase/.branches/
