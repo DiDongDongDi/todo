@@ -32,6 +32,7 @@ desktop.ini
 *.jks
 app/android/key.properties
 app/android/app/todo-release.keystore
+app/android/app/.keystore-password.txt
 
 # Supabase local
 supabase/.branches/
