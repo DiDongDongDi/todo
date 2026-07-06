@@ -34,7 +34,7 @@ class AppTheme {
         labelPadding: const EdgeInsets.only(top: 4, bottom: 6),
         indicatorColor: colorScheme.primaryContainer,
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         elevation: 0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         color: colorScheme.surfaceContainerHighest,
