@@ -1,7 +1,10 @@
 allprojects {
     repositories {
-        maven { url = uri("https://maven.aliyun.com/repository/google") }
-        maven { url = uri("https://maven.aliyun.com/repository/public") }
+        // CI（GitHub Actions）走官方源；本地开发可优先国内镜像
+        if (System.getenv("CI") != "true") {
+            maven { url = uri("https://maven.aliyun.com/repository/google") }
+            maven { url = uri("https://maven.aliyun.com/repository/public") }
+        }
         google()
         mavenCentral()
     }
