@@ -35,6 +35,10 @@ jobs:
         run: |
           echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > android/app/todo-release.keystore
 
+      - name: Use official Gradle distribution in CI
+        run: |
+          sed -i 's|https://mirrors.cloud.tencent.com/gradle/|https://services.gradle.org/distributions/|' android/gradle/wrapper/gradle-wrapper.properties
+
       - name: Build release APK
         env:
           ANDROID_KEYSTORE_PATH: ${{ github.workspace }}/app/android/app/todo-release.keystore
