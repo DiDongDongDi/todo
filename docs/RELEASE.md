@@ -70,20 +70,99 @@ PowerShell：
 
 ## 三、配置 Cloudflare Pages
 
+本项目 Web **不由 Cloudflare 连 Git 构建**，而是由 GitHub Actions 执行 `flutter build web` 后上传静态文件。Cloudflare 侧只需：**创建 Pages 项目**、**拿到 Account ID / API Token**、**写入 GitHub Secrets**。
+
+### 3.1 在控制台创建 Pages 项目
+
+Cloudflare 近年将 Pages 并入 **Workers & Pages**，入口与旧文档不同。
+
 1. 登录 [Cloudflare Dashboard](https://dash.cloudflare.com/)
-2. **Workers & Pages → Create → Pages → Connect to Git**（可选，我们主要用 Actions 部署）
-3. 先创建一个空项目，名称 **`todo-app`**（与 workflow 中 `projectName` 一致）
-4. 创建 API Token：**My Profile → API Tokens → Create Token**
-   - 模板选 **Edit Cloudflare Workers** 或自定义，勾选 **Account → Cloudflare Pages → Edit**
-5. 记下 **Account ID**，写入 GitHub Secret
+2. **左上角**确认处于 **Account Home（账户首页）**，而非某个域名的 DNS 页
+3. 左侧边栏打开 **Workers & Pages**
+   - 若找不到，可尝试直接访问：`https://dash.cloudflare.com/?to=/:account/workers-and-pages`
+4. 点击 **Create application（创建应用）**
+5. 切换到 **Pages** 标签页
+6. 选择 **Direct Upload（直接上传）**（**不要**选 Connect to Git，构建在 GitHub Actions 完成）
+7. 项目名填 **`todo-app`**（必须与 [`.github/workflows/deploy-web.yml`](../.github/workflows/deploy-web.yml) 中 `projectName` 一致）
+8. 上传任意占位文件（如一个 `index.html`）完成首次创建
 
-首次 `master` 推送或手动运行 **Deploy Web to Cloudflare Pages** workflow 后，站点 URL 形如：
+> 若提示「项目名已存在」，说明之前已创建过，可跳过此步。
+
+**找不到 Create application？** 常见原因：停在域名 DNS 页、子账户权限不足、或界面语言不同。可改用下方命令行创建。
+
+### 3.2 命令行创建（可选）
+
+已安装 Node.js 时：
+
+```powershell
+npm install -g wrangler
+wrangler login
+wrangler pages project create todo-app
+```
+
+### 3.3 获取 Account ID 与 API Token
+
+| 项 | 获取位置 |
+|----|----------|
+| **Account ID** | Dashboard 右侧 **Account ID** 栏；或 **Workers & Pages** 页面 URL 中 |
+| **API Token** | [My Profile → API Tokens → Create Token](https://dash.cloudflare.com/profile/api-tokens) |
+
+创建 Token 时：
+
+- 权限勾选 **Account → Cloudflare Pages → Edit**
+- 或使用 **Edit Cloudflare Workers** 模板（含 Pages 权限）
+
+**安全：** Token 只写入 GitHub Secrets 或密码管理器，**不要**提交 git、不要贴在聊天或文档里。若曾泄露，立即在 Cloudflare 控制台 **Revoke** 并重新生成。
+
+### 3.4 写入 GitHub Secrets
+
+仓库 **Settings → Secrets and variables → Actions**，或使用 CLI（将占位符换成真实值）：
+
+```powershell
+gh secret set CLOUDFLARE_ACCOUNT_ID
+gh secret set CLOUDFLARE_API_TOKEN
+```
+
+### 3.5 首次部署 Web
+
+Secrets 就绪后任选其一：
+
+```bash
+git push origin master
+```
+
+或在 GitHub **Actions → Deploy Web to Cloudflare Pages → Run workflow** 手动触发。
+
+### 3.6 查看线上 URL
+
+Cloudflare 分配的 `*.pages.dev` 域名**不一定**是 `todo-app.pages.dev`，常见格式为：
 
 ```
-https://todo-app.pages.dev
+https://todo-app-<随机后缀>.pages.dev
 ```
+
+在 **Workers & Pages → 选择 todo-app → Visit site** 或项目 **Domains** 页查看实际地址。将该 URL 用于 Supabase 配置（见下一节）和 README 链接。
 
 可在 Cloudflare 绑定自定义域名。
+
+### Production 与 Preview
+
+Cloudflare 根据**分支名**判断环境：
+
+| 部署分支 | Cloudflare 项目 Production branch | 结果 |
+|----------|-----------------------------------|------|
+| 与 Production branch **相同** | 如 `master` | **Production**（主域名 `todo-app-xxxxx.pages.dev`） |
+| 与 Production branch **不同** | 默认常为 `main` | **Preview**（仅 `master.todo-app-xxxxx.pages.dev` 等别名） |
+
+本仓库默认分支为 **`master`**。若控制台 Production branch 仍为 `main`（Direct Upload 创建时的默认值），GitHub Actions 部署会落到 Preview。
+
+**处理：**
+
+1. 控制台：**Workers & Pages → todo-app → Settings → Builds & deployments → Production branch** 改为 `master`
+2. 或依赖 workflow 中的自动 PATCH（见 [deploy-web.yml](../.github/workflows/deploy-web.yml)）
+3. workflow 已显式设置 `branch: master`
+
+重新部署后，在 **Deployments** 列表中应看到 **Production** 环境；主域名即为 README 中的线上地址。
 
 ### SPA 路由
 
@@ -103,7 +182,7 @@ https://todo-app.pages.dev
 
 | 项 | 建议值 |
 |----|--------|
-| **Site URL** | `https://todo-app.pages.dev`（或你的自定义域名） |
+| **Site URL** | Cloudflare 控制台中 **todo-app** 项目的实际 `*.pages.dev` 地址（见 [RELEASE.md 第三节](RELEASE.md#36-查看线上-url)） |
 | **Redirect URLs** | 同上；开发用另加 `http://localhost:*` |
 
 本项目登录使用**邮箱 OTP 验证码**（见 [README Supabase 章节](../README.md)），不依赖魔法链接回调，配置相对简单。
@@ -168,8 +247,8 @@ Workflow：[`.github/workflows/deploy-web.yml`](../.github/workflows/deploy-web.
 - [ ] `SUPABASE_*` Secrets 已配置
 - [ ] Release keystore 已生成并备份
 - [ ] `ANDROID_*` Secrets 已配置
-- [ ] Cloudflare 项目 `todo-app` 已创建，`CLOUDFLARE_*` Secrets 已配置
-- [ ] Supabase Site URL / Redirect URLs 含线上域名
+- [ ] Cloudflare 项目 `todo-app` 已创建（Direct Upload 或 Wrangler），`CLOUDFLARE_*` Secrets 已配置
+- [ ] Supabase Site URL / Redirect URLs 含 Cloudflare 实际 `*.pages.dev` 域名
 - [ ] `pubspec.yaml` 版本号已更新
 - [ ] 推送 `v*` 标签后 Release 有 APK
 - [ ] `master` 推送后 Web 可访问且登录正常
@@ -182,14 +261,15 @@ Workflow：[`.github/workflows/deploy-web.yml`](../.github/workflows/deploy-web.
 |------|------|
 | Release 构建失败：keystore | 检查 Base64 是否完整、密码与 alias 是否正确 |
 | 新 APK 装不上，提示签名冲突 | 卸载手机上旧 debug 包后再装 release 包 |
-| Web 登录失败 | 检查 Supabase URL 配置是否含 `todo-app.pages.dev` |
-| Cloudflare 部署 403 | API Token 权限不足或 `accountId` 错误 |
+| Web 登录失败 | 检查 Supabase Site URL 是否与 Cloudflare 控制台显示的 `*.pages.dev` 一致 |
+| Cloudflare 部署只在 Preview | Production branch 默认为 `main`，仓库为 `master`；改控制台或用 workflow 同步 |
 | MIUI `INSTALL_FAILED_USER_RESTRICTED` | USB 安装限制；从 Release 下载 APK 手动安装通常可绕过 |
 
 ---
 
 ## 相关文档
 
+- [发布体系实施记录（脱敏）](RELEASE-SETUP-NOTES.md)
 - [Android 签名说明](ANDROID-SIGNING.md)
 - [FCM 推送简介](FCM.md)（未来可选能力）
 - [真机安装笔记](ANDROID-PHONE-INSTALL-NOTES.md)
