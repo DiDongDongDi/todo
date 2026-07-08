@@ -92,6 +92,8 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
   Completer<void>? _deckTransitionCompleter;
   TextEditingController? _deckPreviewTopController;
   TextEditingController? _deckPreviewBottomController;
+  bool _keyboardHandlerRegistered = false;
+  int _keyboardSuspendCount = 0;
 
   /// 与收集页一致：底部按钮组由焦点驱动；tab 不可见时一律视为非编辑 UI。
   bool get _editUiVisible =>
@@ -106,6 +108,8 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
   void initState() {
     super.initState();
     _editFocusNode.addListener(_onEditFocusChange);
+    HardwareKeyboard.instance.addHandler(_handleProcessKeyEvent);
+    _keyboardHandlerRegistered = true;
     WidgetsBinding.instance.addPostFrameCallback((_) => _syncVolumeKeyHandler());
   }
 
@@ -168,6 +172,10 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
   void dispose() {
     ref.read(volumeKeyHandlerProvider.notifier).registerProcess(null);
     ref.read(volumeKeyHandlerProvider.notifier).setProcessBlocked(false);
+    if (_keyboardHandlerRegistered) {
+      HardwareKeyboard.instance.removeHandler(_handleProcessKeyEvent);
+      _keyboardHandlerRegistered = false;
+    }
     _editFocusNode.removeListener(_onEditFocusChange);
     _editController.dispose();
     _editFocusNode.dispose();
@@ -688,32 +696,6 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
 
         final isSomedayQueue = queueSource.kind == ProcessQueueKind.someday;
 
-        final shortcuts = _editUiVisible
-            ? {
-                const SingleActivator(
-                  LogicalKeyboardKey.enter,
-                  control: true,
-                ): () => _saveEdit(task),
-                const SingleActivator(
-                  LogicalKeyboardKey.enter,
-                  meta: true,
-                ): () => _saveEdit(task),
-                const SingleActivator(LogicalKeyboardKey.escape): () =>
-                    _cancelEdit(task),
-              }
-            : {
-                const SingleActivator(LogicalKeyboardKey.arrowLeft): () =>
-                    _archive(task, animated: true),
-                const SingleActivator(LogicalKeyboardKey.arrowRight): () =>
-                    isSomedayQueue
-                        ? _restoreToInbox(task, animated: true)
-                        : _moveToSomeday(task, animated: true),
-                const SingleActivator(LogicalKeyboardKey.arrowUp): () =>
-                    _setIndex(clampedIndex - 1, tasks.length, animated: true),
-                const SingleActivator(LogicalKeyboardKey.arrowDown): () =>
-                    _setIndex(clampedIndex + 1, tasks.length, animated: true),
-              };
-
         final content = Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -852,15 +834,64 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
           ],
         );
 
-        return CallbackShortcuts(
-          bindings: shortcuts,
-          child: Focus(
-            autofocus: !_editUiVisible && !_editing,
-            child: content,
-          ),
-        );
+        return content;
       },
     );
+  }
+
+  bool _handleProcessKeyEvent(KeyEvent event) {
+    if (!widget.isActive ||
+        _keyboardSuspendCount > 0 ||
+        _deckTransitionActive ||
+        _shuffling) {
+      return false;
+    }
+    if (event is! KeyDownEvent) return false;
+
+    final tasks = ref.read(processTasksProvider).value;
+    if (tasks == null || tasks.isEmpty) return false;
+
+    final clampedIndex = _index.clamp(0, tasks.length - 1);
+    final task = tasks[clampedIndex];
+    final queueSource =
+        ref.read(processQueueSourceProvider).value ?? const ProcessQueueSource.inbox();
+    final isSomedayQueue = queueSource.kind == ProcessQueueKind.someday;
+    final keyboard = HardwareKeyboard.instance;
+
+    if (_editUiVisible) {
+      final isSaveCombo = event.logicalKey == LogicalKeyboardKey.enter &&
+          (keyboard.isControlPressed || keyboard.isMetaPressed);
+      if (isSaveCombo) {
+        unawaited(_saveEdit(task));
+        return true;
+      }
+      if (event.logicalKey == LogicalKeyboardKey.escape) {
+        _cancelEdit(task);
+        return true;
+      }
+      return false;
+    }
+
+    switch (event.logicalKey) {
+      case LogicalKeyboardKey.arrowLeft:
+        unawaited(_archive(task, animated: true));
+        return true;
+      case LogicalKeyboardKey.arrowRight:
+        if (isSomedayQueue) {
+          unawaited(_restoreToInbox(task, animated: true));
+        } else {
+          unawaited(_moveToSomeday(task, animated: true));
+        }
+        return true;
+      case LogicalKeyboardKey.arrowUp:
+        unawaited(_setIndex(clampedIndex - 1, tasks.length, animated: true));
+        return true;
+      case LogicalKeyboardKey.arrowDown:
+        unawaited(_setIndex(clampedIndex + 1, tasks.length, animated: true));
+        return true;
+      default:
+        return false;
+    }
   }
 
   int _wrapIndex(int index, int length) {
@@ -1432,14 +1463,19 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
       ...ref.read(somedayTasksProvider).value ?? [],
     ];
 
-    final selected = await showProcessTaskSearchSheet(
-      context,
-      tasks: searchable,
-      allTasks: allTasks,
-      currentTaskId: currentTask?.id,
-    );
-    if (selected == null || !mounted) return;
-    await _jumpToTask(selected);
+    _keyboardSuspendCount++;
+    try {
+      final selected = await showProcessTaskSearchSheet(
+        context,
+        tasks: searchable,
+        allTasks: allTasks,
+        currentTaskId: currentTask?.id,
+      );
+      if (selected == null || !mounted) return;
+      await _jumpToTask(selected);
+    } finally {
+      if (_keyboardSuspendCount > 0) _keyboardSuspendCount--;
+    }
   }
 
   Future<void> _jumpToTask(Task target) async {

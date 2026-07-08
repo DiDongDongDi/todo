@@ -3,39 +3,32 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('CallbackShortcuts arrow keys invoke bindings', (tester) async {
-    var left = 0;
-    var right = 0;
-    var up = 0;
-    var down = 0;
+  testWidgets('HardwareKeyboard handler receives arrow keys without focus',
+      (tester) async {
+    var downCount = 0;
+
+    bool handler(KeyEvent event) {
+      if (event is KeyDownEvent &&
+          event.logicalKey == LogicalKeyboardKey.arrowDown) {
+        downCount++;
+        return true;
+      }
+      return false;
+    }
+
+    HardwareKeyboard.instance.addHandler(handler);
+    addTearDown(() => HardwareKeyboard.instance.removeHandler(handler));
 
     await tester.pumpWidget(
-      MaterialApp(
-        home: CallbackShortcuts(
-          bindings: {
-            const SingleActivator(LogicalKeyboardKey.arrowLeft): () => left++,
-            const SingleActivator(LogicalKeyboardKey.arrowRight): () => right++,
-            const SingleActivator(LogicalKeyboardKey.arrowUp): () => up++,
-            const SingleActivator(LogicalKeyboardKey.arrowDown): () => down++,
-          },
-          child: const Focus(
-            autofocus: true,
-            child: SizedBox(),
-          ),
-        ),
+      const MaterialApp(
+        home: Scaffold(body: SizedBox()),
       ),
     );
     await tester.pump();
 
-    await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
-    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
-    await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
     await tester.pump();
 
-    expect(left, 1);
-    expect(right, 1);
-    expect(up, 1);
-    expect(down, 1);
+    expect(downCount, 1);
   });
 }
