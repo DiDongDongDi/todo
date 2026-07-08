@@ -17,7 +17,7 @@ Android · iOS · macOS · Windows · Web
 | 平台 | 链接 |
 |------|------|
 | **Android APK** | [GitHub Releases 最新版](https://github.com/DiDongDongDi/todo/releases/latest) |
-| **Web** | [todo-app.pages.dev](https://todo-app.pages.dev)（Cloudflare Pages，推送到 `master` 自动部署） |
+| **Web** | [todo-app-5y9.pages.dev](https://todo-app-5y9.pages.dev)（Cloudflare Pages；实际域名见控制台） |
 
 发版流程、Secrets 配置与签名说明见 [docs/RELEASE.md](docs/RELEASE.md)。
 
@@ -28,6 +28,7 @@ Android · iOS · macOS · Windows · Web
 - [架构设计](docs/ARCHITECTURE.md)
 - [路线图](docs/ROADMAP.md)
 - [发版与部署](docs/RELEASE.md) — APK Release、Cloudflare Web、Secrets 清单
+- [发布体系实施记录](docs/RELEASE-SETUP-NOTES.md) — 2026-07 搭建过程与当前状态（脱敏）
 - [Android 签名说明](docs/ANDROID-SIGNING.md) — release keystore 用途与保管
 - [FCM 推送简介](docs/FCM.md) — Firebase 云消息（未来可选）
 - [Web 调试分工清单](docs/WEB-SETUP-CHECKLIST.md) — Chrome 日常开发，几乎即开即用
@@ -287,7 +288,7 @@ flutter run -d ios
 1. 进入 **Authentication → Providers**
 2. 确认 **Email** 已启用
 3. 在 **Authentication → URL Configuration** 中配置回调地址：
-   - **Site URL** 建议设为线上 Web 地址（如 `https://todo-app.pages.dev`）；仅 Android 时可设 `com.todo.app.todo_app://login-callback/`
+   - **Site URL** 建议设为 Cloudflare 控制台中 todo-app 的实际 `*.pages.dev` 地址；仅 Android 时可设 `com.todo.app.todo_app://login-callback/`
    - **Redirect URLs** 添加线上域名；Android 深链另加：
      ```
      com.todo.app.todo_app://login-callback
