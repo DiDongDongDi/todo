@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:todo_app/core/models/task.dart';
 import 'package:todo_app/core/models/task_display.dart';
 import 'package:todo_app/shared/theme/app_semantic_colors.dart';
@@ -491,36 +492,64 @@ class BigTaskCard extends StatelessWidget {
     VoidCallback? onTap,
     bool autofocus = false,
     Color? textColor,
+    VoidCallback? onEnterSubmit,
   }) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
+    final textField = TextField(
+      controller: fieldController,
+      focusNode: focusNode,
+      readOnly: readOnly,
+      autofocus: autofocus,
+      showCursor: !readOnly,
+      cursorColor: colorScheme.primary,
+      onTap: readOnly ? onTap : null,
+      onChanged: onChanged,
+      minLines: 1,
+      maxLines: null,
+      keyboardType: TextInputType.multiline,
+      textInputAction: TextInputAction.newline,
+      textAlignVertical: TextAlignVertical.top,
+      style: theme.textTheme.headlineMedium?.copyWith(
+        color: textColor ?? colorScheme.onSurface,
+        height: 1.35,
+      ),
+      decoration: decoration ??
+          (hintText != null
+              ? InputDecoration(hintText: hintText)
+              : const InputDecoration(border: InputBorder.none)),
+    );
+
     return SizedBox(
       width: double.infinity,
-      child: TextField(
-        controller: fieldController,
-        focusNode: focusNode,
-        readOnly: readOnly,
-        autofocus: autofocus,
-        showCursor: !readOnly,
-        cursorColor: colorScheme.primary,
-        onTap: readOnly ? onTap : null,
-        onChanged: onChanged,
-        minLines: 1,
-        maxLines: null,
-        keyboardType: TextInputType.multiline,
-        textInputAction: TextInputAction.newline,
-        textAlignVertical: TextAlignVertical.top,
-        style: theme.textTheme.headlineMedium?.copyWith(
-          color: textColor ?? colorScheme.onSurface,
-          height: 1.35,
-        ),
-        decoration: decoration ??
-            (hintText != null
-                ? InputDecoration(hintText: hintText)
-                : const InputDecoration(border: InputBorder.none)),
-      ),
+      child: onEnterSubmit != null
+          ? Focus(
+              onKeyEvent: (node, event) =>
+                  _handleTitleEnterKey(event, fieldController, onEnterSubmit),
+              child: textField,
+            )
+          : textField,
     );
+  }
+
+  KeyEventResult _handleTitleEnterKey(
+    KeyEvent event,
+    TextEditingController fieldController,
+    VoidCallback onEnterSubmit,
+  ) {
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+    if (event.logicalKey != LogicalKeyboardKey.enter) {
+      return KeyEventResult.ignored;
+    }
+    if (HardwareKeyboard.instance.isShiftPressed) {
+      return KeyEventResult.ignored;
+    }
+    if (fieldController.value.composing.isValid) {
+      return KeyEventResult.ignored;
+    }
+    onEnterSubmit();
+    return KeyEventResult.handled;
   }
 
   Widget _buildContent(BuildContext context) {
@@ -552,6 +581,7 @@ class BigTaskCard extends StatelessWidget {
                         fieldController: controller!,
                         readOnly: false,
                         hintText: '记下一件事…',
+                        onEnterSubmit: onSave,
                       ),
                     ),
                     if (subtaskEditor != null) ...[

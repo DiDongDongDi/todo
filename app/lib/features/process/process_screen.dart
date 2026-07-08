@@ -852,8 +852,6 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
           ],
         );
 
-        if (kIsWeb) return content;
-
         return CallbackShortcuts(
           bindings: shortcuts,
           child: Focus(
