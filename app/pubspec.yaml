@@ -1,7 +1,7 @@
 name: todo_app
 description: 上瘾式跨平台 Todo — 手势优先的待办应用
 publish_to: "none"
-version: 0.1.0+1
+version: 0.1.1+2
 
 environment:
   sdk: ">=3.2.0 <4.0.0"
