@@ -87,6 +87,13 @@ class _TemplateEditScreenState extends ConsumerState<TemplateEditScreen> {
     });
   }
 
+  Future<int> _submitSubtaskRow(int index) async {
+    setState(() {
+      _subtaskControllers.insert(index + 1, TextEditingController());
+    });
+    return index + 1;
+  }
+
   void _addSubtaskField() {
     unawaited(AppHaptics.light());
     setState(() => _subtaskControllers.add(TextEditingController()));
@@ -436,6 +443,7 @@ class _TemplateEditScreenState extends ConsumerState<TemplateEditScreen> {
             SubtaskTitleEditor(
               controllers: _subtaskControllers,
               onRemove: _removeSubtaskField,
+              onSubmitRow: _submitSubtaskRow,
               onImportLines: _importSubtaskLines,
             ),
           ],
