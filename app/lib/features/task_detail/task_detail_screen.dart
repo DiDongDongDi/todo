@@ -710,7 +710,11 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
           const SizedBox(height: 20),
           SubtaskListSection(
             subtasks: _subtasks,
-            onSubtaskTap: (sub) => context.push('/task/${sub.id}'),
+            onSubtaskTap: (sub) async {
+              await context.push('/task/${sub.id}');
+              if (!mounted) return;
+              unawaited(_load());
+            },
           ),
           if (!_editingTask) ...[
             const SizedBox(height: 12),
