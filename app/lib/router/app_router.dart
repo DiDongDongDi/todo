@@ -4,6 +4,7 @@ import 'package:todo_app/features/archive/archive_screen.dart';
 import 'package:todo_app/features/auth/auth_screen.dart';
 import 'package:todo_app/features/shell/shell_screen.dart';
 import 'package:todo_app/features/task_detail/task_detail_screen.dart';
+import 'package:todo_app/features/settings/mcp_tokens_screen.dart';
 import 'package:todo_app/features/settings/notification_reminder_settings_screen.dart';
 import 'package:todo_app/features/settings/sound_settings_screen.dart';
 import 'package:todo_app/features/someday/someday_screen.dart';
@@ -55,6 +56,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/templates',
         builder: (context, state) => const TemplateListScreen(),
+      ),
+      GoRoute(
+        path: '/mcp-tokens',
+        builder: (context, state) => const McpTokensScreen(),
       ),
       GoRoute(
         path: '/templates/:id',

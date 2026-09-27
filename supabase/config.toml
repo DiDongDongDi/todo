@@ -9,3 +9,9 @@ verify_jwt = true
 
 [functions.cleanup-ai-usage]
 verify_jwt = false
+
+[functions.mcp]
+verify_jwt = false
+
+[functions.mcp-tokens]
+verify_jwt = true
