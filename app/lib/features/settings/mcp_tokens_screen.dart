@@ -115,29 +115,37 @@ class McpTokensScreen extends ConsumerWidget {
     final nameController = TextEditingController();
     final name = await showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('生成 MCP Token'),
-        content: TextField(
-          controller: nameController,
-          autofocus: true,
-          decoration: const InputDecoration(
-            labelText: '名称',
-            hintText: '例如：Cursor、Claude Desktop',
+      builder: (context) {
+        final theme = Theme.of(context);
+        return AlertDialog(
+          title: const Text('生成 MCP Token'),
+          content: TextField(
+            controller: nameController,
+            autofocus: true,
+            style: theme.textTheme.bodyMedium,
+            decoration: InputDecoration(
+              labelText: '名称',
+              hintText: '例如：Cursor、Claude Desktop',
+              hintStyle: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.35),
+              ),
+            ),
+            maxLength: 50,
+            onSubmitted: (v) => Navigator.pop(context, v.trim()),
           ),
-          maxLength: 50,
-          onSubmitted: (v) => Navigator.pop(context, v.trim()),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, nameController.text.trim()),
-            child: const Text('生成'),
-          ),
-        ],
-      ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () =>
+                  Navigator.pop(context, nameController.text.trim()),
+              child: const Text('生成'),
+            ),
+          ],
+        );
+      },
     );
 
     if (name == null || name.isEmpty || !context.mounted) return;
