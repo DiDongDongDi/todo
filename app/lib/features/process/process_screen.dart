@@ -94,6 +94,8 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
   TextEditingController? _deckPreviewBottomController;
   bool _keyboardHandlerRegistered = false;
   int _keyboardSuspendCount = 0;
+  // dispose 中禁止使用 ref，提前缓存 notifier 引用。
+  late final VolumeKeyHandlerNotifier _volumeKeyNotifier;
 
   /// 与收集页一致：底部按钮组由焦点驱动；tab 不可见时一律视为非编辑 UI。
   bool get _editUiVisible =>
@@ -107,6 +109,7 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
   @override
   void initState() {
     super.initState();
+    _volumeKeyNotifier = ref.read(volumeKeyHandlerProvider.notifier);
     _editFocusNode.addListener(_onEditFocusChange);
     HardwareKeyboard.instance.addHandler(_handleProcessKeyEvent);
     _keyboardHandlerRegistered = true;
@@ -170,8 +173,8 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
 
   @override
   void dispose() {
-    ref.read(volumeKeyHandlerProvider.notifier).registerProcess(null);
-    ref.read(volumeKeyHandlerProvider.notifier).setProcessBlocked(false);
+    _volumeKeyNotifier.registerProcess(null);
+    _volumeKeyNotifier.setProcessBlocked(false);
     if (_keyboardHandlerRegistered) {
       HardwareKeyboard.instance.removeHandler(_handleProcessKeyEvent);
       _keyboardHandlerRegistered = false;
@@ -334,7 +337,28 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
     final repo = await ref.read(taskRepositoryProvider.future);
     final subtasks = await repo.getSubtasks(parentId);
     if (!mounted || _subtasksTaskId != parentId) return;
+    // build 的后置回调每帧都会触发拉取；内容未变化时跳过 setState，
+    // 否则会形成「重建→后置回调→拉取→重建」的无限循环。
+    if (_sameSubtasks(_subtasks, subtasks)) return;
     setState(() => _subtasks = subtasks);
+  }
+
+  bool _sameSubtasks(List<Task> a, List<Task> b) {
+    if (identical(a, b)) return true;
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      final x = a[i];
+      final y = b[i];
+      if (identical(x, y)) continue;
+      if (x.id != y.id ||
+          x.title != y.title ||
+          x.status != y.status ||
+          x.isStarred != y.isStarred ||
+          x.updatedAt != y.updatedAt) {
+        return false;
+      }
+    }
+    return true;
   }
 
   void _addEditSubtaskField() {
@@ -606,6 +630,9 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
   @override
   Widget build(BuildContext context) {
     ref.listen(volumeKeyShortcutsProvider, (_, __) => _syncVolumeKeyHandler());
+    ref.listen(processTasksProvider, (previous, next) {
+      _pinIndexToCurrentTask(previous?.value, next.value);
+    });
     ref.listen(processNavigationIntentProvider, (previous, next) {
       if (next == null) return;
       WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -897,6 +924,18 @@ class _ProcessScreenState extends ConsumerState<ProcessScreen> {
   int _wrapIndex(int index, int length) {
     if (length <= 0) return 0;
     return ((index % length) + length) % length;
+  }
+
+  /// 队列变化时按任务 id 钉住当前卡片：新任务会插到队首并使队列整体后移，
+  /// 若仍按旧下标渲染，展示的会是当前任务的上一张卡；任务已不在队列中
+  /// （如已完成/删除）则不做调整，沿用原有下标收敛逻辑。
+  void _pinIndexToCurrentTask(List<Task>? previous, List<Task>? next) {
+    if (!mounted || previous == null || previous.isEmpty) return;
+    if (next == null || next.isEmpty) return;
+    final current = previous[_index.clamp(0, previous.length - 1)];
+    final newIndex = next.indexWhere((t) => t.id == current.id);
+    if (newIndex < 0 || newIndex == _index) return;
+    setState(() => _index = newIndex);
   }
 
   Future<void> _setIndex(
